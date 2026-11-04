@@ -175,12 +175,12 @@ describe('energy, maintenance, cameras and lists', () => {
     expect(home.find(c => c.type === 'custom:ad-house-info')!.links).toMatchObject({ energy: 'energy', climate: 'climate' })
   })
 
-  it('energy graphs only sensors with statistics', async () => {
+  it('energy shows each room with a 24-hour history of all its power sensors', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const energy = cards(views.find(v => v.path === 'energy')!)
-    const graphs = energy.filter(c => c.type === 'statistics-graph').flatMap(c => c.entities)
+    const graphs = energy.filter(c => c.type === 'history-graph').flatMap(c => c.entities)
     expect(graphs).toContain('sensor.kuche_backofen')
-    expect(graphs).not.toContain('sensor.wohnzimmer_tv_leistung')
+    expect(graphs).toContain('sensor.wohnzimmer_tv_leistung')
     expect(energy.filter(c => c.type === 'custom:ad-power' && c.variant === 'room').map(c => c.areas[0]))
       .toEqual(expect.arrayContaining(['kuche', 'wohnzimmer', 'buro_keller']))
   })
@@ -279,5 +279,14 @@ describe('room settings, own cards and energy settings', () => {
   it('ha_colors: false reaches the nav bar', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#14b8a6', ha_colors: false }, createHass(true))
     expect(cards(views[0]!).find(c => c.type === 'custom:ad-nav-bar')).toMatchObject({ ha_colors: false })
+  })
+})
+
+describe('hand-written YAML', () => {
+  it('hide_areas as a single name hides exactly that room', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', hide_areas: 'bad' as unknown as string[] }, createHass(true))
+    const paths = views.map(v => v.path)
+    expect(paths).not.toContain('area-bad')
+    expect(paths).toContain('area-garage')
   })
 })

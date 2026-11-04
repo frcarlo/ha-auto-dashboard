@@ -1,4 +1,5 @@
 import { accessOf, intersect, ruleFor } from './access'
+import { normalizeConfig } from './config'
 import { t } from './i18n'
 import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
@@ -31,7 +32,8 @@ function heading(text: string, icon?: string | null, navigateTo?: string, style:
 const fullWidth = (cards: Card[]): Section => ({ type: 'grid', column_span: MAX_COLUMNS, cards })
 
 /** Build the generated dashboard. Runs in the browser whenever the dashboard loads. */
-export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAssistant) {
+export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAssistant) {
+  const baseConfig = normalizeConfig(rawConfig)
   // The viewing user's rule narrows rooms and pages on top of the dashboard's own filter.
   // HA runs the strategy in each browser with that browser's user, so every user gets their own dashboard.
   const rule = ruleFor(baseConfig.users, hass.user)
@@ -228,14 +230,11 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
       const cards = group.areas.flatMap(area => {
         const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)
         if (!sensors.length) return []
-        // Graphs need long-term statistics, which only sensors with a state class have
-        const stats = sensors.filter(e => e.attributes.state_class)
+        // Card and graph each take the full row: HA packs sections densely and would otherwise
+        // slide the next room's card next to this room's graph. The history graph needs no long-term statistics.
         return [
-          { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], ...(stats.length ? {} : { wide: true }), ...powerOpts },
-          ...(stats.length ? [{
-            type: 'statistics-graph', entities: stats.map(e => e.entity_id), days_to_show: 1, period: 'hour',
-            chart_type: 'line', stat_types: ['mean'], hide_legend: stats.length === 1, grid_options: { columns: 12, rows: 4 },
-          }] : []),
+          { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], wide: true, ...powerOpts },
+          { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: 3 } },
         ]
       })
       return { type: 'grid', column_span: 2, cards: cards.length ? [heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon), ...cards] : [] }

@@ -1,7 +1,7 @@
 // Config editor HA shows for this strategy in edit mode (pencil → "Edit dashboard").
 // Only admins can edit dashboards, so only admins reach it. Uses HA's theme variables to fit the dialog.
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
-import { cleanConfig } from './config'
+import { cleanConfig, normalizeConfig } from './config'
 import { HIDE_LABEL } from './model'
 import { isHexColor } from './styles/palette'
 import type { RoomsPatch } from './editor-rooms'
@@ -41,12 +41,15 @@ export class AdStrategyEditor extends LitElement {
     config: { state: true },
     users: { state: true },
     labels: { state: true },
+    openPickers: { state: true },
   }
 
   hass?: HomeAssistant
   config: StrategyConfig = { type: 'custom:auto-dashboard' }
   users: HaUser[] = []
   labels: HaLabel[] = []
+  /** Room pickers currently showing their full list */
+  openPickers = new Set<string>()
   private usersRequested = false
 
   static styles = css`
@@ -66,7 +69,14 @@ export class AdStrategyEditor extends LitElement {
     details[open] summary::after { transform: rotate(180deg); }
     .body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 16px; }
     .field { display: flex; flex-direction: column; gap: 8px; }
-    .label { font-size: 12px; color: var(--secondary-text-color, #94a3b8); letter-spacing: 0.02em; }
+    /* Each option is its own block, so long chip lists don't run into the next heading */
+    .body > .field + .field, .body > .field + .row, .body > .row + .field { border-top: 1px solid var(--ad-line); padding-top: 14px; }
+    .label { font-size: 14px; font-weight: 600; color: var(--primary-text-color, inherit); }
+    .picker-list { border: 1px solid var(--ad-line); border-radius: 12px; padding: 10px 12px; }
+    /* .chip resets everything, so these need the higher specificity */
+    .chip.picked { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 11px; }
+    .picked .x { all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; line-height: 1; }
+    .picked .x:hover { background: color-mix(in srgb, var(--ad-accent) 25%, transparent); }
     .hint { font-size: 12px; color: var(--secondary-text-color, #94a3b8); line-height: 1.4; }
     input[type=text], select, textarea {
       font: inherit; color: inherit; background: var(--secondary-background-color, rgba(127, 127, 127, 0.1));
@@ -78,7 +88,7 @@ export class AdStrategyEditor extends LitElement {
     .seg button { all: unset; cursor: pointer; padding: 7px 14px; font-size: 13px; }
     .seg button + button { border-left: 1px solid var(--ad-line); }
     .seg button[aria-pressed=true] { background: color-mix(in srgb, var(--ad-accent) 18%, transparent); color: var(--ad-accent); font-weight: 500; }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
     .colors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .swatch {
       all: unset; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; box-sizing: border-box;
@@ -95,7 +105,8 @@ export class AdStrategyEditor extends LitElement {
       border-color: var(--ad-accent); color: var(--ad-accent);
       background: color-mix(in srgb, var(--ad-accent) 14%, transparent);
     }
-    .group { font-size: 11px; opacity: 0.6; width: 100%; margin-top: 4px; }
+    .group { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.55; width: 100%; margin-top: 6px; }
+    .group:first-child { margin-top: 0; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; cursor: pointer; }
     .switch { all: unset; position: relative; flex: 0 0 auto; width: 36px; height: 20px; border-radius: 10px; background: var(--ad-line); transition: background 0.2s ease; }
     .switch::after {
@@ -118,7 +129,7 @@ export class AdStrategyEditor extends LitElement {
   `
 
   setConfig(config: StrategyConfig) {
-    this.config = { ...config }
+    this.config = normalizeConfig(config)
   }
 
   connectedCallback() {
@@ -186,6 +197,30 @@ export class AdStrategyEditor extends LitElement {
     if (!groups) return html`<div class="chips">${options.map(chip)}</div>`
     return html`<div class="chips">${[...groups].map(([name, items]) => html`
       <span class="group">${name}</span>${items.map(chip)}`)}</div>`
+  }
+
+  /**
+   * Room selection: the chosen rooms as removable chips, the full list by floor only when opened.
+   * Three long lists of every room in a row were too easy to mix up.
+   */
+  private areaPicker(key: string, selected: string[] | undefined, onChange: (v: string[]) => void) {
+    const sel = selected ?? []
+    const open = this.openPickers.has(key)
+    const toggleOpen = () => {
+      const next = new Set(this.openPickers)
+      if (open) next.delete(key)
+      else next.add(key)
+      this.openPickers = next
+    }
+    const name = (id: string) => this.hass?.areas[id]?.name ?? id
+    return html`<div class="chips">
+        ${sel.length ? sel.map(id => html`<span class="chip picked" aria-pressed="true">${name(id)}
+          <button class="x" aria-label="${this.l('ed.remove')}: ${name(id)}" title=${this.l('ed.remove')}
+            @click=${() => onChange(sel.filter(x => x !== id))}>×</button></span>`)
+          : html`<span class="hint">${this.l('ed.none_selected')}</span>`}
+        <button class="chip" aria-expanded=${open} @click=${toggleOpen}>${open ? this.l('ed.done') : `${this.l('ed.pick_areas')} ▾`}</button>
+      </div>
+      ${open ? html`<div class="picker-list">${this.chips([], sel, onChange, this.areasByFloor)}</div>` : nothing}`
   }
 
   private colorPicker(value: string | undefined) {
@@ -317,9 +352,9 @@ export class AdStrategyEditor extends LitElement {
       <summary>${this.l('ed.rooms')}</summary>
       <div class="body">
         ${this.field(this.l('ed.only_floors'), this.chips(this.floorOptions, c.floors, floors => this.change({ floors })), this.l('ed.none_hint'))}
-        ${this.field(this.l('ed.only_areas'), this.chips([], c.areas, areas => this.change({ areas }), this.areasByFloor), this.l('ed.none_hint'))}
-        ${this.field(this.l('ed.hide_areas'), this.chips([], c.hide_areas, hide_areas => this.change({ hide_areas }), this.areasByFloor))}
-        ${this.field(this.l('ed.outdoor'), this.chips([], c.outdoor_areas, outdoor_areas => this.change({ outdoor_areas }), this.areasByFloor), this.l('ed.outdoor_hint'))}
+        ${this.field(this.l('ed.only_areas'), this.areaPicker('areas', c.areas, areas => this.change({ areas })), this.l('ed.none_hint'))}
+        ${this.field(this.l('ed.hide_areas'), this.areaPicker('hide_areas', c.hide_areas, hide_areas => this.change({ hide_areas })))}
+        ${this.field(this.l('ed.outdoor'), this.areaPicker('outdoor', c.outdoor_areas, outdoor_areas => this.change({ outdoor_areas })), this.l('ed.outdoor_hint'))}
         ${this.field(this.l('ed.hide_domains'), this.chips(
           DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
         ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
@@ -372,7 +407,7 @@ export class AdStrategyEditor extends LitElement {
         PAGES.map(p => ({ id: p, label: this.l(p) })),
         rule.hide_pages, hide_pages => this.changeRule(key, { hide_pages: hide_pages as PagePath[] })))}
       ${this.field(this.l('ed.only_floors'), this.chips(this.floorOptions, rule.floors, floors => this.changeRule(key, { floors })), this.l('ed.none_hint'))}
-      ${this.field(this.l('ed.only_areas'), this.chips([], rule.areas, areas => this.changeRule(key, { areas }), this.areasByFloor), this.l('ed.none_hint'))}
+      ${this.field(this.l('ed.only_areas'), this.areaPicker(`rule:${key}`, rule.areas, areas => this.changeRule(key, { areas })), this.l('ed.none_hint'))}
     </div>`
   }
 }

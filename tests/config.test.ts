@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanConfig } from '../src/config'
+import { cleanConfig, normalizeConfig } from '../src/config'
 
 describe('cleanConfig', () => {
   it('drops defaults and empty values but keeps type and users', () => {
@@ -29,5 +29,19 @@ describe('room settings', () => {
       },
     })
     expect(out.rooms).toEqual({ wohnzimmer: { order: ['light.a'], cards: { bottom: [{ type: 'markdown' }] } } })
+  })
+})
+
+describe('normalizeConfig', () => {
+  it('turns single values into lists, also in user rules and rooms', () => {
+    const out = normalizeConfig({
+      type: 'custom:auto-dashboard',
+      hide_areas: 'controlroom' as unknown as string[],
+      users: { leni: { areas: 'zimmer' as unknown as string[] } },
+      rooms: { bad: { hide_groups: 'sensor' as never } },
+    })
+    expect(out.hide_areas).toEqual(['controlroom'])
+    expect(out.users!.leni!.areas).toEqual(['zimmer'])
+    expect(out.rooms!.bad!.hide_groups).toEqual(['sensor'])
   })
 })

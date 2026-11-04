@@ -4,7 +4,7 @@ import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { canBulk } from '../access'
-import { areaEntities, entityIndex, hideOf, quickGroups, roomSummary, type QuickKey } from '../model'
+import { areaEntities, entityIndex, hideOf, quickGroups, roomSummary, type QuickKey, type Reading } from '../model'
 import { HVAC_ICONS, domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -136,10 +136,10 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     }, SEND_DELAY)
   }
 
-  private valueChip(entity: HassEntity | undefined, icon: string) {
-    if (!entity) return nothing
-    const { value, unit } = this.value(entity)
-    return html`<button class="value" @click=${() => this.moreInfo(entity.entity_id)}><ha-icon icon=${icon}></ha-icon>${value}${unit}</button>`
+  private valueChip(reading: Reading | undefined, icon: string, digits: number) {
+    if (!reading) return nothing
+    return html`<button class="value" @click=${() => this.moreInfo(reading.entity.entity_id)}>
+      <ha-icon icon=${icon}></ha-icon>${this.number(reading.value, digits)}${reading.unit}</button>`
   }
 
   private renderThermostat(climate: HassEntity) {
@@ -203,8 +203,8 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
       <div class="top ${area.picture ? 'photo' : ''}" style=${area.picture ? `--photo: url('${area.picture}')` : ''}>
         <h1>${area.icon ? html`<ha-icon icon=${area.icon}></ha-icon>` : nothing}${area.name}</h1>
         <div class="values">
-          ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer')}
-          ${this.valueChip(summary.humidity, 'mdi:water-percent')}
+          ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer', 1)}
+          ${this.valueChip(summary.humidity, 'mdi:water-percent', 0)}
         </div>
       </div>
       ${climate || quick.length ? html`<div class="row">

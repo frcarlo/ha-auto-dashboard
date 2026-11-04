@@ -111,7 +111,8 @@ describe('roomSummary', () => {
     const summary = roomSummary(areaEntities(fakeHass(), 'wohnzimmer'))
     expect(summary.lights.map(e => e.entity_id)).toEqual(['light.wz_decke'])
     expect(summary.climate?.entity_id).toBe('climate.wz')
-    expect(summary.temperature?.entity_id).toBe('sensor.wz_temp')
+    // The thermostat measures the room; it comes before loose sensors
+    expect(summary.temperature).toMatchObject({ value: 21.4, entity: { entity_id: 'climate.wz' } })
     expect(summary.status.map(e => e.entity_id)).toEqual(['binary_sensor.wz_fenster'])
   })
 })
@@ -165,13 +166,24 @@ describe('room controls', () => {
     const hass = fakeHass()
     hass.states['sensor.other_temp'] = st('sensor.other_temp', '19', { device_class: 'temperature' })
     const area = { ...hass.areas.wohnzimmer!, temperature_entity_id: 'sensor.other_temp' }
-    expect(roomSummary(areaEntities(hass, 'wohnzimmer'), area, hass.states).temperature?.entity_id).toBe('sensor.other_temp')
-    expect(roomSummary(areaEntities(hass, 'wohnzimmer')).temperature?.entity_id).toBe('sensor.wz_temp')
+    expect(roomSummary(areaEntities(hass, 'wohnzimmer'), area, hass.states).temperature?.entity.entity_id).toBe('sensor.other_temp')
+    expect(roomSummary(areaEntities(hass, 'wohnzimmer')).temperature?.entity.entity_id).toBe('climate.wz')
+  })
+
+  it('without a thermostat takes the first working sensor, skipping unavailable ones', () => {
+    const entities = [
+      st('sensor.broken', 'unavailable', { device_class: 'temperature' }),
+      st('sensor.ok', '19.5', { device_class: 'temperature', unit_of_measurement: '°C' }),
+    ]
+    expect(roomSummary(entities).temperature).toMatchObject({ value: 19.5, unit: '°C', entity: { entity_id: 'sensor.ok' } })
   })
 
   it('quick groups collect lights, switches and covers', () => {
-    const entities = [st('light.a', 'on'), st('fan.b', 'off'), st('switch.c', 'on'), st('cover.d', 'open'), st('sensor.e', '1')]
-    expect(quickGroups(entities).map(g => [g.key, g.entities.length])).toEqual([['light', 1], ['switch', 2], ['shading', 1]])
+    const entities = [st('light.a', 'on'), st('fan.b', 'off'), st('switch.c', 'on', { device_class: 'outlet' }), st('switch.child_lock', 'on'), st('cover.d', 'open'), st('sensor.e', '1')]
+    // Device settings like a child lock never join "all off"
+    expect(quickGroups(entities).map(g => [g.key, g.entities.map(e => e.entity_id)])).toEqual([
+      ['light', ['light.a']], ['switch', ['fan.b', 'switch.c']], ['shading', ['cover.d']],
+    ])
   })
 
   it('splits covers by what they do', () => {
@@ -196,7 +208,11 @@ describe('room controls', () => {
   })
 
   it('bulk control fits the group, and needs two entities', () => {
-    expect(bulkControl([st('light.a', 'on'), st('switch.b', 'off')]).control).toBe('toggle')
+    expect(bulkControl([st('light.a', 'on'), st('switch.b', 'off', { device_class: 'outlet' })]).control).toBe('toggle')
+    expect(bulkControl([st('switch.a', 'on'), st('switch.b', 'off')]).control).toBeUndefined()
+    const mixed = bulkControl([st('switch.p1', 'on', { device_class: 'outlet' }), st('switch.p2', 'on', { device_class: 'outlet' }), st('switch.lock', 'on')])
+    expect(mixed).toMatchObject({ control: 'toggle' })
+    expect(mixed.entities.map(e => e.entity_id)).toEqual(['switch.p1', 'switch.p2'])
     expect(bulkControl([st('cover.a', 'open'), st('cover.b', 'closed')]).control).toBe('cover')
     expect(bulkControl([st('light.a', 'on')]).control).toBeUndefined()
     expect(bulkControl([st('climate.a', 'heat'), st('sensor.b', '1')]).control).toBeUndefined()
@@ -247,7 +263,7 @@ describe('energy and climate', () => {
     hass.states['sensor.k_t'] = st('sensor.k_t', '19.3', { device_class: 'temperature', unit_of_measurement: '°C' })
     hass.entities['sensor.k_t'] = { entity_id: 'sensor.k_t', area_id: 'kueche' }
     const avg = averageClimate(hass, [hass.areas.wohnzimmer!, hass.areas.kueche!, hass.areas.flur!])
-    expect(avg.temperature).toBeCloseTo(20.3)
+    expect(avg.temperature).toBeCloseTo(20.35)
     expect(avg.humidity).toBeUndefined()
   })
 })
@@ -320,6 +336,23 @@ describe('energy settings', () => {
     ] })
     expect(sources).toEqual({ grid: ['sensor.grid'] })
     expect(powerSources(hass(), undefined)).toBeUndefined()
+  })
+
+  it('ignores several grid power sensors: they are plugs, not the house', () => {
+    const h = hass()
+    h.states['sensor.plug'] = st('sensor.plug', '50', { unit_of_measurement: 'W' })
+    expect(powerSources(h, { energy_sources: [
+      { type: 'grid', stat_rate: 'sensor.grid' }, { type: 'grid', stat_rate: 'sensor.plug' }, { type: 'solar', stat_rate: 'sensor.pv' },
+    ] })).toBeUndefined()
+    expect(powerSources(h, { energy_sources: [
+      { type: 'grid', stat_rate: 'sensor.grid' }, { type: 'grid', stat_rate: 'sensor.plug' }, { type: 'home', stat_rate: 'sensor.house' },
+    ] })).toEqual({ home: ['sensor.house'] })
+    expect(powerSources(h, { energy_sources: [{ type: 'grid', stat_rate: 'sensor.grid' }, { type: 'grid' }, { type: 'solar', stat_rate: 'sensor.pv' }] }))
+      .toEqual({ grid: ['sensor.grid'], solar: ['sensor.pv'] })
+    // Four plugs as grid, three of them gone: still ambiguous
+    expect(powerSources(h, { energy_sources: [
+      { type: 'grid', stat_rate: 'sensor.grid' }, { type: 'grid', stat_rate: 'sensor.gone1' }, { type: 'grid', stat_rate: 'sensor.gone2' },
+    ] })).toBeUndefined()
   })
 
   it('the house is the home sensor, else grid + solar + battery', () => {

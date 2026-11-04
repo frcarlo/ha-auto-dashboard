@@ -36,6 +36,8 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
       border-radius: 999px; font-size: 11px; background: rgba(var(--ad-on-surface), 0.08); white-space: nowrap;
     }
     .chip ha-icon { --mdc-icon-size: 13px; opacity: 0.7; }
+    /* Rooms with nothing to show still get their icon instead of an empty card */
+    .area-icon { --mdc-icon-size: 26px; opacity: 0.35; }
     .room { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
     .lit .room { opacity: 0.9; }
     .temp-ctl { display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
@@ -80,12 +82,13 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
     </button>`
   }
 
-  private chip(entity: HassEntity | undefined) {
-    if (!entity) return nothing
+  private chip(entity: HassEntity | undefined, icon?: string, text?: string) {
+    // Unavailable sensors would only print "unavailable" into the narrow card
+    if (!entity || (text === undefined && !Number.isFinite(Number(entity.state)))) return nothing
     const { value, unit } = this.value(entity)
     return html`<button class="chip" @pointerdown=${(e: Event) => e.stopPropagation()}
       @click=${(e: Event) => { e.stopPropagation(); this.moreInfo(entity.entity_id) }}>
-      <ha-icon icon=${entityIcon(entity)}></ha-icon>${value}${unit}
+      <ha-icon icon=${icon ?? entityIcon(entity)}></ha-icon>${text ?? `${value}${unit}`}
     </button>`
   }
 
@@ -102,7 +105,6 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
     const s = this.summary
     const lit = s.lights.some(l => l.state === 'on')
     const climate = s.climate
-    const current = climate?.attributes.current_temperature as number | undefined
     const target = climate?.attributes.temperature as number | undefined
     const step = (climate?.attributes.target_temp_step as number | undefined) ?? 0.5
     const climateOk = climate && !isUnavailable(climate) && target !== undefined
@@ -114,6 +116,7 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
       @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.config!.path && this.navigate(this.config!.path)}>
       <div class="main">
         <div class="dots">
+          ${!s.lights.length && !climate && !s.status.length ? html`<ha-icon class="area-icon" icon=${area.icon ?? 'mdi:texture-box'}></ha-icon>` : nothing}
           ${s.lights.length ? this.dot(s.lights[0]!, lit ? 'mdi:lightbulb' : 'mdi:lightbulb-outline', lit ? 'warning' : '',
             s.lights.length > 1 ? `${lightsOn}/${s.lights.length}` : entityName(s.lights[0])) : nothing}
           ${climate ? this.dot(climate, HVAC_ICONS[climate.state] ?? 'mdi:thermostat', hvacColor(climate.state) === 'muted' ? '' : hvacColor(climate.state),
@@ -126,10 +129,8 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
           })}
         </div>
         <div class="values">
-          ${current !== undefined
-            ? html`<ha-icon icon="mdi:thermometer"></ha-icon><span class="temp">${this.number(current)}°C</span>`
-            : s.temperature ? html`<ha-icon icon="mdi:thermometer"></ha-icon><span class="temp">${this.value(s.temperature).value}${this.value(s.temperature).unit}</span>` : nothing}
-          ${this.chip(s.humidity)}
+          ${s.temperature ? html`<ha-icon icon="mdi:thermometer"></ha-icon><span class="temp">${this.number(s.temperature.value)}${s.temperature.unit}</span>` : nothing}
+          ${s.humidity ? this.chip(s.humidity.entity, 'mdi:water-percent', `${this.number(s.humidity.value, 0)}${s.humidity.unit}`) : nothing}
           ${this.chip(s.co2)}
         </div>
         <span class="room">${area.name}</span>

@@ -31,3 +31,25 @@ export function cleanConfig(config: StrategyConfig): StrategyConfig {
   if (users && Object.keys(users).length) out.users = Object.fromEntries(Object.entries(users).map(([k, r]) => [k, cleanRule(r)]))
   return { type: config.type, ...out }
 }
+
+const LIST_KEYS = ['areas', 'floors', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities', 'favorites', 'scenes', 'outdoor_areas'] as const
+const RULE_LIST_KEYS = ['areas', 'floors', 'hide_pages'] as const
+const ROOM_LIST_KEYS = ['hide_groups', 'group_order', 'order'] as const
+
+/** One value where YAML wants a list (`hide_areas: keller`) becomes a one-item list. */
+function listify<T extends object>(obj: T, keys: readonly string[]): T {
+  const out = { ...obj } as Record<string, unknown>
+  for (const key of keys) {
+    const value = out[key]
+    if (typeof value === 'string') out[key] = value.trim() ? [value.trim()] : []
+  }
+  return out as T
+}
+
+/** Hand-written YAML tolerated: single values for lists, in the dashboard, user rules and room settings. */
+export function normalizeConfig(config: StrategyConfig): StrategyConfig {
+  const out = listify(config, LIST_KEYS)
+  if (out.users) out.users = Object.fromEntries(Object.entries(out.users).map(([k, rule]) => [k, listify(rule ?? {}, RULE_LIST_KEYS)]))
+  if (out.rooms) out.rooms = Object.fromEntries(Object.entries(out.rooms).map(([k, room]) => [k, listify(room ?? {}, ROOM_LIST_KEYS)]))
+  return out
+}

@@ -199,11 +199,18 @@ export function floorsWithAreas(
   return groups
 }
 
+/** A room's temperature or humidity and where it comes from (tap opens that entity). */
+export interface Reading {
+  entity: HassEntity
+  value: number
+  unit: string
+}
+
 export interface RoomSummary {
   lights: HassEntity[]
   climate?: HassEntity
-  temperature?: HassEntity
-  humidity?: HassEntity
+  temperature?: Reading
+  humidity?: Reading
   co2?: HassEntity
   status: HassEntity[]
 }
@@ -211,9 +218,30 @@ export interface RoomSummary {
 const firstSensor = (entities: HassEntity[], deviceClass: string) =>
   entities.find(e => domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === deviceClass)
 
-/** Sensors chosen for the area in HA win over the first matching sensor in the room. */
+function sensorReading(entity: HassEntity | undefined, fallbackUnit: string): Reading | undefined {
+  const value = Number(entity?.state)
+  if (!entity || entity.state === '' || !Number.isFinite(value)) return undefined
+  return { entity, value, unit: String(entity.attributes.unit_of_measurement ?? fallbackUnit) }
+}
+
+function climateReading(climates: HassEntity[], attribute: string, unit: string): Reading | undefined {
+  for (const entity of climates) {
+    const value = Number(entity.attributes[attribute])
+    if (entity.attributes[attribute] !== undefined && entity.attributes[attribute] !== null && Number.isFinite(value)) return { entity, value, unit }
+  }
+  return undefined
+}
+
+/**
+ * The room's temperature and humidity: the sensors picked for the area in HA, else what the thermostat measures,
+ * else the first working sensor. The thermostat comes before loose sensors, which may sit in a fridge or outside.
+ */
 export function roomSummary(entities: HassEntity[], area?: AreaRegistryEntry, states?: Record<string, HassEntity>): RoomSummary {
   const picked = (id?: string | null) => (id ? states?.[id] : undefined)
+  const climates = entities.filter(e => domainOf(e.entity_id) === 'climate')
+  const firstWorking = (deviceClass: string, unit: string) => entities
+    .filter(e => domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === deviceClass)
+    .map(e => sensorReading(e, unit)).find(Boolean)
   const status = [
     ...entities.filter(e => domainOf(e.entity_id) === 'binary_sensor' && OPENING_CLASSES.includes(deviceClassOf(e) ?? '')),
     ...entities.filter(e => domainOf(e.entity_id) === 'lock'),
@@ -222,8 +250,8 @@ export function roomSummary(entities: HassEntity[], area?: AreaRegistryEntry, st
   return {
     lights: entities.filter(e => domainOf(e.entity_id) === 'light'),
     climate: entities.find(e => domainOf(e.entity_id) === 'climate'),
-    temperature: picked(area?.temperature_entity_id) ?? firstSensor(entities, 'temperature'),
-    humidity: picked(area?.humidity_entity_id) ?? firstSensor(entities, 'humidity'),
+    temperature: sensorReading(picked(area?.temperature_entity_id), '°C') ?? climateReading(climates, 'current_temperature', '°C') ?? firstWorking('temperature', '°C'),
+    humidity: sensorReading(picked(area?.humidity_entity_id), '%') ?? climateReading(climates, 'current_humidity', '%') ?? firstWorking('humidity', '%'),
     co2: firstSensor(entities, 'carbon_dioxide'),
     status: status.slice(0, 5),
   }
@@ -303,11 +331,20 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [],
 export type QuickKey = 'light' | 'switch' | 'shading' | 'opening' | 'gate'
 
 const isDomain = (...domains: string[]) => (e: HassEntity) => domains.includes(domainOf(e.entity_id))
+
+/**
+ * What may be switched together: lights, fans and sockets. Other switches are often device settings
+ * (child lock, eco mode of a dishwasher) that must not flip with "all off".
+ */
+export function bulkSwitchable(e: HassEntity) {
+  const domain = domainOf(e.entity_id)
+  return domain === 'light' || domain === 'fan' || (domain === 'switch' && deviceClassOf(e) === 'outlet')
+}
 const isCover = (kind: ReturnType<typeof coverKind>) => (e: HassEntity) => domainOf(e.entity_id) === 'cover' && coverKind(e) === kind
 
 const QUICK: Record<QuickKey, (e: HassEntity) => boolean> = {
   light: isDomain('light'),
-  switch: isDomain('switch', 'fan', 'input_boolean'),
+  switch: e => bulkSwitchable(e) && domainOf(e.entity_id) !== 'light',
   shading: isCover('shading'),
   opening: isCover('opening'),
   gate: isCover('gate'),
@@ -348,7 +385,10 @@ export function bulkControl(entities: HassEntity[]): { control?: GroupControl; e
   const domains = new Set(entities.map(e => domainOf(e.entity_id)))
   const many = (list: HassEntity[]) => list.length > 1
   if (!many(entities)) return { entities }
-  if ([...domains].every(d => ['light', 'switch', 'fan', 'input_boolean'].includes(d))) return { control: 'toggle', entities }
+  if (entities.every(bulkSwitchable)) return { control: 'toggle', entities }
+  // A switch group with sockets among settings: the sockets alone
+  const sockets = entities.filter(bulkSwitchable)
+  if (many(sockets) && [...domains].every(d => ['switch', 'fan', 'input_boolean'].includes(d))) return { control: 'toggle', entities: sockets }
   if (domains.size === 1 && domains.has('cover') && new Set(entities.map(coverKind)).size === 1) return { control: 'cover', entities }
   const locks = entities.filter(e => domainOf(e.entity_id) === 'lock')
   if (many(locks) && [...domains].every(d => ['lock', 'binary_sensor', 'alarm_control_panel'].includes(d))) return { control: 'lock', entities: locks }
@@ -398,20 +438,18 @@ export interface ClimateAverage {
   unit: string
 }
 
-/** Average of the rooms' temperature and humidity (the sensors picked for the area, else the first in the room). */
+/** Average of the rooms' temperature and humidity, each room read as in roomSummary. */
 export function averageClimate(hass: HomeAssistant, areas: AreaRegistryEntry[], hide: Hide = {}): ClimateAverage {
   const temps: number[] = []
   const hums: number[] = []
   let unit = '°C'
   for (const area of areas) {
     const s = roomSummary(areaEntities(hass, area.area_id, hide), area, hass.states)
-    const t = Number(s.temperature?.state)
-    if (s.temperature && s.temperature.state !== '' && Number.isFinite(t)) {
-      temps.push(t)
-      unit = String(s.temperature.attributes.unit_of_measurement ?? unit)
+    if (s.temperature) {
+      temps.push(s.temperature.value)
+      unit = s.temperature.unit
     }
-    const h = Number(s.humidity?.state)
-    if (s.humidity && s.humidity.state !== '' && Number.isFinite(h)) hums.push(h)
+    if (s.humidity) hums.push(s.humidity.value)
   }
   const avg = (list: number[]) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : undefined)
   return { temperature: avg(temps), humidity: avg(hums), unit }
@@ -463,15 +501,22 @@ export interface EnergyPrefs {
   energy_sources?: { type: string; stat_rate?: string }[]
 }
 
-/** The power sensors HA's energy settings name, keeping only those that exist. */
+/**
+ * The power sensors HA's energy settings name, keeping only those that exist. Only an unambiguous setup counts:
+ * a home sensor, or exactly one grid source with a power sensor (plus solar and battery). Several grid sources
+ * with power sensors are usually single plugs entered as "grid", and their sum is not the house.
+ */
 export function powerSources(hass: HomeAssistant, prefs: EnergyPrefs | undefined): PowerSources | undefined {
-  const out: PowerSources = {}
-  for (const source of prefs?.energy_sources ?? []) {
-    const type = source.type as keyof PowerSources
-    if (!source.stat_rate || !hass.states[source.stat_rate] || !['home', 'grid', 'solar', 'battery'].includes(type)) continue
-    ;(out[type] ??= []).push(source.stat_rate)
-  }
-  return Object.keys(out).length ? out : undefined
+  const sources = (prefs?.energy_sources ?? []).filter(s => s.stat_rate && ['home', 'grid', 'solar', 'battery'].includes(s.type))
+  // Counted before checking the sensors exist: four plugs entered as grid stay ambiguous even if three are gone
+  const configured = (type: string) => sources.filter(s => s.type === type)
+  const existing = (type: string) => configured(type).map(s => s.stat_rate!).filter(id => hass.states[id])
+  if (existing('home').length) return { home: existing('home') }
+  if (configured('grid').length !== 1 || !existing('grid').length) return undefined
+  const out: PowerSources = { grid: existing('grid') }
+  if (existing('solar').length) out.solar = existing('solar')
+  if (existing('battery').length) out.battery = existing('battery')
+  return out
 }
 
 /**
