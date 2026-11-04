@@ -6,7 +6,7 @@ Ein ES-Modul (~140 KB, ~39 KB gzip), einzige Abhängigkeit ist Lit. Keine andere
 
 ## Was erzeugt wird
 
-- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Personen (zu Hause oder unterwegs) und Alarmanlage, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar; ein Tipp klappt die Liste auf), Innen- und Außenklima und aktueller Stromverbrauch, „Läuft gerade“, eine Zeile mit Szenen und Skripten, Favoriten, darunter eine Raumkarte pro Area, gruppiert nach Etage. Ganz unten die To-do-Listen (HAs eigene Karte, Listen lassen sich direkt abhaken).
+- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Personen (zu Hause oder unterwegs) und Alarmanlage, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar; ein Tipp klappt die Liste auf), Innen- und Außenklima und aktueller Stromverbrauch, „Läuft gerade“, eine Zeile mit Szenen und Skripten, Favoriten, darunter eine Raumkarte pro Area, gruppiert nach Etage. Ganz unten die To-do-Listen mit ihrem Namen (HAs eigene Karte, Einträge lassen sich direkt abhaken). Welche erscheinen, legt `todo_lists` fest; `hide_domains: [todo]` blendet alle aus.
 - **Raumseiten** (`area-<area_id>`, Subview): oben Temperatur, Luftfeuchte und, wenn der Raum genau ein Thermostat hat, Ist- und Solltemperatur mit −/+. Daneben Schnellkacheln „Licht 2 von 5 an“, „Steckdosen“ und je eine pro Rollo-Art, die alles im Raum auf einmal schalten. Darunter die Favoriten des Raums und die Gruppen Licht, Klima, Beschattung, Fenster & Türen, Tore, Schlösser, Medien, Schalter, Auswahl, Bewegung & Anwesenheit, Sicherheit & Alarm, Sensoren, Szenen. Gruppen mit mehreren Lichtern, Steckdosen, Rollos oder Schlössern haben einen Sammelschalter in der Überschrift. Gemeinsam geschaltet werden nur Lichter, Ventilatoren und Schalter mit der Geräteklasse `outlet`; andere Schalter sind oft Geräteeinstellungen (Kindersicherung, Eco-Modus) und bleiben außen vor.
 - **Domain-Seiten**: Licht (mit „Alle aus“), Klima, Rollos (mit „Alle zu“, nur Beschattung), Sicherheit (Fenster, Türen, Tore, Schlösser, Bewegung, Rauch- und Wassermelder). Nach Raum gruppiert, nur wenn es passende Entities gibt. Jede Raum-Überschrift führt zur Raumseite und hat einen Schalter mit „2/5“, bei Rollos auf/zu, bei Schlössern verriegeln/entriegeln. Entriegeln fragt immer erst nach.
 - **Kameras** (`cameras`, mit Eintrag in der Navigationsleiste): alle Kameras mit Live-Bild, nach Etage und Raum gruppiert, jede Raum-Überschrift führt zur Raumseite. Die Kameras eines Raums stehen zusätzlich oben auf seiner Raumseite.
@@ -79,6 +79,7 @@ strategy:
   hide_labels: [technik]   # Label-IDs, siehe unten
   favorites: [light.flur, lock.haustuer]       # Startseite und oben im jeweiligen Raum
   scenes: [scene.kino, script.gute_nacht]      # Zeile auf der Startseite
+  todo_lists: [todo.einkaufsliste]             # Listen auf der Startseite, sonst alle
   outdoor_areas: [garten]  # Durchschnitt als „Außen“
   hide_entities: [light.deko]   # einzelne Geräte überall ausblenden
   rooms:                   # Einstellungen pro Raumseite, siehe unten

@@ -50,6 +50,7 @@ const defs: Def[] = [
   ['sensor.wohnzimmer_tv_leistung', '96', { friendly_name: 'Wohnzimmer TV Leistung', device_class: 'power', unit_of_measurement: 'W' }, 'wohnzimmer'],
   ['camera.garage', 'idle', { friendly_name: 'Garage Kamera' }, 'garage'],
   ['todo.einkauf', '3', { friendly_name: 'Einkaufsliste' }, 'kuche'],
+  ['todo.werkstatt', '0', { friendly_name: 'Werkstatt' }, 'garage'],
   ['sensor.garten_temperatur', '9.4', { friendly_name: 'Garten Temperatur', device_class: 'temperature', unit_of_measurement: '°C' }, 'garten'],
   ['sensor.garten_luftfeuchte', '82', { friendly_name: 'Garten Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' }, 'garten'],
   ['switch.buro_keller_drucker', 'unavailable', { friendly_name: 'Drucker' }, 'buro_keller'],

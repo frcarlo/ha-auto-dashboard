@@ -32,7 +32,7 @@ const SWATCHES = ['#6366f1', '#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f43f5
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
-  'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor',
+  'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor', 'camera', 'todo',
 ] as const
 
 export class AdStrategyEditor extends LitElement {
@@ -315,6 +315,7 @@ export class AdStrategyEditor extends LitElement {
       <div class="body">
         ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
+        ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
       </div>
     </details>`
   }

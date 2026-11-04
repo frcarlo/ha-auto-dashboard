@@ -81,6 +81,7 @@ const de = {
   'ed.room_reset': 'Raum zurücksetzen',
   'ed.ha_colors': 'HA-Kopfzeile, Seitenleiste und Dialoge mitfärben',
   'ed.home': 'Startseite',
+  'ed.todos_hint': 'Keine Auswahl = alle Listen. Ganz ausblenden: Räume → Gerätearten ausblenden → To-do-Listen.',
   'ed.favorites_hint': 'Erscheinen auf der Startseite und oben im jeweiligen Raum.',
   'ed.scenes_hint': 'Keine Auswahl = alle Szenen. Skripte erscheinen nur, wenn sie hier ausgewählt sind.',
   'ed.ids_hint': 'Entity-IDs, eine pro Zeile',
@@ -155,6 +156,8 @@ const de = {
   'dom.script': 'Skripte',
   'dom.sensor': 'Sensoren',
   'dom.binary_sensor': 'Binärsensoren',
+  'dom.camera': 'Kameras',
+  'dom.todo': 'To-do-Listen',
 }
 
 export type Key = keyof typeof de
@@ -240,6 +243,7 @@ const en: Record<Key, string> = {
   'ed.room_reset': 'Reset room',
   'ed.ha_colors': 'Color HA header, sidebar and dialogs too',
   'ed.home': 'Home page',
+  'ed.todos_hint': 'Nothing selected = all lists. To hide them all: Rooms → Hide device types → To-do lists.',
   'ed.favorites_hint': 'Shown on the home page and at the top of their room.',
   'ed.scenes_hint': 'Nothing selected = all scenes. Scripts only appear when selected here.',
   'ed.ids_hint': 'Entity ids, one per line',
@@ -314,6 +318,8 @@ const en: Record<Key, string> = {
   'dom.script': 'Scripts',
   'dom.sensor': 'Sensors',
   'dom.binary_sensor': 'Binary sensors',
+  'dom.camera': 'Cameras',
+  'dom.todo': 'To-do lists',
 }
 
 export function t(hass: Pick<HomeAssistant, 'language'> | undefined, key: Key, vars: Record<string, string | number> = {}) {

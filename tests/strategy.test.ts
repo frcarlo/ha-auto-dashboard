@@ -290,3 +290,19 @@ describe('hand-written YAML', () => {
     expect(paths).toContain('area-garage')
   })
 })
+
+describe('to-do lists', () => {
+  const lists = async (config: Record<string, unknown>) => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', ...config }, createHass(true))
+    return (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).filter(c => c.type === 'todo-list')
+  }
+
+  it('shows every list with its name as title', async () => {
+    expect((await lists({})).map(c => [c.entity, c.title])).toEqual([['todo.einkauf', 'Einkaufsliste'], ['todo.werkstatt', 'Werkstatt']])
+  })
+
+  it('todo_lists picks lists, hide_domains todo hides them all', async () => {
+    expect((await lists({ todo_lists: ['todo.werkstatt'] })).map(c => c.entity)).toEqual(['todo.werkstatt'])
+    expect(await lists({ hide_domains: ['todo'], todo_lists: ['todo.werkstatt'] })).toEqual([])
+  })
+})

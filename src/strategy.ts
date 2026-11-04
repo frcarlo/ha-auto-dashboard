@@ -5,7 +5,7 @@ import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
-import { domainOf } from './presentation'
+import { domainOf, entityName } from './presentation'
 import { isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -86,7 +86,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const scenes = sceneEntities(hass, config.scenes, hide, areaIds)
   const ofDomain = (domain: string) => (e: HassEntity) => domainOf(e.entity_id) === domain
   const cameras = all.filter(ofDomain('camera'))
-  const todos = all.filter(ofDomain('todo'))
+  // Picked lists in their order, else every visible one
+  const todos = config.hide_domains?.includes('todo') ? []
+    : config.todo_lists?.length ? favoriteEntities(hass, config.todo_lists, areaIds).filter(ofDomain('todo'))
+    : all.filter(ofDomain('todo'))
   // HA's own cards for what it draws best: camera streams, editable to-do lists, statistics graphs
   const cameraCard = (e: HassEntity): Card => ({ type: 'picture-entity', entity: e.entity_id, show_state: false, camera_view: 'auto', grid_options: { columns: 12 } })
   const outdoor = config.outdoor_areas ?? []
@@ -210,7 +213,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       })),
       ...(todos.length ? [fullWidth([
         heading(t(hass, 'todos'), 'mdi:clipboard-list-outline'),
-        ...todos.map(e => ({ type: 'todo-list', entity: e.entity_id, grid_options: { columns: 12 } })),
+        ...todos.map(e => ({ type: 'todo-list', entity: e.entity_id, title: entityName(e), grid_options: { columns: 12 } })),
       ])] : []),
     ]),
   }

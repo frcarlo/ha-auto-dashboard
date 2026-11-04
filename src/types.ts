@@ -131,6 +131,8 @@ export interface StrategyConfig extends CardLook {
   favorites?: string[]
   /** Scenes and scripts in the row on Home; unset = every visible scene */
   scenes?: string[]
+  /** To-do lists on Home; unset = every visible list, hide_domains: [todo] hides them all */
+  todo_lists?: string[]
   /** With primary_color: false keeps HA's header, sidebar and dialogs in HA's theme */
   ha_colors?: boolean
   /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */
