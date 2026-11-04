@@ -15,7 +15,8 @@ interface RoomCardConfig extends BaseConfig {
 
 export class AdRoomCard extends BaseCard<RoomCardConfig> {
   static styles = [tokens, css`
-    :host { display: block; container-type: inline-size; }
+    /* Fill the grid rows HA reserves (getGridOptions), not just the content height */
+    :host { display: block; height: 100%; container-type: inline-size; }
     .card { display: flex; gap: 8px; padding: 12px; cursor: pointer; user-select: none; }
     .card.lit { background: color-mix(in srgb, rgb(var(--ad-warning)) 14%, var(--ad-surface)); filter: drop-shadow(0 1px 3px rgba(0,0,0,.15)); }
     .card.lit::before {

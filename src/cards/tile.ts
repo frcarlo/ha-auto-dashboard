@@ -15,6 +15,8 @@ const LARGE = ['light', 'climate', 'cover', 'media_player', 'sensor']
 
 export class AdTile extends BaseCard<TileConfig> {
   static styles = [tokens, css`
+    /* Fill the grid rows HA reserves (getGridOptions), not just the content height */
+    :host { display: block; height: 100%; }
     .card { padding: 12px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; user-select: none; }
     .head { display: flex; align-items: center; gap: 6px; position: relative; z-index: 1; }
     .head > ha-icon { --mdc-icon-size: 13px; opacity: 0.45; }

@@ -123,11 +123,13 @@ function render() {
     for (const conf of section.cards) {
       const { el, options } = createCard(conf)
       const c = options.columns === 'full' ? gridCols : Math.min(Number(options.columns), gridCols)
-      el.style.gridColumn = `span ${c}`
-      if (options.rows !== 'auto') el.style.height = `${options.rows * 56 + (options.rows - 1) * 8}px`
-      if (options.rows !== 'auto') el.style.gridRow = `span ${options.rows}`
-      el.style.display = el.style.display || 'block'
-      s.append(el)
+      // Like HA's hui-card wrapper: the cell gets the size, the card has to fill it itself
+      const cell = document.createElement('div')
+      cell.style.gridColumn = `span ${c}`
+      if (options.rows !== 'auto') cell.style.height = `${options.rows * 56 + (options.rows - 1) * 8}px`
+      if (options.rows !== 'auto') cell.style.gridRow = `span ${options.rows}`
+      cell.append(el)
+      s.append(cell)
     }
     grid.append(s)
   }
