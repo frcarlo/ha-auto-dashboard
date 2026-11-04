@@ -60,7 +60,7 @@ Updates kommen danach wie bei jedem HACS-Plugin.
 
 ## Optionen
 
-Am einfachsten über den Editor: Dashboard öffnen → Stift oben rechts → **Dashboard bearbeiten**. Dort lassen sich Darstellung, Startseite (Favoriten, Szenen), Räume und Nutzerregeln anklicken. Den Editor sehen nur Admins, weil nur sie Dashboards bearbeiten dürfen. Gespeichert wird dieselbe YAML-Konfiguration wie unten, ohne Standardwerte. Nutzerregeln aus dem Editor sind an die User-ID gebunden, eine Umbenennung bricht sie deshalb nicht.
+Am einfachsten über den Editor: Dashboard öffnen → Stift oben rechts → **Dashboard bearbeiten**. Der Editor hat die Reiter Darstellung, Startseite, Haus, Raumseiten und Nutzer. Unter „Haus“ ist das Haus als Querschnitt gezeichnet: Etagen übereinander, Räume darin, Räume ohne Etage draußen. Oben wählst du, was ein Tipp auf einen Raum bewirkt (ausblenden, Außenbereich, nur diesen zeigen), und jeder Raum zeigt seine Rolle direkt in der Zeichnung; ein Tipp auf eine Etage zeigt nur diese Etage. Dieselbe Zeichnung wählt unter „Raumseiten“ den Raum zum Anpassen und in den Nutzerregeln die Räume, die jemand sieht. Den Editor sehen nur Admins, weil nur sie Dashboards bearbeiten dürfen. Gespeichert wird dieselbe YAML-Konfiguration wie unten, ohne Standardwerte. Nutzerregeln aus dem Editor sind an die User-ID gebunden, eine Umbenennung bricht sie deshalb nicht.
 
 Alle Optionen, alle optional:
 

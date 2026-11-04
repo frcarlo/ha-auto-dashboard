@@ -16,7 +16,8 @@ export class AdRoomSettings extends LitElement {
   static properties = {
     hass: { attribute: false },
     config: { attribute: false },
-    area: { state: true },
+    /** Picked in the editor's house drawing */
+    area: { attribute: false },
     slot: { state: true },
     yamlError: { state: true },
   }
@@ -183,14 +184,8 @@ export class AdRoomSettings extends LitElement {
 
   protected render() {
     if (!this.hass || !this.area) return nothing
-    const areas = this.areas
     const customized = !!this.config.rooms?.[this.area] || (this.config.hide_entities ?? []).some(id => this.groups().some(([, list]) => list.some(e => e.entity_id === id)))
     return html`
-      <select .value=${this.area} aria-label=${this.l('ed.room')}
-        @change=${(e: Event) => { this.area = (e.target as HTMLSelectElement).value; this.slot = 'top'; this.yamlError = false }}>
-        ${areas.map(a => html`<option value=${a.area_id} ?selected=${a.area_id === this.area}>${a.name}${this.config.rooms?.[a.area_id] ? ' •' : ''}</option>`)}
-      </select>
-      <span class="hint">${this.l('ed.room_hint')}</span>
       ${this.renderGroups()}
       ${this.renderCards()}
       ${customized ? html`<button class="link" @click=${() => this.resetRoom()}>${this.l('ed.room_reset')}</button>` : nothing}`

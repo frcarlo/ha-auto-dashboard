@@ -5,6 +5,7 @@ import { cleanConfig, normalizeConfig } from './config'
 import { HIDE_LABEL } from './model'
 import { isHexColor } from './styles/palette'
 import type { RoomsPatch } from './editor-rooms'
+import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import type { AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
@@ -29,6 +30,13 @@ interface Option {
 /** Accent suggestions; the color picker covers everything else. Indigo is the default. */
 const SWATCHES = ['#6366f1', '#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f43f5e', '#a855f7', '#64748b']
 
+type Tab = 'look' | 'home' | 'house' | 'rooms' | 'users'
+const TABS: [Tab, Key][] = [['look', 'ed.look'], ['home', 'ed.home'], ['house', 'ed.house'], ['rooms', 'ed.room_pages'], ['users', 'ed.users']]
+
+/** Room roles set in the house drawing, and the config list each one writes */
+type Tool = 'hide' | 'outdoor' | 'only'
+const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide: 'hide_areas', outdoor: 'outdoor_areas', only: 'areas' }
+
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
@@ -41,42 +49,34 @@ export class AdStrategyEditor extends LitElement {
     config: { state: true },
     users: { state: true },
     labels: { state: true },
-    openPickers: { state: true },
+    tab: { state: true },
+    tool: { state: true },
+    roomArea: { state: true },
   }
 
   hass?: HomeAssistant
   config: StrategyConfig = { type: 'custom:auto-dashboard' }
   users: HaUser[] = []
   labels: HaLabel[] = []
-  /** Room pickers currently showing their full list */
-  openPickers = new Set<string>()
+  tab: Tab = 'look'
+  /** What a tap on a room does in the house tab */
+  tool: Tool = 'hide'
+  /** Room being edited on the room pages tab */
+  roomArea = ''
   private usersRequested = false
 
-  static styles = css`
+  static styles = [houseStyles, css`
     :host {
       display: block;
       color: var(--primary-text-color, #e5e7eb);
       --ad-accent: var(--primary-color, #6366f1);
       --ad-line: var(--divider-color, rgba(127, 127, 127, 0.25));
     }
-    details { border: 1px solid var(--ad-line); border-radius: 16px; margin-bottom: 12px; overflow: hidden; }
-    summary {
-      cursor: pointer; list-style: none; padding: 14px 16px; font-weight: 500; font-size: 15px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    summary::-webkit-details-marker { display: none; }
-    summary::after { content: '▾'; opacity: 0.5; transition: transform 0.2s ease; }
-    details[open] summary::after { transform: rotate(180deg); }
-    .body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+    .body { display: flex; flex-direction: column; gap: 16px; }
     .field { display: flex; flex-direction: column; gap: 8px; }
     /* Each option is its own block, so long chip lists don't run into the next heading */
     .body > .field + .field, .body > .field + .row, .body > .row + .field { border-top: 1px solid var(--ad-line); padding-top: 14px; }
     .label { font-size: 14px; font-weight: 600; color: var(--primary-text-color, inherit); }
-    .picker-list { border: 1px solid var(--ad-line); border-radius: 12px; padding: 10px 12px; }
-    /* .chip resets everything, so these need the higher specificity */
-    .chip.picked { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 11px; }
-    .picked .x { all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; line-height: 1; }
-    .picked .x:hover { background: color-mix(in srgb, var(--ad-accent) 25%, transparent); }
     .hint { font-size: 12px; color: var(--secondary-text-color, #94a3b8); line-height: 1.4; }
     input[type=text], select, textarea {
       font: inherit; color: inherit; background: var(--secondary-background-color, rgba(127, 127, 127, 0.1));
@@ -126,7 +126,17 @@ export class AdStrategyEditor extends LitElement {
     .badge { font-size: 11px; font-weight: 400; opacity: 0.6; margin-left: 6px; }
     .link { all: unset; cursor: pointer; font-size: 12px; color: var(--ad-accent); }
     button:focus-visible, .switch:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 2px; }
-  `
+    .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--ad-line); margin-bottom: 18px; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      all: unset; cursor: pointer; padding: 10px 12px; margin-bottom: -1px; font-size: 14px; font-weight: 500; white-space: nowrap;
+      color: var(--secondary-text-color, #94a3b8); border-bottom: 2px solid transparent;
+    }
+    .tab:hover { color: var(--primary-text-color, inherit); }
+    .tab[aria-selected=true] { color: var(--ad-accent); border-bottom-color: var(--ad-accent); }
+    .tab:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: -2px; }
+    .tool-hint { min-height: 2.8em; }
+  `]
 
   setConfig(config: StrategyConfig) {
     this.config = normalizeConfig(config)
@@ -199,30 +209,6 @@ export class AdStrategyEditor extends LitElement {
       <span class="group">${name}</span>${items.map(chip)}`)}</div>`
   }
 
-  /**
-   * Room selection: the chosen rooms as removable chips, the full list by floor only when opened.
-   * Three long lists of every room in a row were too easy to mix up.
-   */
-  private areaPicker(key: string, selected: string[] | undefined, onChange: (v: string[]) => void) {
-    const sel = selected ?? []
-    const open = this.openPickers.has(key)
-    const toggleOpen = () => {
-      const next = new Set(this.openPickers)
-      if (open) next.delete(key)
-      else next.add(key)
-      this.openPickers = next
-    }
-    const name = (id: string) => this.hass?.areas[id]?.name ?? id
-    return html`<div class="chips">
-        ${sel.length ? sel.map(id => html`<span class="chip picked" aria-pressed="true">${name(id)}
-          <button class="x" aria-label="${this.l('ed.remove')}: ${name(id)}" title=${this.l('ed.remove')}
-            @click=${() => onChange(sel.filter(x => x !== id))}>×</button></span>`)
-          : html`<span class="hint">${this.l('ed.none_selected')}</span>`}
-        <button class="chip" aria-expanded=${open} @click=${toggleOpen}>${open ? this.l('ed.done') : `${this.l('ed.pick_areas')} ▾`}</button>
-      </div>
-      ${open ? html`<div class="picker-list">${this.chips([], sel, onChange, this.areasByFloor)}</div>` : nothing}`
-  }
-
   private colorPicker(value: string | undefined) {
     const current = isHexColor(value) ? value.toLowerCase() : undefined
     const set = (primary_color?: string) => this.change({ primary_color })
@@ -259,25 +245,6 @@ export class AdStrategyEditor extends LitElement {
     return [...known, ...gone]
   }
 
-  private get floorOptions(): Option[] {
-    return Object.values(this.hass?.floors ?? {})
-      .sort((a, b) => (b.level ?? -Infinity) - (a.level ?? -Infinity) || a.name.localeCompare(b.name))
-      .map(f => ({ id: f.floor_id, label: f.name }))
-  }
-
-  private get areasByFloor(): Map<string, Option[]> {
-    const groups = new Map<string, Option[]>()
-    const floors = this.hass?.floors ?? {}
-    const areas = Object.values(this.hass?.areas ?? {}).sort((a, b) => a.name.localeCompare(b.name))
-    for (const floor of this.floorOptions) {
-      const items = areas.filter(a => a.floor_id === floor.id).map(a => ({ id: a.area_id, label: a.name }))
-      if (items.length) groups.set(floor.label, items)
-    }
-    const rest = areas.filter(a => !a.floor_id || !floors[a.floor_id]).map(a => ({ id: a.area_id, label: a.name }))
-    if (rest.length) groups.set(this.l('other_rooms'), rest)
-    return groups
-  }
-
   private get orderedAreas(): AreaRegistryEntry[] {
     const order = this.config.area_order ?? []
     const rank = (id: string) => (order.indexOf(id) + 1 || order.length + 1)
@@ -295,36 +262,52 @@ export class AdStrategyEditor extends LitElement {
 
   protected render() {
     if (!this.hass) return nothing
-    return html`${this.renderLook()}${this.renderHome()}${this.renderRooms()}${this.renderRoomPages()}${this.renderUsers()}`
+    const panels: Record<Tab, () => TemplateResult> = {
+      look: () => this.renderLook(), home: () => this.renderHome(), house: () => this.renderHouse(),
+      rooms: () => this.renderRoomPages(), users: () => this.renderUsers(),
+    }
+    return html`<div class="tabs" role="tablist" @keydown=${this.onTabKey}>
+        ${TABS.map(([tab, label]) => html`<button class="tab" role="tab" id="tab-${tab}" aria-selected=${this.tab === tab}
+          aria-controls="panel" tabindex=${this.tab === tab ? 0 : -1} @click=${() => (this.tab = tab)}>${this.l(label)}</button>`)}
+      </div>
+      <div class="body" role="tabpanel" id="panel" aria-labelledby="tab-${this.tab}">${panels[this.tab]()}</div>`
   }
 
+  /** Arrow keys move between tabs, as in any tab list */
+  private onTabKey = (e: KeyboardEvent) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key]
+    if (!step) return
+    const i = TABS.findIndex(([tab]) => tab === this.tab)
+    this.tab = TABS[(i + step + TABS.length) % TABS.length]![0]
+    this.updateComplete.then(() => this.renderRoot.querySelector<HTMLElement>(`#tab-${this.tab}`)?.focus())
+  }
+
+  private markLabel = (mark: RoomMark) => this.l(`ed.mark_${mark}` as Key)
+
   private renderRoomPages() {
-    return html`<details ?open=${!!this.config.rooms}>
-      <summary>${this.l('ed.room_pages')}</summary>
-      <div class="body">
-        <ad-room-settings .hass=${this.hass} .config=${this.config}
-          @rooms-changed=${(e: CustomEvent<RoomsPatch>) => this.change(e.detail)}></ad-room-settings>
-      </div>
-    </details>`
+    const area = this.hass!.areas[this.roomArea] ? this.roomArea : Object.values(this.hass!.areas).sort((a, b) => a.name.localeCompare(b.name))[0]?.area_id ?? ''
+    return html`
+      <span class="hint">${this.l('ed.house_pick_hint')}</span>
+      ${house({
+        hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel,
+        marks: id => id === area ? ['picked'] : [],
+        onRoom: id => (this.roomArea = id),
+      })}
+      ${area ? this.field(this.hass!.areas[area]!.name, html`<ad-room-settings .hass=${this.hass} .config=${this.config} .area=${area}
+        @rooms-changed=${(e: CustomEvent<RoomsPatch>) => this.change(e.detail)}></ad-room-settings>`) : nothing}`
   }
 
   private renderHome() {
     const c = this.config
-    return html`<details ?open=${!!(c.favorites?.length || c.scenes?.length)}>
-      <summary>${this.l('ed.home')}</summary>
-      <div class="body">
+    return html`
         ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
-        ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
-      </div>
-    </details>`
+        ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}`
   }
 
   private renderLook() {
     const c = this.config
-    return html`<details open>
-      <summary>${this.l('ed.look')}</summary>
-      <div class="body">
+    return html`
         ${this.field(this.l('ed.title'), html`<input type="text" .value=${c.title ?? ''} placeholder=${this.l('home')}
           @change=${(e: Event) => this.change({ title: (e.target as HTMLInputElement).value.trim() || undefined })}>`)}
         ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
@@ -335,12 +318,10 @@ export class AdStrategyEditor extends LitElement {
         ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}
         ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
-          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}
-      </div>
-    </details>`
+          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}`
   }
 
-  private renderRooms() {
+  private renderHouse() {
     const c = this.config
     const ordered = this.orderedAreas
     const move = (index: number, by: number) => {
@@ -349,13 +330,24 @@ export class AdStrategyEditor extends LitElement {
       ids.splice(index + by, 0, id!)
       this.change({ area_order: ids })
     }
-    return html`<details>
-      <summary>${this.l('ed.rooms')}</summary>
-      <div class="body">
-        ${this.field(this.l('ed.only_floors'), this.chips(this.floorOptions, c.floors, floors => this.change({ floors })), this.l('ed.none_hint'))}
-        ${this.field(this.l('ed.only_areas'), this.areaPicker('areas', c.areas, areas => this.change({ areas })), this.l('ed.none_hint'))}
-        ${this.field(this.l('ed.hide_areas'), this.areaPicker('hide_areas', c.hide_areas, hide_areas => this.change({ hide_areas })))}
-        ${this.field(this.l('ed.outdoor'), this.areaPicker('outdoor', c.outdoor_areas, outdoor_areas => this.change({ outdoor_areas })), this.l('ed.outdoor_hint'))}
+    const key = TOOL_KEYS[this.tool]
+    const toggleIn = (list: string[] | undefined, id: string) => (list ?? []).includes(id) ? (list ?? []).filter(x => x !== id) : [...(list ?? []), id]
+    const marks = (id: string): RoomMark[] => [
+      ...(c.areas?.includes(id) ? ['only' as const] : []),
+      ...(c.hide_areas?.includes(id) ? ['hidden' as const] : []),
+      ...(c.outdoor_areas?.includes(id) ? ['outdoor' as const] : []),
+    ]
+    return html`
+        ${this.field(this.l('ed.tool'), html`${this.seg<Tool>(
+          [['hide', 'ed.tool_hide'], ['outdoor', 'ed.tool_outdoor'], ['only', 'ed.tool_only']], this.tool, tool => (this.tool = tool))}
+          <span class="hint tool-hint">${this.l(`ed.tool_${this.tool}_hint` as Key)}</span>
+          ${house({
+            hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel, marks,
+            onRoom: id => this.change({ [key]: toggleIn(c[key], id) }),
+            // Storeys narrow the dashboard to whole floors, whatever tool is active
+            onFloor: id => this.change({ floors: toggleIn(c.floors, id) }),
+            floorPressed: id => !!c.floors?.includes(id),
+          })}`)}
         ${this.field(this.l('ed.hide_domains'), this.chips(
           DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
         ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
@@ -367,9 +359,7 @@ export class AdStrategyEditor extends LitElement {
             <button class="icon-btn" aria-label="↓" ?disabled=${i === ordered.length - 1} @click=${() => move(i, 1)}>↓</button>
           </div>`)}
           ${c.area_order?.length ? html`<button class="link" @click=${() => this.change({ area_order: undefined })}>${this.l('ed.reset')}</button>` : nothing}
-        </div>`)}
-      </div>
-    </details>`
+        </div>`)}`
   }
 
   private renderUsers() {
@@ -378,9 +368,7 @@ export class AdStrategyEditor extends LitElement {
       ...this.users.filter(u => !this.config.users?.[u.id]).map(u => ({ id: u.id, label: u.name })),
       ...(this.config.users?.default ? [] : [{ id: 'default', label: this.l('ed.default_user') }]),
     ]
-    return html`<details ?open=${rules.length > 0}>
-      <summary>${this.l('ed.users')}</summary>
-      <div class="body">
+    return html`
         <span class="hint">${this.l('ed.users_hint')}</span>
         ${rules.map(([key, rule]) => this.renderRule(key, rule))}
         ${free.length ? html`<select @change=${(e: Event) => {
@@ -390,9 +378,7 @@ export class AdStrategyEditor extends LitElement {
         }}>
           <option value="">${this.l('ed.add_user')}</option>
           ${free.map(o => html`<option value=${o.id}>${o.label}</option>`)}
-        </select>` : nothing}
-      </div>
-    </details>`
+        </select>` : nothing}`
   }
 
   private renderRule(key: string, rule: UserRule) {
@@ -407,8 +393,13 @@ export class AdStrategyEditor extends LitElement {
       ${this.field(this.l('ed.hide_pages'), this.chips(
         PAGES.map(p => ({ id: p, label: this.l(p) })),
         rule.hide_pages, hide_pages => this.changeRule(key, { hide_pages: hide_pages as PagePath[] })))}
-      ${this.field(this.l('ed.only_floors'), this.chips(this.floorOptions, rule.floors, floors => this.changeRule(key, { floors })), this.l('ed.none_hint'))}
-      ${this.field(this.l('ed.only_areas'), this.areaPicker(`rule:${key}`, rule.areas, areas => this.changeRule(key, { areas })), this.l('ed.none_hint'))}
+      ${this.field(this.l('ed.rule_rooms'), house({
+        hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel,
+        marks: id => rule.areas?.includes(id) ? ['only'] : [],
+        onRoom: id => this.changeRule(key, { areas: rule.areas?.includes(id) ? rule.areas.filter(x => x !== id) : [...(rule.areas ?? []), id] }),
+        onFloor: id => this.changeRule(key, { floors: rule.floors?.includes(id) ? rule.floors.filter(x => x !== id) : [...(rule.floors ?? []), id] }),
+        floorPressed: id => !!rule.floors?.includes(id),
+      }), this.l('ed.rule_rooms_hint'))}
     </div>`
   }
 }
