@@ -1,6 +1,7 @@
 import { LitElement, type PropertyValues } from 'lit'
 import type { CardLook, HassEntity, HomeAssistant } from '../types'
 import { domainOf } from '../presentation'
+import { canControl, canOpen } from '../access'
 
 export interface BaseConfig extends CardLook {
   type: string
@@ -50,7 +51,13 @@ export abstract class BaseCard<C extends BaseConfig = BaseConfig> extends LitEle
     return entityId ? this.hass?.states[entityId] : undefined
   }
 
+  /** Whether the viewing user may operate this entity (per-user rules, see access.ts). */
+  protected canControl(entityId: string) {
+    return canControl(this.config?.access, entityId)
+  }
+
   protected moreInfo(entityId: string) {
+    if (!canOpen(this.config?.access, entityId)) return
     this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true }))
   }
 
@@ -62,6 +69,7 @@ export abstract class BaseCard<C extends BaseConfig = BaseConfig> extends LitEle
   }
 
   protected call(domain: string, service: string, entityId: string | string[], data: Record<string, unknown> = {}) {
+    if ([entityId].flat().some(id => !this.canControl(id))) return
     return this.hass?.callService(domain, service, data, { entity_id: entityId })
   }
 

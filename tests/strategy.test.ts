@@ -68,3 +68,32 @@ describe('filters and nav position', () => {
     }
   })
 })
+
+describe('per-user rules', () => {
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const asUser = (name: string, is_admin = false) => {
+    const hass = createHass(true)
+    hass.user = { id: `id-${name}`, name, is_admin }
+    return hass
+  }
+  const users = {
+    leni: { areas: ['schlafzimmer', 'wohnzimmer'], hide_pages: ['security' as const], control_critical: false },
+    gast: { read_only: true },
+  }
+
+  it('narrows rooms and pages and passes the access level to every card', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', users }, asUser('Leni'))
+    expect(views.map(v => v.path)).not.toContain('security')
+    expect(views.filter(v => String(v.path).startsWith('area-')).map(v => v.path)).toEqual(['area-schlafzimmer', 'area-wohnzimmer'])
+    const custom = views.flatMap(cards).filter(c => String(c.type).startsWith('custom:'))
+    expect(custom.every(c => c.access === 'no_critical')).toBe(true)
+  })
+
+  it('read-only users get read_only cards; admins without an entry see everything', async () => {
+    const guest = await generateDashboard({ type: 'custom:auto-dashboard', users }, asUser('Gast'))
+    expect(cards(guest.views[0]!).find(c => c.type === 'custom:ad-header')!.access).toBe('read_only')
+    const admin = await generateDashboard({ type: 'custom:auto-dashboard', users }, asUser('Francesco', true))
+    expect(admin.views.flatMap(cards).some(c => 'access' in c)).toBe(false)
+    expect(admin.views.map(v => v.path)).toContain('security')
+  })
+})

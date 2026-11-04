@@ -88,7 +88,7 @@ export function createHass(dark: boolean): HomeAssistant {
     themes: { darkMode: dark },
     language: 'de',
     locale: { language: 'de' },
-    user: { name: 'Frank Carlo' },
+    user: { id: 'u-frank', name: 'Frank Carlo', is_admin: true },
     formatEntityState: (e: HassEntity) => {
       const map: Record<string, string> = {
         on: 'An', off: 'Aus', open: 'Offen', closed: 'Geschlossen', locked: 'Verriegelt', unlocked: 'Entriegelt',

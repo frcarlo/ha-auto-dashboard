@@ -1,8 +1,9 @@
+import { accessOf, intersect, ruleFor } from './access'
 import { t } from './i18n'
 import { allEntities, areaEntities, floorsWithAreas, groupEntities, groupOf } from './model'
 import { OPENING_CLASSES, domainOf } from './presentation'
 import type { NavItem } from './cards/nav-bar'
-import type { HassEntity, HomeAssistant, StrategyConfig } from './types'
+import type { HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
 type Card = Record<string, unknown>
 type Section = { type: 'grid'; column_span?: number; cards: Card[] }
@@ -26,15 +27,29 @@ function heading(text: string, icon?: string | null, navigateTo?: string, style:
 const fullWidth = (cards: Card[]): Section => ({ type: 'grid', column_span: MAX_COLUMNS, cards })
 
 /** Build the generated dashboard. Runs in the browser whenever the dashboard loads. */
-export async function generateDashboard(config: StrategyConfig, hass: HomeAssistant) {
-  const look = { ...(config.theme ? { theme: config.theme } : {}), ...(config.glass ? { glass: true } : {}) }
+export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAssistant) {
+  // The viewing user's rule narrows rooms and pages on top of the dashboard's own filter.
+  // HA runs the strategy in each browser with that browser's user, so every user gets their own dashboard.
+  const rule = ruleFor(baseConfig.users, hass.user)
+  const access = accessOf(rule)
+  const config: StrategyConfig = {
+    ...baseConfig,
+    areas: intersect(baseConfig.areas, rule?.areas),
+    floors: intersect(baseConfig.floors, rule?.floors),
+  }
+  const look = {
+    ...(config.theme ? { theme: config.theme } : {}),
+    ...(config.glass ? { glass: true } : {}),
+    ...(access !== 'full' ? { access } : {}),
+  }
   const hide = config.hide_domains ?? []
   const floors = floorsWithAreas(hass, config)
   const areas = floors.flatMap(f => f.areas)
   // areas/floors narrow the whole dashboard, e.g. to one room for a wall tablet
   const scoped = !!(config.areas?.length || config.floors?.length)
   if (scoped && !areas.length) {
-    throw new Error(`Auto Dashboard: keine Räume mit Geräten für areas ${JSON.stringify(config.areas ?? [])} / floors ${JSON.stringify(config.floors ?? [])}`)
+    const who = rule ? ` (Nutzer ${hass.user?.name})` : ''
+    throw new Error(`Auto Dashboard: keine Räume mit Geräten für areas ${JSON.stringify(config.areas ?? [])} / floors ${JSON.stringify(config.floors ?? [])}${who}`)
   }
   const areaIds = scoped ? areas.map(a => a.area_id) : undefined
   const all = allEntities(hass, hide, areaIds)
@@ -72,6 +87,7 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
       counts: (e: HassEntity) => domainOf(e.entity_id) === 'lock' || OPENING_CLASSES.includes(e.attributes.device_class),
     },
   ]
+    .filter(page => !rule?.hide_pages?.includes(page.path as PagePath))
     .map(page => ({ ...page, entities: all.filter(page.pick) }))
     .filter(page => page.entities.length)
 

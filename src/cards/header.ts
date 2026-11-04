@@ -94,7 +94,7 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     const weather = this.weather
     return html`<div class="wrap">
       <div class="text">
-        <div class="eyebrow">${now.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}${this.config!.scope ? ` · ${this.config!.scope}` : ''}</div>
+        <div class="eyebrow">${now.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}${this.config!.scope ? ` · ${this.config!.scope}` : ''}${this.config!.access === 'read_only' ? ` · ${t(this.hass, 'view_only')}` : ''}</div>
         <h1>${this.greeting(now.getHours())}${name ? `, ${name}` : ''}</h1>
       </div>
       <div class="right">
@@ -117,7 +117,7 @@ export class AdHeader extends BaseCard<HeaderConfig> {
         ${c.count_label ? html`<div class="eyebrow">${t(this.hass, c.count_label, { n: active.length })}</div>` : nothing}
         <h1>${c.icon ? html`<ha-icon icon=${c.icon}></ha-icon>` : nothing}${c.title}</h1>
       </div>
-      ${c.action && active.length ? html`<button class="action"
+      ${c.action && active.length && (c.access ?? 'full') === 'full' ? html`<button class="action"
         @click=${() => this.call(domainOf(active[0]!.entity_id), c.action!.service, active.map(e => e.entity_id))}>
         <ha-icon icon=${c.action.icon}></ha-icon>${t(this.hass, c.action.label)}
       </button>` : nothing}

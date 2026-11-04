@@ -63,6 +63,31 @@ strategy:
 
 **Nur ein Raum oder eine Etage:** `areas` und `floors` beschränken das ganze Dashboard, also Startseite, Status-Chips, Übersichten und Raumseiten. Beide zusammen ergeben die Schnittmenge. Mit genau einem Raum zeigt die Startseite gleich dessen Inhalt, praktisch für ein Wandtablet. Die IDs stehen unter Einstellungen → Bereiche, Etagen & Zonen in der URL des Bereichs bzw. der Etage.
 
+### Nutzer
+
+Pro HA-Nutzer lässt sich festlegen, was er sieht und bedienen darf:
+
+```yaml
+strategy:
+  type: custom:auto-dashboard
+  users:
+    leni:                          # Vorname, voller Name oder User-ID
+      areas: [zimmer_leni, wohnzimmer]
+      floors: [obergeschoss]
+      hide_pages: [security]       # lights | climate | covers | security
+      control_critical: false      # keine Schlösser, Alarmanlage, „Alle aus/zu“
+    gast:
+      read_only: true              # nur ansehen
+    default:                       # alle übrigen Nicht-Admins
+      control_critical: false
+```
+
+- Admins ohne eigenen Eintrag sehen und bedienen alles. Mit einem eigenen Eintrag gilt auch für sie die Regel.
+- `areas` und `floors` gelten zusätzlich zu den Filtern des Dashboards.
+- Was jemand nicht bedienen darf, erscheint ohne Schalter und Knöpfe. HAs Detail-Dialog öffnet sich dafür ebenfalls nicht, sonst ließe sich darüber schalten. Reine Anzeigen wie Sensoren öffnen weiter ihre Infos.
+
+**Wichtig:** Das ist keine Sicherheitsfunktion. HA kennt keine Rechte pro Raum oder Gerät. Wer angemeldet ist, kann über andere Dashboards, die Einstellungen oder die API weiterhin alles schalten. Die Regeln eignen sich für Kinder-Tablets, Gäste und Wandpanels, nicht zum Schutz gegen jemanden, der es darauf anlegt. Wer nur dieses Dashboard sehen soll, bekommt in HA keine Admin-Rechte, und die anderen Dashboards werden über „Nur für Admins sichtbar“ ausgeblendet.
+
 Einzelne Entities blendet man mit dem Label `ad_hide` aus. Versteckte Entities und Diagnose-/Konfigurations-Entities erscheinen ohnehin nicht. Die Area eines Entities ist seine eigene oder die seines Geräts.
 
 ## Entwicklung

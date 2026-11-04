@@ -40,6 +40,7 @@ const de = {
   n_on: '{n} an',
   n_open: '{n} offen',
   unavailable: 'Nicht verfügbar',
+  view_only: 'Nur ansehen',
 }
 
 type Key = keyof typeof de
@@ -84,6 +85,7 @@ const en: Record<Key, string> = {
   n_on: '{n} on',
   n_open: '{n} open',
   unavailable: 'Unavailable',
+  view_only: 'View only',
 }
 
 export function t(hass: Pick<HomeAssistant, 'language'> | undefined, key: Key, vars: Record<string, string | number> = {}) {

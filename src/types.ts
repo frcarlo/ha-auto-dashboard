@@ -50,7 +50,7 @@ export interface HomeAssistant {
   themes: { darkMode: boolean }
   language: string
   locale?: { language: string }
-  user?: { name: string }
+  user?: { id: string; name: string; is_admin?: boolean }
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>
   formatEntityState?(stateObj: HassEntity, state?: string): string
   formatEntityAttributeValue?(stateObj: HassEntity, attribute: string, value?: unknown): string
@@ -58,10 +58,27 @@ export interface HomeAssistant {
 
 export type ThemeMode = 'auto' | 'dark' | 'light'
 
+/** What the viewing user may operate. Only shapes the UI; HA itself does not enforce it. */
+export type Access = 'full' | 'no_critical' | 'read_only'
+
 /** Options shared by every card the strategy emits. */
 export interface CardLook {
   theme?: ThemeMode
   glass?: boolean
+  access?: Access
+}
+
+export type PagePath = 'lights' | 'climate' | 'covers' | 'security'
+
+/** Per-user rule under `users:`, keyed by user name, first name, user id or `default`. */
+export interface UserRule {
+  areas?: string[]
+  floors?: string[]
+  hide_pages?: PagePath[]
+  /** Nothing can be switched; only plain information opens */
+  read_only?: boolean
+  /** false: no locks, alarm panels or bulk actions like "all off" */
+  control_critical?: boolean
 }
 
 export type NavPosition = 'bottom' | 'top' | 'left' | 'right'
@@ -74,6 +91,7 @@ export interface StrategyConfig extends CardLook {
   /** Only areas on these floors */
   floors?: string[]
   nav_position?: NavPosition
+  users?: Record<string, UserRule>
   hide_areas?: string[]
   area_order?: string[]
   hide_domains?: string[]

@@ -35,8 +35,11 @@ const config: StrategyConfig = {
   areas: list('areas'),
   floors: list('floors'),
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
+  // ?as=leni&users={"leni":{"read_only":true}} views the dashboard as a non-admin with that rule
+  users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,
 }
 let hass: HomeAssistant = createHass(dark)
+if (params.has('as')) hass.user = { id: 'harness', name: params.get('as')!, is_admin: false }
 let views: any[] = []
 const cards: any[] = []
 

@@ -132,7 +132,7 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
         </div>
         <span class="room">${area.name}</span>
       </div>
-      ${climate ? html`<div class="temp-ctl" @pointerdown=${(e: Event) => e.stopPropagation()} @click=${(e: Event) => e.stopPropagation()}>
+      ${climate && this.canControl(climate.entity_id) ? html`<div class="temp-ctl" @pointerdown=${(e: Event) => e.stopPropagation()} @click=${(e: Event) => e.stopPropagation()}>
         <button class="btn" ?disabled=${!climateOk} aria-label="+"
           @click=${() => this.call('climate', 'set_temperature', climate.entity_id, { temperature: Math.round((target! + step) / step) * step })}>
           <ha-icon icon="mdi:plus"></ha-icon></button>

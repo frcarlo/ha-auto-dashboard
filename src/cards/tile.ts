@@ -109,7 +109,7 @@ export class AdTile extends BaseCard<TileConfig> {
     const entity = this.entity
     if (!entity || isUnavailable(entity)) return this.moreInfo(this.config!.entity)
     const domain = domainOf(entity.entity_id)
-    if (['light', 'switch', 'fan', 'input_boolean', 'scene', 'script'].includes(domain)) this.toggle(entity)
+    if (this.canControl(entity.entity_id) && ['light', 'switch', 'fan', 'input_boolean', 'scene', 'script'].includes(domain)) this.toggle(entity)
     else this.moreInfo(entity.entity_id)
   }
 
@@ -160,14 +160,14 @@ export class AdTile extends BaseCard<TileConfig> {
         <ha-icon class="bulb" icon=${on ? 'mdi:lightbulb' : 'mdi:lightbulb-off-outline'}></ha-icon>
         ${dimmable && on ? html`<span class="big">${pct}<span class="unit">%</span></span>` : nothing}
       </div>
-      <div class="row" @click=${this.stop} @pointerdown=${this.stop}>
+      ${!this.canControl(entity.entity_id) ? nothing : html`<div class="row" @click=${this.stop} @pointerdown=${this.stop}>
         <button class="switch" role="switch" style="--accent: var(--ad-warning)" aria-checked=${on} aria-label=${this.label}
           @click=${() => this.toggle(entity)}></button>
         ${dimmable ? html`<input type="range" min="1" max="100" .value=${String(pct || 1)} style="--pct:${pct}%"
           aria-label=${this.label}
           @input=${(e: Event) => (e.target as HTMLElement).style.setProperty('--pct', `${(e.target as HTMLInputElement).value}%`)}
           @change=${(e: Event) => this.call('light', 'turn_on', entity.entity_id, { brightness_pct: Number((e.target as HTMLInputElement).value) })}>` : nothing}
-      </div>
+      </div>`}
     `)
   }
 
@@ -177,6 +177,7 @@ export class AdTile extends BaseCard<TileConfig> {
     const setTarget = (delta: number) => target !== undefined &&
       this.call('climate', 'set_temperature', entity.entity_id, { temperature: Math.round((target + delta) / step) * step })
     const mode = entity.state
+    const ctl = this.canControl(entity.entity_id)
     return this.wrap(off, html`
       <div class="head">
         <ha-icon icon="mdi:thermostat"></ha-icon>
@@ -187,9 +188,9 @@ export class AdTile extends BaseCard<TileConfig> {
         <span class="big" style="text-align:left">${this.number(entity.attributes.current_temperature)}<span class="unit">°C</span></span>
       </div>
       <div class="row" @click=${this.stop} @pointerdown=${this.stop}>
-        <button class="btn" ?disabled=${!!off || target === undefined} aria-label="-" @click=${() => setTarget(-step)}><ha-icon icon="mdi:minus"></ha-icon></button>
+        ${ctl ? html`<button class="btn" ?disabled=${!!off || target === undefined} aria-label="-" @click=${() => setTarget(-step)}><ha-icon icon="mdi:minus"></ha-icon></button>` : nothing}
         <span class="target" title=${t(this.hass, 'target')}>${this.number(target, Number.isInteger(target) ? 0 : 1)}°</span>
-        <button class="btn" ?disabled=${!!off || target === undefined} aria-label="+" @click=${() => setTarget(step)}><ha-icon icon="mdi:plus"></ha-icon></button>
+        ${ctl ? html`<button class="btn" ?disabled=${!!off || target === undefined} aria-label="+" @click=${() => setTarget(step)}><ha-icon icon="mdi:plus"></ha-icon></button>` : nothing}
       </div>
     `)
   }
@@ -206,11 +207,11 @@ export class AdTile extends BaseCard<TileConfig> {
       <div class="body">
         <span class="big" style="text-align:left">${position ?? (open ? 100 : 0)}<span class="unit">%</span></span>
       </div>
-      <div class="row end" @click=${this.stop} @pointerdown=${this.stop}>
+      ${!this.canControl(entity.entity_id) ? nothing : html`<div class="row end" @click=${this.stop} @pointerdown=${this.stop}>
         <button class="btn" ?disabled=${!!off} aria-label="up" @click=${() => this.call('cover', 'open_cover', entity.entity_id)}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
         <button class="btn" ?disabled=${!!off} aria-label="stop" @click=${() => this.call('cover', 'stop_cover', entity.entity_id)}><ha-icon icon="mdi:stop"></ha-icon></button>
         <button class="btn" ?disabled=${!!off} aria-label="down" @click=${() => this.call('cover', 'close_cover', entity.entity_id)}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
-      </div>
+      </div>`}
     `)
   }
 
@@ -233,7 +234,7 @@ export class AdTile extends BaseCard<TileConfig> {
           ${artist ? html`<span class="sub">${artist}</span>` : nothing}
         </div>
       </div>
-      ${active ? html`<div class="row end" @click=${this.stop} @pointerdown=${this.stop}>
+      ${active && this.canControl(entity.entity_id) ? html`<div class="row end" @click=${this.stop} @pointerdown=${this.stop}>
         <button class="btn" aria-label="previous" @click=${() => this.call('media_player', 'media_previous_track', entity.entity_id)}><ha-icon icon="mdi:skip-previous"></ha-icon></button>
         <button class="btn" aria-label="play/pause" @click=${() => this.call('media_player', 'media_play_pause', entity.entity_id)}><ha-icon icon=${playing ? 'mdi:pause' : 'mdi:play'}></ha-icon></button>
         <button class="btn" aria-label="next" @click=${() => this.call('media_player', 'media_next_track', entity.entity_id)}><ha-icon icon="mdi:skip-next"></ha-icon></button>
@@ -266,9 +267,9 @@ export class AdTile extends BaseCard<TileConfig> {
         <span class="label">${this.label}</span>
         ${domain === 'scene' || domain === 'script' ? nothing : html`<span class="sub">${this.hass!.formatEntityState?.(entity) ?? entity.state}</span>`}
       </div>
-      ${toggleable ? html`<button class="switch" role="switch" aria-checked=${active} aria-label=${this.label}
+      ${toggleable && this.canControl(entity.entity_id) ? html`<button class="switch" role="switch" aria-checked=${active} aria-label=${this.label}
         @pointerdown=${this.stop} @click=${(e: Event) => { e.stopPropagation(); this.toggle(entity) }}></button>` : nothing}
-      ${domain === 'lock' ? html`<button class="btn" aria-label=${this.label} ?disabled=${!!off}
+      ${domain === 'lock' && this.canControl(entity.entity_id) ? html`<button class="btn" aria-label=${this.label} ?disabled=${!!off}
         @pointerdown=${this.stop} @click=${(e: Event) => { e.stopPropagation(); this.toggle(entity) }}>
         <ha-icon icon=${active ? 'mdi:lock-open-variant-outline' : 'mdi:lock'}></ha-icon></button>` : nothing}
     `)
