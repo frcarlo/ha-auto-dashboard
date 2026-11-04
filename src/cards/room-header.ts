@@ -5,7 +5,8 @@ import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { canBulk } from '../access'
 import { areaEntities, entityIndex, hideOf, quickGroups, roomSummary, type QuickKey, type Reading } from '../model'
-import { HVAC_ICONS, domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
+import { domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
+import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
 
@@ -14,14 +15,6 @@ interface RoomHeaderConfig extends BaseConfig {
   hide_domains?: string[]
   hide_labels?: string[]
   hide_entities?: string[]
-}
-
-const QUICK_ICONS: Record<QuickKey, [on: string, off: string]> = {
-  light: ['mdi:lightbulb-group', 'mdi:lightbulb-group-outline'],
-  switch: ['mdi:toggle-switch', 'mdi:toggle-switch-off-outline'],
-  shading: ['mdi:window-shutter-open', 'mdi:window-shutter'],
-  opening: ['mdi:window-open-variant', 'mdi:window-closed-variant'],
-  gate: ['mdi:garage-open-variant', 'mdi:garage-variant'],
 }
 
 const HVAC_ACTIONS = ['heating', 'cooling', 'drying', 'fan', 'idle', 'off']
@@ -35,52 +28,49 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
   pending?: number
   private sendTimer?: number
 
-  static styles = [tokens, css`
+  static styles = [tokens, materials, css`
     :host { display: block; container-type: inline-size; }
-    .wrap { padding: 8px 4px 4px; display: flex; flex-direction: column; gap: 12px; }
-    .top { display: flex; align-items: flex-end; gap: 12px; }
+    .wrap { padding: 8px 4px 4px; display: flex; flex-direction: column; gap: 14px; }
+    .top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 20px; }
     /* Area picture: the name sits on the photo, darkened at the bottom so it stays readable */
     .top.photo {
-      min-height: 150px; box-sizing: border-box; padding: 16px; border-radius: var(--ad-radius); color: #fff;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.05) 70%), var(--photo) center / cover no-repeat;
+      min-height: 160px; box-sizing: border-box; padding: 18px; border-radius: var(--ad-radius); color: #fff; align-content: flex-end;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.05) 70%), var(--photo) center / cover no-repeat;
     }
-    .photo h1 ha-icon { opacity: 0.8; }
-    .photo .value { background: rgba(0, 0, 0, 0.35); color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-    h1 { flex: 1; min-width: 0; margin: 0; font-size: 28px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.15; }
-    h1 ha-icon { --mdc-icon-size: 26px; opacity: 0.5; margin-right: 6px; vertical-align: -3px; }
-    .values { display: flex; gap: 6px; }
+    /* The room name is the page's one big type element */
+    h1 { min-width: 0; margin: 0; font-size: 44px; font-weight: 200; letter-spacing: -0.045em; line-height: 1; }
+    .values { display: flex; gap: 16px; }
     .value {
-      all: unset; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 7px; cursor: pointer;
-      border-radius: 999px; background: rgba(var(--ad-on-surface), 0.08); font-size: 13px; white-space: nowrap;
+      all: unset; display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; font-size: 16px; font-weight: 300;
+      font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0.8;
     }
-    .value ha-icon { --mdc-icon-size: 16px; opacity: 0.65; }
+    .value ha-icon { --mdc-icon-size: 16px; opacity: 0.6; align-self: center; }
+    .value:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 3px; border-radius: 4px; }
     .row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
     .row::-webkit-scrollbar { display: none; }
     .tile {
-      flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-height: 52px; box-sizing: border-box;
+      position: relative; overflow: hidden; isolation: isolate; flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+      min-width: 150px; min-height: 60px; padding: 10px 12px 10px 14px; box-sizing: border-box;
       border-radius: 18px; background: var(--ad-surface); box-shadow: var(--ad-shadow); cursor: pointer; user-select: none;
-      transition: background 0.3s ease;
     }
     :host([glass]) .tile { background: var(--ad-glass-bg); }
-    .tile.on { background: color-mix(in srgb, rgb(var(--ad-warning)) 16%, var(--ad-surface)); }
     .tile.static { cursor: default; }
-    .tile:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
-    .tile .text { display: flex; flex-direction: column; gap: 1px; }
-    .tile .label { font-size: 13px; font-weight: 500; }
-    .tile .sub { font-size: 12px; opacity: 0.6; white-space: nowrap; }
+    .tile:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    .tile > .text, .tile > .btn, .tile > .pilot, .tile > .now, .tile > .set { position: relative; z-index: 1; }
+    .tile .text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    .tile .label { font-size: 14px; font-weight: 600; }
+    .tile .sub { font-size: 12px; opacity: 0.65; white-space: nowrap; }
     .tile .btn { width: 30px; height: 30px; }
-    .thermo { gap: 12px; }
-    .thermo .now { font-size: 24px; font-weight: 300; letter-spacing: -0.03em; }
-    .thermo .set { display: flex; align-items: center; gap: 6px; }
-    .thermo .target { min-width: 44px; text-align: center; font-size: 15px; font-weight: 500; }
+    .thermo { padding-bottom: 14px; }
+    .thermo .now { font-size: 28px; font-weight: 200; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .thermo .set { display: flex; align-items: center; gap: 4px; }
+    .thermo .target { min-width: 40px; text-align: center; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
     .thermo .target.pending { opacity: 0.6; }
-    .mode { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; opacity: 0.75; }
-    .mode ha-icon { --mdc-icon-size: 14px; }
+    .mode { font-size: 12px; opacity: 0.7; }
     .mode.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
     @container (max-width: 480px) {
-      h1 { font-size: 24px; }
-      .top { flex-direction: column; align-items: flex-start; gap: 8px; }
+      h1 { font-size: 34px; }
     }
   `]
 
@@ -144,23 +134,31 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
 
   private renderThermostat(climate: HassEntity) {
     const a = climate.attributes
+    const current = a.current_temperature as number | undefined
     const target = this.pending ?? (a.temperature as number | undefined)
     const action = (a.hvac_action as string | undefined) ?? climate.state
     const color = hvacColor(action === 'heating' ? 'heat' : action === 'cooling' ? 'cool' : action)
     const label = HVAC_ACTIONS.includes(action) ? t(this.hass, `hvac.${action}` as Key) : this.hass!.formatEntityState?.(climate) ?? action
-    // heat_cool with a range, or off: show values only, like Dwains
+    const min = (a.min_temp as number | undefined) ?? 7
+    const max = (a.max_temp as number | undefined) ?? 30
+    const at = (v: number) => `${Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100))}%`
+    // heat_cool with a range, or off: show values only
     const adjustable = target !== undefined && this.canControl(climate.entity_id)
     return html`<div class="tile thermo static">
-      <span class="now" role="button" tabindex="0" @click=${() => this.moreInfo(climate.entity_id)}>${this.number(a.current_temperature)}°</span>
+      <span class="now" role="button" tabindex="0" @click=${() => this.moreInfo(climate.entity_id)}
+        @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.moreInfo(climate.entity_id)}>${this.number(current)}°</span>
       <div class="text">
-        <span class="mode ${color}"><ha-icon icon=${HVAC_ICONS[climate.state] ?? 'mdi:thermostat'}></ha-icon>${label}</span>
+        <span class="mode ${color}">${label}</span>
         <div class="set">
-          ${adjustable ? html`<button class="btn" aria-label="-" @click=${() => this.nudge(climate, -1)}><ha-icon icon="mdi:minus"></ha-icon></button>` : nothing}
+          ${adjustable ? html`<button class="btn" aria-label="−" @click=${() => this.nudge(climate, -1)}><ha-icon icon="mdi:minus"></ha-icon></button>` : nothing}
           <span class="target ${this.pending !== undefined ? 'pending' : ''}" title=${t(this.hass, 'target')}>
             ${target !== undefined ? `${this.number(target, Number.isInteger(target) ? 0 : 1)}°` : '–'}</span>
           ${adjustable ? html`<button class="btn" aria-label="+" @click=${() => this.nudge(climate, 1)}><ha-icon icon="mdi:plus"></ha-icon></button>` : nothing}
         </div>
       </div>
+      ${current !== undefined ? html`<div class="scale" style="--now:${at(current)};--goal:${at(target ?? current)}">
+        <span class="now"></span>${target !== undefined ? html`<span class="goal"></span>` : nothing}
+      </div>` : nothing}
     </div>`
   }
 
@@ -174,22 +172,31 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const sub = covers
       ? t(this.hass, 'n_open', { n: active.length })
       : entities.length > 1 ? t(this.hass, 'n_of_on', { n: active.length, total: entities.length }) : (active.length ? t(this.hass, 'on') : t(this.hass, 'off'))
-    const icon = QUICK_ICONS[key][active.length ? 0 : 1]
-    const content = html`<span class="dot ${active.length ? 'warning' : ''}"><ha-icon icon=${icon}></ha-icon></span>
-      <div class="text"><span class="label">${label}</span><span class="sub">${sub}</span></div>`
+    const text = html`<div class="text"><span class="label">${label}</span><span class="sub">${sub}</span></div>`
 
     if (covers) {
-      return html`<div class="tile static ${active.length ? 'on' : ''}">${content}
+      // The slats show how far the covers are closed on average
+      const positions = entities.map(e => (e.attributes.current_position as number | undefined) ?? (isActive(e) ? 100 : 0))
+      const closed = Math.round(100 - positions.reduce((a, b) => a + b, 0) / Math.max(positions.length, 1))
+      return html`<div class="tile static">
+        <div class="slats" style="--closed:${closed}%" data-closed=${closed}></div>
+        ${text}
         ${allowed ? html`
           <button class="btn" aria-label=${t(this.hass, 'all_open')} @click=${() => this.call('cover', 'open_cover', ids)}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
           <button class="btn" aria-label=${t(this.hass, 'all_close')} @click=${() => this.call('cover', 'close_cover', ids)}><ha-icon icon="mdi:arrow-down"></ha-icon></button>` : nothing}
       </div>`
     }
+    // Lights fill the tile by the share that is on; sockets show a pilot light
+    const share = entities.length ? Math.round((active.length / entities.length) * 100) : 0
     // Something on: switch those off. All off: switch everything on.
     const toggle = () => allowed && this.call('homeassistant', active.length ? 'turn_off' : 'turn_on', active.length ? active.map(e => e.entity_id) : ids)
-    return html`<div class="tile ${active.length ? 'on' : ''} ${allowed ? '' : 'static'}" role=${allowed ? 'button' : nothing}
-      tabindex=${allowed ? '0' : nothing} aria-pressed=${active.length > 0} @click=${toggle}
-      @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && toggle()}>${content}</div>`
+    return html`<div class="tile ${allowed ? '' : 'static'}" role=${allowed ? 'button' : nothing}
+      tabindex=${allowed ? '0' : nothing} aria-pressed=${active.length > 0} aria-label="${label}: ${sub}" @click=${toggle}
+      @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && toggle()}>
+      ${key === 'light' && share ? html`<div class="light-fill" style="--level:${share}%" ?data-full=${share >= 100}></div>` : nothing}
+      ${text}
+      <span class="pilot ${active.length ? 'on' : ''}" style="--pilot: ${key === 'light' ? 'var(--ad-warning)' : 'var(--ad-primary)'}"></span>
+    </div>`
   }
 
   protected render() {
@@ -201,7 +208,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const quick = quickGroups(entities)
     return html`<div class="wrap">
       <div class="top ${area.picture ? 'photo' : ''}" style=${area.picture ? `--photo: url('${area.picture}')` : ''}>
-        <h1>${area.icon ? html`<ha-icon icon=${area.icon}></ha-icon>` : nothing}${area.name}</h1>
+        <h1>${area.name}</h1>
         <div class="values">
           ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer', 1)}
           ${this.valueChip(summary.humidity, 'mdi:water-percent', 0)}

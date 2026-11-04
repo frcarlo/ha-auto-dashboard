@@ -23,33 +23,29 @@ interface GroupHeadingConfig extends BaseConfig {
 export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
   static styles = [tokens, css`
     :host { display: block; }
-    .wrap { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 4px 0; }
+    .wrap { display: flex; align-items: baseline; gap: 10px; min-height: 40px; padding: 10px 4px 2px; }
     .title {
-      all: unset; display: inline-flex; align-items: center; gap: 8px; min-width: 0;
-      font-size: 18px; font-weight: 500; letter-spacing: -0.01em;
+      all: unset; display: inline-flex; align-items: baseline; gap: 6px; min-width: 0;
+      font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
     }
-    .sub .title { font-size: 14px; font-weight: 500; opacity: 0.8; }
+    .sub .title { font-size: 15px; }
     .title[role=link] { cursor: pointer; }
-    .title[role=link]:hover .chev { opacity: 0.6; }
-    .title ha-icon { --mdc-icon-size: 20px; opacity: 0.55; }
-    .sub .title ha-icon { --mdc-icon-size: 17px; }
-    .chev { --mdc-icon-size: 16px !important; opacity: 0.3; transition: opacity 0.2s ease; }
-    .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title[role=link]:hover .name { text-decoration: underline; text-underline-offset: 3px; }
+    .title:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 3px; border-radius: 4px; }
+    .title ha-icon { --mdc-icon-size: 18px; opacity: 0.5; align-self: center; }
+    .chev { --mdc-icon-size: 16px !important; opacity: 0.35; }
+    /* The shared .name style is the small tile caption; a heading takes its size from .title */
+    .title .name { font-size: inherit; opacity: 1; letter-spacing: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .count { font-size: 13px; opacity: 0.55; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .fill { flex: 1; }
-    .count { font-size: 12px; opacity: 0.55; white-space: nowrap; }
-    .ctl { display: flex; align-items: center; gap: 6px; }
-    .btn { width: 30px; height: 30px; }
-    .switch {
-      all: unset; position: relative; flex: 0 0 auto; width: 36px; height: 20px; border-radius: 10px; cursor: pointer;
-      background: rgba(var(--ad-on-surface), 0.18); transition: background 0.25s ease;
+    .ctl { display: flex; align-items: center; gap: 4px; align-self: center; }
+    /* Bulk actions are words, so it is clear what happens to the whole group */
+    .act {
+      all: unset; cursor: pointer; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap;
+      background: rgba(var(--ad-on-surface), 0.07);
     }
-    .switch::after {
-      content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
-      background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform 0.25s ease;
-    }
-    .switch[aria-checked=true] { background: rgb(var(--ad-warning)); }
-    .switch[aria-checked=true]::after { transform: translateX(16px); }
-    .switch:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    .act:hover { background: rgba(var(--ad-on-surface), 0.12); }
+    .act:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
   `]
 
   getGridOptions() {
@@ -74,6 +70,10 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     this.call('lock', 'unlock', locks.map(e => e.entity_id))
   }
 
+  private act(label: string, onClick: () => void) {
+    return html`<button class="act" @click=${onClick}>${label}</button>`
+  }
+
   private renderControl(entities: HassEntity[]) {
     const ids = entities.map(e => e.entity_id)
     if (!this.config!.control || !canBulk(this.config!.access, ids) || ids.some(id => !this.canControl(id))) return nothing
@@ -81,18 +81,19 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
       case 'toggle': {
         const on = entities.filter(e => e.state === 'on')
         // Something on: switch those off. All off: switch everything on.
-        return html`<div class="ctl"><button class="switch" role="switch" aria-checked=${on.length > 0} aria-label=${this.config!.title}
-          @click=${() => this.call('homeassistant', on.length ? 'turn_off' : 'turn_on', on.length ? on.map(e => e.entity_id) : ids)}></button></div>`
+        return html`<div class="ctl">${on.length
+          ? this.act(t(this.hass, 'all_off'), () => this.call('homeassistant', 'turn_off', on.map(e => e.entity_id)))
+          : this.act(t(this.hass, 'all_on'), () => this.call('homeassistant', 'turn_on', ids))}</div>`
       }
       case 'cover':
         return html`<div class="ctl">
-          <button class="btn" aria-label=${t(this.hass, 'all_open')} title=${t(this.hass, 'all_open')} @click=${() => this.call('cover', 'open_cover', ids)}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
-          <button class="btn" aria-label=${t(this.hass, 'all_close')} title=${t(this.hass, 'all_close')} @click=${() => this.call('cover', 'close_cover', ids)}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+          ${this.act(t(this.hass, 'act_up'), () => this.call('cover', 'open_cover', ids))}
+          ${this.act(t(this.hass, 'act_down'), () => this.call('cover', 'close_cover', ids))}
         </div>`
       case 'lock':
         return html`<div class="ctl">
-          <button class="btn" aria-label=${t(this.hass, 'lock_all')} title=${t(this.hass, 'lock_all')} @click=${() => this.call('lock', 'lock', ids)}><ha-icon icon="mdi:lock"></ha-icon></button>
-          <button class="btn" aria-label=${t(this.hass, 'unlock_all')} title=${t(this.hass, 'unlock_all')} @click=${() => this.unlockAll(entities)}><ha-icon icon="mdi:lock-open-variant-outline"></ha-icon></button>
+          ${this.act(t(this.hass, 'do_lock'), () => this.call('lock', 'lock', ids))}
+          ${this.act(t(this.hass, 'do_unlock'), () => this.unlockAll(entities))}
         </div>`
     }
   }
@@ -100,7 +101,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
   private countText(entities: HassEntity[]) {
     const c = this.config!
     if (!c.control || entities.length < 2) return undefined
-    if (c.control === 'toggle') return `${entities.filter(e => e.state === 'on').length}/${entities.length}`
+    if (c.control === 'toggle') return t(this.hass, 'n_of_on', { n: entities.filter(e => e.state === 'on').length, total: entities.length })
     if (c.control === 'cover') return t(this.hass, 'n_open', { n: entities.filter(e => isActive(e)).length })
     return t(this.hass, 'n_open', { n: entities.filter(e => !isActive(e)).length })
   }
