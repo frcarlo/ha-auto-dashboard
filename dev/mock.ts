@@ -98,6 +98,15 @@ export function createHass(dark: boolean): HomeAssistant {
       return map[e.state] ?? (unit ? `${e.state} ${unit}` : e.state)
     },
     callService: async () => undefined,
+    callWS: async <T,>(msg: Record<string, unknown>) => {
+      if (msg.type !== 'config/auth/list') throw new Error(`mock: ${msg.type}`)
+      return [
+        { id: 'u-frank', name: 'Frank Carlo', system_generated: false, is_active: true, group_ids: ['system-admin'] },
+        { id: 'u-leni', name: 'Leni', system_generated: false, is_active: true, group_ids: ['system-users'] },
+        { id: 'u-gast', name: 'Gast', system_generated: false, is_active: true, group_ids: ['system-users'] },
+        { id: 'u-sup', name: 'Supervisor', system_generated: true, is_active: true, group_ids: ['system-admin'] },
+      ] as T
+    },
   }
   return hass
 }

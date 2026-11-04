@@ -148,7 +148,20 @@ function render() {
 }
 
 document.body.classList.toggle('light', !dark)
-generateDashboard(config, hass).then(result => {
+
+// ?editor shows the strategy's config editor and the config it would save
+if (params.has('editor')) {
+  const main = document.getElementById('view')!
+  main.style.cssText = 'max-width:560px;margin:24px auto;padding:0 16px'
+  const editor: any = document.createElement('ad-strategy-editor')
+  editor.setConfig({ type: 'custom:auto-dashboard' })
+  editor.hass = hass
+  const out = document.createElement('pre')
+  out.id = 'saved'
+  out.style.cssText = 'font-size:12px;opacity:.7;white-space:pre-wrap'
+  editor.addEventListener('config-changed', (e: any) => { out.textContent = JSON.stringify(e.detail.config, null, 2) })
+  main.append(editor, out)
+} else generateDashboard(config, hass).then(result => {
   views = result.views
   render()
 })

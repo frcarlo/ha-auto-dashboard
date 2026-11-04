@@ -52,6 +52,7 @@ export interface HomeAssistant {
   locale?: { language: string }
   user?: { id: string; name: string; is_admin?: boolean }
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>
+  callWS?<T>(msg: Record<string, unknown>): Promise<T>
   formatEntityState?(stateObj: HassEntity, state?: string): string
   formatEntityAttributeValue?(stateObj: HassEntity, attribute: string, value?: unknown): string
 }

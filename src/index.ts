@@ -4,6 +4,7 @@ import { AdRoomCard } from './cards/room-card'
 import { AdStatusBar } from './cards/status-bar'
 import { AdHeader } from './cards/header'
 import { AdNavBar } from './cards/nav-bar'
+import { AdStrategyEditor } from './editor'
 import type { HomeAssistant, StrategyConfig } from './types'
 
 declare const __VERSION__: string
@@ -32,6 +33,11 @@ define(`ll-strategy-dashboard-${STRATEGY_TYPE}`, class extends HTMLElement {
   static async generate(config: StrategyConfig, hass: HomeAssistant) {
     return generateDashboard(config, hass)
   }
+
+  // HA opens this in edit mode; only admins can edit dashboards
+  static async getConfigElement() {
+    return document.createElement('ad-strategy-editor')
+  }
 })
 
 define('ad-tile', AdTile)
@@ -39,6 +45,7 @@ define('ad-room-card', AdRoomCard)
 define('ad-status-bar', AdStatusBar)
 define('ad-header', AdHeader)
 define('ad-nav-bar', AdNavBar)
+define('ad-strategy-editor', AdStrategyEditor)
 
 // Lists the dashboard under "Community dashboards" in HA's Add dashboard dialog (HA 2026.5+)
 window.customStrategies ??= []

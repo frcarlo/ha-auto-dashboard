@@ -43,7 +43,9 @@ Updates kommen danach wie bei jedem HACS-Plugin.
 
 ## Optionen
 
-Alle optional:
+Am einfachsten über den Editor: Dashboard öffnen → Stift oben rechts → **Dashboard bearbeiten**. Dort lassen sich Darstellung, Räume und Nutzerregeln anklicken. Den Editor sehen nur Admins, weil nur sie Dashboards bearbeiten dürfen. Gespeichert wird dieselbe YAML-Konfiguration wie unten, ohne Standardwerte. Nutzerregeln aus dem Editor sind an die User-ID gebunden, eine Umbenennung bricht sie deshalb nicht.
+
+Alle Optionen, alle optional:
 
 ```yaml
 strategy:
