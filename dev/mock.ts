@@ -44,7 +44,14 @@ const defs: Def[] = [
   ['sensor.bad_luftfeuchte', '71', { friendly_name: 'Bad Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' }, 'bad'],
 
   ['light.buro_keller', 'on', { friendly_name: 'Büro Keller Schreibtisch', brightness: 255, supported_color_modes: ['brightness'] }, 'buro_keller'],
-  ['sensor.buro_keller_leistung', '142.6', { friendly_name: 'Büro Keller Leistung', device_class: 'power', unit_of_measurement: 'W' }, 'buro_keller'],
+  ['sensor.buro_keller_leistung', '142.6', { friendly_name: 'Büro Keller Leistung', device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' }, 'buro_keller'],
+  ['sensor.buro_keller_pc', '86', { friendly_name: 'Büro Keller PC', device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' }, 'buro_keller'],
+  ['sensor.kuche_backofen', '1.85', { friendly_name: 'Küche Backofen', device_class: 'power', unit_of_measurement: 'kW', state_class: 'measurement' }, 'kuche'],
+  ['sensor.wohnzimmer_tv_leistung', '96', { friendly_name: 'Wohnzimmer TV Leistung', device_class: 'power', unit_of_measurement: 'W' }, 'wohnzimmer'],
+  ['camera.garage', 'idle', { friendly_name: 'Garage Kamera' }, 'garage'],
+  ['todo.einkauf', '3', { friendly_name: 'Einkaufsliste' }, 'kuche'],
+  ['sensor.garten_temperatur', '9.4', { friendly_name: 'Garten Temperatur', device_class: 'temperature', unit_of_measurement: '°C' }, 'garten'],
+  ['sensor.garten_luftfeuchte', '82', { friendly_name: 'Garten Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' }, 'garten'],
   ['switch.buro_keller_drucker', 'unavailable', { friendly_name: 'Drucker' }, 'buro_keller'],
 
   ['light.garage', 'off', { friendly_name: 'Garage', supported_color_modes: ['onoff'] }, 'garage'],
@@ -56,6 +63,8 @@ const defs: Def[] = [
 const extras: HassEntity[] = [
   { entity_id: 'sensor.flur_batterie', state: '9', attributes: { friendly_name: 'Flur Bewegungsmelder Batterie', device_class: 'battery', unit_of_measurement: '%' } },
   { entity_id: 'script.gute_nacht', state: 'off', attributes: { friendly_name: 'Gute Nacht', icon: 'mdi:weather-night', last_triggered: new Date(Date.now() - 15 * 3600_000).toISOString() } },
+  { entity_id: 'sensor.kuche_fenster_batterie', state: '34', attributes: { friendly_name: 'Küche Fenster Batterie', device_class: 'battery', unit_of_measurement: '%' } },
+  { entity_id: 'update.zigbee_router', state: 'on', attributes: { friendly_name: 'Zigbee Router Firmware', installed_version: '1.2.0', latest_version: '1.3.1' } },
   { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo' } },
   { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni' } },
   { entity_id: 'alarm_control_panel.haus', state: 'armed_home', attributes: { friendly_name: 'Alarmanlage' } },
@@ -92,6 +101,7 @@ export function createHass(dark: boolean): HomeAssistant {
       buro_keller: { area_id: 'buro_keller', name: 'Büro Keller', icon: 'mdi:chair-rolling', floor_id: 'keller' },
       flur: { area_id: 'flur', name: 'Flur', icon: null },
       garage: { area_id: 'garage', name: 'Garage', icon: 'mdi:garage' },
+      garten: { area_id: 'garten', name: 'Garten', icon: 'mdi:flower' },
     },
     floors: {
       keller: { floor_id: 'keller', name: 'Keller', level: -1, icon: 'mdi:home-floor-b' },

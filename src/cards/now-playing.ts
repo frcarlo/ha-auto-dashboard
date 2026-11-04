@@ -42,7 +42,7 @@ export class AdNowPlaying extends BaseCard<NowPlayingConfig> {
     .sub { font-size: 12px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .btns { display: flex; align-items: center; gap: 6px; }
     .btn { width: 34px; height: 34px; }
-    .btn.main { background: rgb(var(--ad-primary)); color: #fff; }
+    .btn.main { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .more {
       all: unset; cursor: pointer; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
       background: rgba(var(--ad-on-surface), 0.08);

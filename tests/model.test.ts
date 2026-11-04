@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, batteryEntities, bulkControl, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, averageClimate, batteryEntities, bulkControl, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
+import { PALETTE_VARS, paletteVars, parseHex } from '../src/styles/palette'
 
 const st = (entity_id: string, state: string, attributes: Record<string, unknown> = {}): HassEntity =>
   ({ entity_id, state, attributes: { friendly_name: entity_id, ...attributes } })
@@ -224,5 +225,56 @@ describe('favorites and scenes', () => {
     expect(sceneEntities(hass, undefined).map(e => e.entity_id)).toEqual(['scene.a', 'scene.b'])
     expect(sceneEntities(hass, undefined, { domains: ['scene'] })).toEqual([])
     expect(sceneEntities(hass, ['script.s', 'light.flur']).map(e => e.entity_id)).toEqual(['script.s'])
+  })
+})
+
+describe('energy and climate', () => {
+  it('reads power in watts and sums rooms, biggest first', () => {
+    expect(powerW(st('sensor.a', '1.5', { device_class: 'power', unit_of_measurement: 'kW' }))).toBe(1500)
+    expect(powerW(st('sensor.a', 'unknown', { device_class: 'power' }))).toBeUndefined()
+    expect(powerW(st('sensor.a', '5', { device_class: 'energy' }))).toBeUndefined()
+    const hass = fakeHass()
+    hass.states['sensor.wz_p'] = st('sensor.wz_p', '100', { device_class: 'power', unit_of_measurement: 'W' })
+    hass.states['sensor.k_p'] = st('sensor.k_p', '0.4', { device_class: 'power', unit_of_measurement: 'kW' })
+    hass.entities['sensor.wz_p'] = { entity_id: 'sensor.wz_p', area_id: 'wohnzimmer' }
+    hass.entities['sensor.k_p'] = { entity_id: 'sensor.k_p', area_id: 'kueche' }
+    const rooms = roomPower(hass, Object.values(hass.areas))
+    expect(rooms.map(r => [r.area.area_id, r.total])).toEqual([['kueche', 400], ['wohnzimmer', 100]])
+  })
+
+  it('averages the rooms', () => {
+    const hass = fakeHass()
+    hass.states['sensor.k_t'] = st('sensor.k_t', '19.3', { device_class: 'temperature', unit_of_measurement: '°C' })
+    hass.entities['sensor.k_t'] = { entity_id: 'sensor.k_t', area_id: 'kueche' }
+    const avg = averageClimate(hass, [hass.areas.wohnzimmer!, hass.areas.kueche!, hass.areas.flur!])
+    expect(avg.temperature).toBeCloseTo(20.3)
+    expect(avg.humidity).toBeUndefined()
+  })
+})
+
+describe('palette', () => {
+  it('derives every variable for dark and light from one color', () => {
+    for (const dark of [true, false]) {
+      const vars = paletteVars('#0ea5e9', dark)!
+      expect(Object.keys(vars).sort()).toEqual([...PALETTE_VARS].sort())
+    }
+    expect(paletteVars('nope', true)).toBeUndefined()
+    expect(parseHex('#abc')).toEqual([170, 187, 204])
+  })
+
+  it('keeps the default look close to the built-in slate and indigo', () => {
+    const dark = paletteVars('#6366f1', true)!
+    const [r, g, b] = dark['--ad-primary'].split(',').map(Number)
+    expect(Math.abs(r! - 99) + Math.abs(g! - 102) + Math.abs(b! - 241)).toBeLessThan(30)
+    expect(dark['--ad-surface']).toMatch(/^rgb\(/)
+  })
+
+  it('a grey accent gives plain greys, a light accent gets dark text', () => {
+    const grey = paletteVars('#808080', true)!
+    const [r, g, b] = grey['--ad-surface'].slice(4, -1).split(',').map(Number)
+    expect(r).toBe(g)
+    expect(g).toBe(b)
+    expect(paletteVars('#fde047', false)!['--ad-on-primary']).toBe('15, 23, 42')
+    expect(paletteVars('#1e3a8a', true)!['--ad-on-primary']).toBe('255, 255, 255')
   })
 })

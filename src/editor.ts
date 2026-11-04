@@ -3,6 +3,7 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig } from './config'
 import { HIDE_LABEL } from './model'
+import { isHexColor } from './styles/palette'
 import { t, type Key } from './i18n'
 import type { AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
@@ -24,7 +25,10 @@ interface Option {
   label: string
 }
 
-const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security']
+/** Accent suggestions; the color picker covers everything else. Indigo is the default. */
+const SWATCHES = ['#6366f1', '#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f43f5e', '#a855f7', '#64748b']
+
+const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
   'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor',
@@ -74,6 +78,14 @@ export class AdStrategyEditor extends LitElement {
     .seg button + button { border-left: 1px solid var(--ad-line); }
     .seg button[aria-pressed=true] { background: color-mix(in srgb, var(--ad-accent) 18%, transparent); color: var(--ad-accent); font-weight: 500; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .colors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .swatch {
+      all: unset; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; box-sizing: border-box;
+      border: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--card-background-color, #fff);
+    }
+    .swatch[aria-pressed=true] { border-color: var(--primary-text-color, currentColor); }
+    .swatch:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 2px; }
+    input[type=color] { width: 36px; height: 30px; padding: 0; border: 1px solid var(--ad-line); border-radius: 8px; background: none; cursor: pointer; }
     .chip {
       all: unset; cursor: pointer; padding: 5px 11px; border-radius: 999px; font-size: 13px;
       border: 1px solid var(--ad-line);
@@ -175,6 +187,18 @@ export class AdStrategyEditor extends LitElement {
       <span class="group">${name}</span>${items.map(chip)}`)}</div>`
   }
 
+  private colorPicker(value: string | undefined) {
+    const current = isHexColor(value) ? value.toLowerCase() : undefined
+    const set = (primary_color?: string) => this.change({ primary_color })
+    return html`<div class="colors">
+      ${SWATCHES.map(color => html`<button class="swatch" style="background:${color}" aria-label=${color} title=${color}
+        aria-pressed=${(current ?? SWATCHES[0]) === color} @click=${() => set(color === SWATCHES[0] ? undefined : color)}></button>`)}
+      <input type="color" .value=${current ?? SWATCHES[0]!} aria-label=${this.l('ed.primary')}
+        @change=${(e: Event) => set((e.target as HTMLInputElement).value)}>
+      ${current ? html`<button class="link" @click=${() => set(undefined)}>${this.l('ed.reset')}</button>` : nothing}
+    </div>`
+  }
+
   /** HA's own entity picker when it is loaded, else one entity id per line. */
   private entityPicker(value: string[] | undefined, domains: string[] | undefined, onChange: (v: string[]) => void) {
     if (customElements.get('ha-selector')) {
@@ -259,6 +283,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
           [['auto', 'ed.theme_auto'], ['dark', 'ed.theme_dark'], ['light', 'ed.theme_light']],
           c.theme ?? 'auto', theme => this.change({ theme })))}
+        ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}
         ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}
         ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
@@ -282,6 +307,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.only_floors'), this.chips(this.floorOptions, c.floors, floors => this.change({ floors })), this.l('ed.none_hint'))}
         ${this.field(this.l('ed.only_areas'), this.chips([], c.areas, areas => this.change({ areas }), this.areasByFloor), this.l('ed.none_hint'))}
         ${this.field(this.l('ed.hide_areas'), this.chips([], c.hide_areas, hide_areas => this.change({ hide_areas }), this.areasByFloor))}
+        ${this.field(this.l('ed.outdoor'), this.chips([], c.outdoor_areas, outdoor_areas => this.change({ outdoor_areas }), this.areasByFloor), this.l('ed.outdoor_hint'))}
         ${this.field(this.l('ed.hide_domains'), this.chips(
           DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
         ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(

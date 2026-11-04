@@ -8,6 +8,9 @@ import { AdGroupHeading } from './cards/group-heading'
 import { AdRoomHeader } from './cards/room-header'
 import { AdScenes } from './cards/scenes'
 import { AdNowPlaying } from './cards/now-playing'
+import { AdHouseInfo } from './cards/house-info'
+import { AdPower } from './cards/power'
+import { AdMaintenanceList } from './cards/maintenance-list'
 import { AdStrategyEditor } from './editor'
 import type { HomeAssistant, StrategyConfig } from './types'
 
@@ -53,6 +56,9 @@ define('ad-group-heading', AdGroupHeading)
 define('ad-room-header', AdRoomHeader)
 define('ad-scenes', AdScenes)
 define('ad-now-playing', AdNowPlaying)
+define('ad-house-info', AdHouseInfo)
+define('ad-power', AdPower)
+define('ad-maintenance-list', AdMaintenanceList)
 define('ad-strategy-editor', AdStrategyEditor)
 
 // Lists the dashboard under "Community dashboards" in HA's Add dashboard dialog (HA 2026.5+)

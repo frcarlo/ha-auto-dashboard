@@ -35,6 +35,9 @@ const config: StrategyConfig = {
   areas: list('areas'),
   floors: list('floors'),
   hide_labels: list('labels'),
+  outdoor_areas: list('outdoor'),
+  // ?primary=0ea5e9 (without #, it would start the URL fragment)
+  primary_color: params.get('primary') ? `#${params.get('primary')}` : undefined,
   // ?fav=light.flur,lock.eingangstur  ?scenes=script.gute_nacht,scene.wohnzimmer_kino
   favorites: list('fav'),
   scenes: list('scenes'),
@@ -88,6 +91,13 @@ function createCard(conf: any) {
     }
     return { el, options: { columns: 'full', rows: 'auto' } }
   }
+  // HA's own cards (camera, to-do list, statistics graph) only get a placeholder here
+  if (!conf.type.startsWith('custom:')) {
+    const el = document.createElement('div')
+    el.className = 'placeholder'
+    el.textContent = `${conf.type}: ${conf.entity ?? conf.entities?.join(', ') ?? ''}`
+    return { el, options: { columns: conf.grid_options?.columns ?? 12, rows: conf.grid_options?.rows ?? 'auto' } }
+  }
   const el: any = document.createElement(conf.type.replace('custom:', ''))
   el.setConfig(conf)
   el.hass = hass
@@ -122,6 +132,9 @@ function render() {
 
   const main = document.getElementById('view')!
   main.innerHTML = ''
+  // Like hui-view-background; color-scheme stands in for the one HA sets from its dark mode
+  main.style.background = view.background ?? ''
+  main.style.colorScheme = dark ? 'dark' : 'light'
   const width = main.clientWidth || window.innerWidth
   const cols = Math.max(1, Math.min(view.max_columns ?? 4, Math.floor((width - 32 + 8) / (320 + 8))))
   // Same tag as HA's view, so the nav bar finds it to make room for a side rail

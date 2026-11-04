@@ -70,10 +70,12 @@ export type Access = 'full' | 'no_critical' | 'read_only'
 export interface CardLook {
   theme?: ThemeMode
   glass?: boolean
+  /** Accent as hex (#0ea5e9); background, surfaces and text are derived from it */
+  primary_color?: string
   access?: Access
 }
 
-export type PagePath = 'lights' | 'climate' | 'covers' | 'security'
+export type PagePath = 'lights' | 'climate' | 'covers' | 'security' | 'energy' | 'maintenance'
 
 /** Per-user rule under `users:`, keyed by user name, first name, user id or `default`. */
 export interface UserRule {
@@ -106,4 +108,6 @@ export interface StrategyConfig extends CardLook {
   favorites?: string[]
   /** Scenes and scripts in the row on Home; unset = every visible scene */
   scenes?: string[]
+  /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */
+  outdoor_areas?: string[]
 }

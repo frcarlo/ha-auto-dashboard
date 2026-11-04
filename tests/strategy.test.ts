@@ -16,7 +16,7 @@ describe('generateDashboard', () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const sections = views[0]!.sections as { cards: Record<string, any>[] }[]
     const floors = sections.slice(1, -1).map(s => s.cards[0]!.heading)
-    expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume'])
+    expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume', 'Kameras', 'Listen'])
     const rooms = sections.flatMap(s => s.cards).filter(c => c.type === 'custom:ad-room-card').map(c => c.area)
     expect(new Set(rooms).size).toBe(rooms.length)
   })
@@ -160,5 +160,66 @@ describe('groups by function and now playing', () => {
     const home = cards(views[0]!)
     expect(home.find(c => c.type === 'custom:ad-now-playing')).toBeDefined()
     expect(home.find(c => c.type === 'custom:ad-header')).toMatchObject({ hide_domains: ['person'] })
+  })
+})
+
+describe('energy, maintenance, cameras and lists', () => {
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+
+  it('adds energy and maintenance pages, linked from Home but not in the nav', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    expect(views.map(v => v.path)).toEqual(expect.arrayContaining(['energy', 'maintenance']))
+    const home = cards(views[0]!)
+    expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).not.toContain('energy')
+    expect(home.find(c => c.type === 'custom:ad-status-bar')!.links).toMatchObject({ battery: 'maintenance', unavailable: 'maintenance' })
+    expect(home.find(c => c.type === 'custom:ad-house-info')!.links).toMatchObject({ energy: 'energy', climate: 'climate' })
+  })
+
+  it('energy graphs only sensors with statistics', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const energy = cards(views.find(v => v.path === 'energy')!)
+    const graphs = energy.filter(c => c.type === 'statistics-graph').flatMap(c => c.entities)
+    expect(graphs).toContain('sensor.kuche_backofen')
+    expect(graphs).not.toContain('sensor.wohnzimmer_tv_leistung')
+    expect(energy.filter(c => c.type === 'custom:ad-power' && c.variant === 'room').map(c => c.areas[0]))
+      .toEqual(expect.arrayContaining(['kuche', 'wohnzimmer', 'buro_keller']))
+  })
+
+  it('outdoor areas leave the indoor average; updates are for admins only', async () => {
+    const admin = await generateDashboard({ type: 'custom:auto-dashboard', outdoor_areas: ['garten'] }, createHass(true))
+    const info = cards(admin.views[0]!).find(c => c.type === 'custom:ad-house-info')!
+    expect(info.outdoor).toEqual(['garten'])
+    expect(info.areas).not.toContain('garten')
+    expect(cards(admin.views.find(v => v.path === 'maintenance')!).map(c => c.source)).toContain('updates')
+    const hass = createHass(true)
+    hass.user = { id: 'x', name: 'Gast', is_admin: false }
+    const guest = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
+    expect(cards(guest.views.find(v => v.path === 'maintenance')!).map(c => c.source)).not.toContain('updates')
+  })
+
+  it('cameras and to-do lists use HA cards; hide_pages removes the new pages', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const home = cards(views[0]!)
+    expect(home.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage' })
+    expect(home.find(c => c.type === 'todo-list')).toMatchObject({ entity: 'todo.einkauf' })
+    expect(cards(views.find(v => v.path === 'area-garage')!).some(c => c.type === 'picture-entity')).toBe(true)
+    const hass = createHass(true)
+    const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['energy', 'maintenance'] } } }, hass)
+    expect(ruled.views.map(v => v.path)).not.toContain('energy')
+    expect(ruled.views.map(v => v.path)).not.toContain('maintenance')
+  })
+})
+
+describe('primary color', () => {
+  it('reaches every card, and an invalid value is ignored', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#0ea5e9' }, createHass(true))
+    const all = views.flatMap(v => (v.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)).filter(c => String(c.type).startsWith('custom:'))
+    expect(all.every(c => c.primary_color === '#0ea5e9')).toBe(true)
+    const bad = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: 'blau' }, createHass(true))
+    expect(JSON.stringify(bad.views)).not.toContain('primary_color')
+    expect(bad.views[0]!.background).toBeUndefined()
+    expect(views.every(v => String(v.background).startsWith('light-dark('))).toBe(true)
+    const dark = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#0ea5e9', theme: 'dark' }, createHass(true))
+    expect(dark.views[0]!.background).toMatch(/^rgb\(/)
   })
 })

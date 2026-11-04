@@ -1,7 +1,11 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { t } from './i18n'
-import { SECURITY_GROUPS, allEntities, areaEntities, bulkControl, coverKind, entityAreaId, favoriteEntities, floorsWithAreas, groupEntities, groupOf, sceneEntities } from './model'
+import {
+  SECURITY_GROUPS, allEntities, areaEntities, averageClimate, bulkControl, coverKind, entityAreaId, favoriteEntities,
+  floorsWithAreas, groupEntities, groupOf, isPower, sceneEntities,
+} from './model'
 import { domainOf } from './presentation'
+import { isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
@@ -40,6 +44,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   const look = {
     ...(config.theme ? { theme: config.theme } : {}),
     ...(config.glass ? { glass: true } : {}),
+    ...(isHexColor(config.primary_color) ? { primary_color: config.primary_color } : {}),
     ...(access !== 'full' ? { access } : {}),
   }
   const hide = { domains: config.hide_domains, labels: config.hide_labels }
@@ -76,6 +81,16 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   }
   const favorites = favoriteEntities(hass, config.favorites, areaIds)
   const scenes = sceneEntities(hass, config.scenes, hide, areaIds)
+  const ofDomain = (domain: string) => (e: HassEntity) => domainOf(e.entity_id) === domain
+  const cameras = all.filter(ofDomain('camera'))
+  const todos = all.filter(ofDomain('todo'))
+  // HA's own cards for what it draws best: camera streams, editable to-do lists, statistics graphs
+  const cameraCard = (e: HassEntity): Card => ({ type: 'picture-entity', entity: e.entity_id, show_state: false, camera_view: 'auto', grid_options: { columns: 12 } })
+  const outdoor = config.outdoor_areas ?? []
+  const indoor = areas.filter(a => !outdoor.includes(a.area_id))
+  const pageAllowed = (path: PagePath) => !rule?.hide_pages?.includes(path)
+  const hasEnergy = pageAllowed('energy') && all.some(isPower)
+  const hasMaintenance = pageAllowed('maintenance')
 
   // Domain pages: which entities, and how the header counts and acts on them
   const domainPages = [
@@ -115,6 +130,11 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
   const has = (path: string) => domainPages.some(p => p.path === path) ? path : undefined
+  const scopeOpts = { ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look }
+  const subview = (path: string, title: string, icon: string, sections: Section[]): View => ({
+    type: 'sections', title, path, icon, subview: true, back_path: `/${dashboardPath()}/home`, max_columns: MAX_COLUMNS,
+    sections: withNav([fullWidth([{ type: 'custom:ad-header', variant: 'page', title, icon, ...look }]), ...sections]),
+  })
 
   const favoritesSection = (entities: HassEntity[], areaName?: string): Section[] => entities.length ? [{
     type: 'grid',
@@ -126,6 +146,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   }] : []
   const roomSections = (area: (typeof areas)[number]): Section[] => [
     ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
+    ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e)] })),
     ...[...groupEntities(areaEntities(hass, area.area_id, hide))].map(([key, entities]): Section => ({
       type: 'grid',
       cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name))],
@@ -143,11 +164,18 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
       fullWidth([
         { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...hideOpts, ...look },
         {
-          type: 'custom:ad-status-bar', ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look,
-          links: { lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate') },
+          type: 'custom:ad-status-bar', ...scopeOpts,
+          links: {
+            lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate'),
+            battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
+          },
         },
+        ...(averageClimate(hass, indoor, hide).temperature !== undefined || hasEnergy || outdoor.length ? [{
+          type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outdoor.length ? { outdoor } : {}), ...hideOpts, ...look,
+          links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
+        }] : []),
         // Hides itself while nothing plays
-        { type: 'custom:ad-now-playing', ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look },
+        { type: 'custom:ad-now-playing', ...scopeOpts },
         ...(scenes.length ? [{ type: 'custom:ad-scenes', entities: scenes.map(e => e.entity_id), ...look }] : []),
       ]),
       ...(singleRoom ? [] : favoritesSection(favorites)),
@@ -162,8 +190,42 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
           ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })),
         ],
       })),
+      ...(cameras.length && !singleRoom ? [fullWidth([heading(t(hass, 'cameras'), 'mdi:cctv'), ...cameras.map(cameraCard)])] : []),
+      ...(todos.length ? [fullWidth([
+        heading(t(hass, 'todos'), 'mdi:clipboard-list-outline'),
+        ...todos.map(e => ({ type: 'todo-list', entity: e.entity_id, grid_options: { columns: 12 } })),
+      ])] : []),
     ]),
   }
+
+  const maintenanceView = subview('maintenance', t(hass, 'maintenance'), 'mdi:wrench-outline', [
+    { type: 'grid', column_span: 2, cards: [heading(t(hass, 'batteries'), 'mdi:battery-50'), { type: 'custom:ad-maintenance-list', source: 'battery', ...scopeOpts }] },
+    { type: 'grid', column_span: 2, cards: [heading(t(hass, 'status.unavailable'), 'mdi:lan-disconnect'), { type: 'custom:ad-maintenance-list', source: 'unavailable', ...scopeOpts }] },
+    // Only admins can install updates
+    ...(hass.user?.is_admin ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'updates'), 'mdi:package-up'), { type: 'custom:ad-maintenance-list', source: 'updates', ...scopeOpts }] }] : []),
+  ])
+
+  // Energy: the house, then per floor each room's sensors next to a graph of the last day
+  const powerOpts = { ...hideOpts, ...look }
+  const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
+    { type: 'grid', column_span: 2, cards: [{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...powerOpts }] },
+    ...floors.map((group): Section => {
+      const cards = group.areas.flatMap(area => {
+        const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)
+        if (!sensors.length) return []
+        // Graphs need long-term statistics, which only sensors with a state class have
+        const stats = sensors.filter(e => e.attributes.state_class)
+        return [
+          { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], ...(stats.length ? {} : { wide: true }), ...powerOpts },
+          ...(stats.length ? [{
+            type: 'statistics-graph', entities: stats.map(e => e.entity_id), days_to_show: 1, period: 'hour',
+            chart_type: 'line', stat_types: ['mean'], hide_legend: stats.length === 1, grid_options: { columns: 12, rows: 4 },
+          }] : []),
+        ]
+      })
+      return { type: 'grid', column_span: 2, cards: cards.length ? [heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon), ...cards] : [] }
+    }).filter(section => section.cards.length),
+  ])
 
   const roomViews: View[] = areas.map(area => {
     return {
@@ -223,8 +285,11 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
     }
   })
 
+  // With an own accent the page behind the cards follows it too; without, HA's theme stays in charge
+  const background = look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
+  const views = [home, ...domainViews, ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {
     title: config.title ?? scopeLabel ?? t(hass, 'home'),
-    views: [home, ...domainViews, ...roomViews],
+    views: background ? views.map((view): View => ({ ...view, background })) : views,
   }
 }

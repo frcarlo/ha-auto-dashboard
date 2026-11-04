@@ -4,6 +4,7 @@ import { css, html, render } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { tokens } from '../styles/tokens'
 import type { NavPosition } from '../types'
+import { PALETTE_VARS } from '../styles/palette'
 
 export interface NavItem {
   path: string
@@ -161,6 +162,12 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
   private paint() {
     if (!bar?.shadowRoot || !this.config) return
     bar.toggleAttribute('dark', this.hasAttribute('dark'))
+    // The bar lives outside the card, so it takes over the card's palette
+    for (const name of PALETTE_VARS) {
+      const value = this.style.getPropertyValue(name)
+      if (value) bar.style.setProperty(name, value)
+      else bar.style.removeProperty(name)
+    }
     bar.setAttribute('pos', this.config.position ?? 'bottom')
     bar.style.setProperty('--ad-offset', `${sidebarRight()}px`)
     this.padView()

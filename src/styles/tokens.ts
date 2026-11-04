@@ -8,6 +8,7 @@ export const tokens = css`
     --ad-surface-variant: #f1f5f9;
     --ad-on-surface: 15, 23, 42;
     --ad-primary: 79, 70, 229;
+    --ad-on-primary: 255, 255, 255;
     --ad-warning: 217, 119, 6;
     --ad-info: 37, 99, 235;
     --ad-success: 22, 163, 74;
@@ -76,7 +77,7 @@ export const tokens = css`
   }
   .dot ha-icon { --mdc-icon-size: 16px; }
   .dot:focus-visible, .btn:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
-  .dot.primary { background: rgb(var(--ad-primary)); color: #fff; }
+  .dot.primary { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
   .dot.warning { background: rgb(var(--ad-warning)); color: #fff; }
   .dot.info { background: rgb(var(--ad-info)); color: #fff; }
   .dot.error { background: rgb(var(--ad-error)); color: #fff; }

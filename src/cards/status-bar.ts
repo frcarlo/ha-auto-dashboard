@@ -2,7 +2,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { allEntities, batteryEntities, entityAreaId, entityIndex, homeStatus, unavailableDevices, type StatusKey } from '../model'
+import { allEntities, batteryEntities, deviceName, entityAreaId, entityIndex, homeStatus, unavailableDevices, type StatusKey } from '../model'
 import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -80,11 +80,6 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels).map(e => e.entity_id)]
   }
 
-  private deviceName(entity: HassEntity) {
-    const device = this.hass!.devices[this.hass!.entities[entity.entity_id]?.device_id ?? '']
-    return device?.name_by_user ?? device?.name ?? entityName(entity)
-  }
-
   private areaName(entity: HassEntity) {
     // A dashboard for one room needs no room names in the list
     if (this.config?.areas?.length === 1) return undefined
@@ -110,7 +105,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       ${openItem ? html`<div class="list card">
         ${openItem.entities.map(e => {
           const area = this.areaName(e)
-          const name = shortName(this.open === 'unavailable' ? this.deviceName(e) : entityName(e), area)
+          const name = shortName(this.open === 'unavailable' ? deviceName(this.hass!, e) : entityName(e), area)
           return html`
             <button class="item" @click=${() => this.moreInfo(e.entity_id)}>
               <ha-icon icon=${entityIcon(e)}></ha-icon>

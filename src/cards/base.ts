@@ -2,6 +2,7 @@ import { LitElement, type PropertyValues } from 'lit'
 import type { CardLook, HassEntity, HomeAssistant } from '../types'
 import { domainOf } from '../presentation'
 import { canControl, canOpen } from '../access'
+import { applyPalette, paletteVars } from '../styles/palette'
 
 export interface BaseConfig extends CardLook {
   type: string
@@ -41,10 +42,20 @@ export abstract class BaseCard<C extends BaseConfig = BaseConfig> extends LitEle
     return this.watched().some(id => old.states[id] !== this.hass!.states[id])
   }
 
+  private paletteKey?: string
+
   protected willUpdate() {
     const theme = this.config?.theme ?? 'auto'
-    this.toggleAttribute('dark', theme === 'dark' || (theme === 'auto' && !!this.hass?.themes?.darkMode))
+    const dark = theme === 'dark' || (theme === 'auto' && !!this.hass?.themes?.darkMode)
+    this.toggleAttribute('dark', dark)
     this.toggleAttribute('glass', !!this.config?.glass)
+    // Inline variables beat the :host defaults in the shadow styles
+    const color = this.config?.primary_color
+    const key = color ? `${color}|${dark}` : ''
+    if (key !== (this.paletteKey ?? '')) {
+      this.paletteKey = key
+      applyPalette(this, color ? paletteVars(color, dark) : undefined)
+    }
   }
 
   protected state(entityId?: string): HassEntity | undefined {

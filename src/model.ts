@@ -265,6 +265,12 @@ export function unavailableDevices(hass: HomeAssistant, hide: Hide = {}, areaIds
   return [...dead, ...loose]
 }
 
+/** The device's name for an entity, as people know it; falls back to the entity name. */
+export function deviceName(hass: HomeAssistant, entity: HassEntity) {
+  const device = hass.devices[hass.entities[entity.entity_id]?.device_id ?? '']
+  return device?.name_by_user ?? device?.name ?? String(entity.attributes.friendly_name ?? entity.entity_id)
+}
+
 /** Things worth a glance on the home page. Only non-empty items are returned. */
 export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [], unavailable: HassEntity[] = []): StatusItem[] {
   const is = (domain: string) => (e: HassEntity) => domainOf(e.entity_id) === domain
@@ -336,4 +342,68 @@ export function bulkControl(entities: HassEntity[]): { control?: GroupControl; e
   const locks = entities.filter(e => domainOf(e.entity_id) === 'lock')
   if (many(locks) && [...domains].every(d => ['lock', 'binary_sensor', 'alarm_control_panel'].includes(d))) return { control: 'lock', entities: locks }
   return { entities }
+}
+
+/** Current power in watts, or undefined for anything that is not a numeric power sensor. */
+export function powerW(entity: HassEntity): number | undefined {
+  if (domainOf(entity.entity_id) !== 'sensor' || deviceClassOf(entity) !== 'power') return undefined
+  const value = Number(entity.state)
+  if (entity.state === '' || !Number.isFinite(value)) return undefined
+  const unit = String(entity.attributes.unit_of_measurement ?? 'W')
+  return unit === 'kW' ? value * 1000 : unit === 'MW' ? value * 1e6 : value
+}
+
+export const isPower = (e: HassEntity) => deviceClassOf(e) === 'power' && domainOf(e.entity_id) === 'sensor'
+
+export interface RoomPower {
+  area: AreaRegistryEntry
+  total: number
+  /** Biggest consumer first */
+  sensors: { entity: HassEntity; watts: number }[]
+}
+
+/** Power per room, biggest room first. Rooms without a reading are left out. */
+export function roomPower(hass: HomeAssistant, areas: AreaRegistryEntry[], hide: Hide = {}): RoomPower[] {
+  return areas
+    .map(area => {
+      const sensors = areaEntities(hass, area.area_id, hide)
+        .map(entity => ({ entity, watts: powerW(entity) }))
+        .filter((s): s is { entity: HassEntity; watts: number } => s.watts !== undefined)
+        .sort((a, b) => b.watts - a.watts)
+      return { area, total: sensors.reduce((sum, s) => sum + s.watts, 0), sensors }
+    })
+    .filter(room => room.sensors.length)
+    .sort((a, b) => b.total - a.total)
+}
+
+export interface ClimateAverage {
+  temperature?: number
+  humidity?: number
+  unit: string
+}
+
+/** Average of the rooms' temperature and humidity (the sensors picked for the area, else the first in the room). */
+export function averageClimate(hass: HomeAssistant, areas: AreaRegistryEntry[], hide: Hide = {}): ClimateAverage {
+  const temps: number[] = []
+  const hums: number[] = []
+  let unit = '°C'
+  for (const area of areas) {
+    const s = roomSummary(areaEntities(hass, area.area_id, hide), area, hass.states)
+    const t = Number(s.temperature?.state)
+    if (s.temperature && s.temperature.state !== '' && Number.isFinite(t)) {
+      temps.push(t)
+      unit = String(s.temperature.attributes.unit_of_measurement ?? unit)
+    }
+    const h = Number(s.humidity?.state)
+    if (s.humidity && s.humidity.state !== '' && Number.isFinite(h)) hums.push(h)
+  }
+  const avg = (list: number[]) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : undefined)
+  return { temperature: avg(temps), humidity: avg(hums), unit }
+}
+
+/** Pending updates (firmware, add-ons, HACS). Update entities are mostly config entities, so they come from the states. */
+export function pendingUpdates(hass: HomeAssistant, hideLabels: string[] = []): HassEntity[] {
+  const labels = [HIDE_LABEL, ...hideLabels]
+  return Object.values(hass.states).filter(e =>
+    domainOf(e.entity_id) === 'update' && e.state === 'on' && !hass.entities[e.entity_id]?.hidden && !labelled(hass, e.entity_id, labels))
 }
