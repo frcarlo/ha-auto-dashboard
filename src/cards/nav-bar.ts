@@ -4,7 +4,7 @@ import { css, html, render } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { tokens } from '../styles/tokens'
 import type { NavPosition } from '../types'
-import { PALETTE_VARS } from '../styles/palette'
+import { PALETTE_VARS, haThemeVars } from '../styles/palette'
 
 export interface NavItem {
   path: string
@@ -15,6 +15,8 @@ export interface NavItem {
 interface NavBarConfig extends BaseConfig {
   items: NavItem[]
   position?: NavPosition
+  /** false: HA's header and sidebar keep their theme when an accent color is set */
+  ha_colors?: boolean
 }
 
 
@@ -52,6 +54,23 @@ let bar: HTMLElement | undefined
 let users = 0
 
 let sidebarObserver: ResizeObserver | undefined
+
+/** HA variables this dashboard changed on <home-assistant>, with the inline values they had before. */
+let haColors: Map<string, string> | undefined
+
+/**
+ * Colors HA's own UI (header, sidebar, dialogs) while the dashboard is open. The variables go inline on
+ * <home-assistant>, above the theme HA sets on <html>, and are put back when the dashboard closes.
+ */
+function tintHa(vars: Record<string, string> | undefined) {
+  const root = document.querySelector('home-assistant') as HTMLElement | null
+  if (!root) return
+  if (haColors) for (const [name, before] of haColors) before ? root.style.setProperty(name, before) : root.style.removeProperty(name)
+  haColors = undefined
+  if (!vars) return
+  haColors = new Map(Object.keys(vars).map(name => [name, root.style.getPropertyValue(name)]))
+  for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value)
+}
 
 function haSidebar() {
   const main = document.querySelector('home-assistant')?.shadowRoot?.querySelector('home-assistant-main')
@@ -146,6 +165,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
         bar = undefined
         sidebarObserver?.disconnect()
         sidebarObserver = undefined
+        tintHa(undefined)
       }
     }, 0)
   }
@@ -169,6 +189,8 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
       else bar.style.removeProperty(name)
     }
     bar.setAttribute('pos', this.config.position ?? 'bottom')
+    const color = this.config.ha_colors === false ? undefined : this.config.primary_color
+    tintHa(color ? haThemeVars(color, this.hasAttribute('dark')) : undefined)
     bar.style.setProperty('--ad-offset', `${sidebarRight()}px`)
     this.padView()
     // A bare dashboard URL shows the first view

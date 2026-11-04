@@ -1,13 +1,13 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { t } from './i18n'
 import {
-  SECURITY_GROUPS, allEntities, areaEntities, averageClimate, bulkControl, coverKind, entityAreaId, favoriteEntities,
-  floorsWithAreas, groupEntities, groupOf, isPower, sceneEntities,
+  SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
+  floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
 import { domainOf } from './presentation'
 import { isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
-import type { HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
+import type { CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
 type Card = Record<string, unknown>
 type Section = { type: 'grid'; column_span?: number; cards: Card[] }
@@ -47,11 +47,12 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
     ...(isHexColor(config.primary_color) ? { primary_color: config.primary_color } : {}),
     ...(access !== 'full' ? { access } : {}),
   }
-  const hide = { domains: config.hide_domains, labels: config.hide_labels }
+  const hide = hideOf(config)
   // Cards filter on their own, so they get the same options
   const hideOpts = {
     ...(config.hide_domains?.length ? { hide_domains: config.hide_domains } : {}),
     ...(config.hide_labels?.length ? { hide_labels: config.hide_labels } : {}),
+    ...(config.hide_entities?.length ? { hide_entities: config.hide_entities } : {}),
   }
   const floors = floorsWithAreas(hass, config)
   const areas = floors.flatMap(f => f.areas)
@@ -89,7 +90,11 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   const outdoor = config.outdoor_areas ?? []
   const indoor = areas.filter(a => !outdoor.includes(a.area_id))
   const pageAllowed = (path: PagePath) => !rule?.hide_pages?.includes(path)
-  const hasEnergy = pageAllowed('energy') && all.some(isPower)
+  // The energy settings know the house meter; without them (or without access) the rooms' sum stands in
+  const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
+  const sources = powerSources(hass, prefs)
+  const sourceOpts = sources ? { power_sources: sources } : {}
+  const hasEnergy = pageAllowed('energy') && (all.some(isPower) || !!sources)
   const hasMaintenance = pageAllowed('maintenance')
 
   // Domain pages: which entities, and how the header counts and acts on them
@@ -130,7 +135,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
     { path: 'home', icon: 'mdi:home-outline', label: t(hass, 'home') },
     ...domainPages.map(p => ({ path: p.path, icon: p.icon, label: p.title })),
   ]
-  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...look }])
+  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...look }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
   const has = (path: string) => domainPages.some(p => p.path === path) ? path : undefined
@@ -148,14 +153,21 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
       ...entities.map(e => tile(e, areaName)),
     ],
   }] : []
-  const roomSections = (area: (typeof areas)[number]): Section[] => [
-    ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
-    ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e)] })),
-    ...[...groupEntities(areaEntities(hass, area.area_id, hide))].map(([key, entities]): Section => ({
-      type: 'grid',
-      cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name))],
-    })),
-  ]
+  const roomSections = (area: (typeof areas)[number]): Section[] => {
+    const room = config.rooms?.[area.area_id] ?? {}
+    // Own cards are plain Lovelace configs, passed through untouched
+    const own = (slot: CardSlot) => room.cards?.[slot] ?? []
+    return [
+      ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
+      ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
+      ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e)] })),
+      ...arrangeRoom(groupEntities(areaEntities(hass, area.area_id, hide)), room).map(([key, entities]): Section => ({
+        type: 'grid',
+        cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name)), ...own(key)],
+      })),
+      ...(own('bottom').length ? [{ type: 'grid' as const, cards: own('bottom') }] : []),
+    ]
+  }
   const singleRoom = scoped && areas.length === 1 ? areas[0] : undefined
 
   const home: View = {
@@ -176,7 +188,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
         },
         ...(averageClimate(hass, indoor, hide).temperature !== undefined || hasEnergy || outdoor.length ? [{
           type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outdoor.length ? { outdoor } : {}), ...hideOpts, ...look,
-          links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
+          ...sourceOpts, links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
         }] : []),
         // Hides itself while nothing plays
         { type: 'custom:ad-now-playing', ...scopeOpts },
@@ -211,7 +223,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
   const powerOpts = { ...hideOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
-    { type: 'grid', column_span: 2, cards: [{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...powerOpts }] },
+    { type: 'grid', column_span: 2, cards: [{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }] },
     ...floors.map((group): Section => {
       const cards = group.areas.flatMap(area => {
         const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, averageClimate, batteryEntities, bulkControl, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
-import { PALETTE_VARS, paletteVars, parseHex } from '../src/styles/palette'
+import { PALETTE_VARS, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
 const st = (entity_id: string, state: string, attributes: Record<string, unknown> = {}): HassEntity =>
   ({ entity_id, state, attributes: { friendly_name: entity_id, ...attributes } })
@@ -276,5 +276,66 @@ describe('palette', () => {
     expect(g).toBe(b)
     expect(paletteVars('#fde047', false)!['--ad-on-primary']).toBe('15, 23, 42')
     expect(paletteVars('#1e3a8a', true)!['--ad-on-primary']).toBe('255, 255, 255')
+  })
+})
+
+describe('room settings', () => {
+  const groups = () => groupEntities([
+    st('light.b', 'on', { friendly_name: 'B' }), st('light.a', 'on', { friendly_name: 'A' }), st('light.c', 'on', { friendly_name: 'C' }),
+    st('switch.s', 'on'), st('sensor.t', '20', { device_class: 'temperature', unit_of_measurement: '°C' }),
+  ])
+
+  it('without settings keeps the default order', () => {
+    expect(arrangeRoom(groups()).map(([k, list]) => [k, list.map(e => e.entity_id)])).toEqual([
+      ['light', ['light.a', 'light.b', 'light.c']], ['switch', ['switch.s']], ['sensor', ['sensor.t']],
+    ])
+  })
+
+  it('hides groups and puts groups and entities in the chosen order', () => {
+    const out = arrangeRoom(groups(), { hide_groups: ['switch'], group_order: ['sensor'], order: ['light.c', 'light.a'] })
+    expect(out.map(([k, list]) => [k, list.map(e => e.entity_id)])).toEqual([
+      ['sensor', ['sensor.t']], ['light', ['light.c', 'light.a', 'light.b']],
+    ])
+  })
+
+  it('hide_entities removes single entities everywhere', () => {
+    const ids = areaEntities(fakeHass(), 'wohnzimmer', { entities: ['climate.wz'] }).map(e => e.entity_id)
+    expect(ids).not.toContain('climate.wz')
+    expect(ids).toContain('sensor.wz_temp')
+  })
+})
+
+describe('energy settings', () => {
+  const hass = () => {
+    const h = fakeHass()
+    h.states['sensor.grid'] = st('sensor.grid', '1.2', { unit_of_measurement: 'kW' })
+    h.states['sensor.pv'] = st('sensor.pv', '800', { unit_of_measurement: 'W' })
+    h.states['sensor.house'] = st('sensor.house', '1500', { unit_of_measurement: 'W' })
+    return h
+  }
+
+  it('keeps sources with an existing power sensor', () => {
+    const sources = powerSources(hass(), { energy_sources: [
+      { type: 'grid', stat_rate: 'sensor.grid' }, { type: 'solar', stat_rate: 'sensor.gone' }, { type: 'gas', stat_rate: 'sensor.pv' }, { type: 'solar' },
+    ] })
+    expect(sources).toEqual({ grid: ['sensor.grid'] })
+    expect(powerSources(hass(), undefined)).toBeUndefined()
+  })
+
+  it('the house is the home sensor, else grid + solar + battery', () => {
+    expect(housePower(hass(), { grid: ['sensor.grid'], solar: ['sensor.pv'] })).toMatchObject({ total: 2000, grid: 1200, solar: 800 })
+    expect(housePower(hass(), { home: ['sensor.house'], grid: ['sensor.grid'] })!.total).toBe(1500)
+    expect(housePower(hass(), undefined)).toBeUndefined()
+  })
+})
+
+describe('HA theme from the accent', () => {
+  it('colors header, sidebar and dialogs like the cards', () => {
+    const vars = haThemeVars('#14b8a6', true)!
+    const cards = paletteVars('#14b8a6', true)!
+    expect(vars['--app-header-background-color']).toBe(cards['--ad-bg'])
+    expect(vars['--card-background-color']).toBe(cards['--ad-surface'])
+    expect(vars['--primary-color']).toBe(`rgb(${cards['--ad-primary']})`)
+    expect(haThemeVars('kaputt', true)).toBeUndefined()
   })
 })

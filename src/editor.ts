@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig } from './config'
 import { HIDE_LABEL } from './model'
 import { isHexColor } from './styles/palette'
+import type { RoomsPatch } from './editor-rooms'
 import { t, type Key } from './i18n'
 import type { AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
@@ -259,7 +260,17 @@ export class AdStrategyEditor extends LitElement {
 
   protected render() {
     if (!this.hass) return nothing
-    return html`${this.renderLook()}${this.renderHome()}${this.renderRooms()}${this.renderUsers()}`
+    return html`${this.renderLook()}${this.renderHome()}${this.renderRooms()}${this.renderRoomPages()}${this.renderUsers()}`
+  }
+
+  private renderRoomPages() {
+    return html`<details ?open=${!!this.config.rooms}>
+      <summary>${this.l('ed.room_pages')}</summary>
+      <div class="body">
+        <ad-room-settings .hass=${this.hass} .config=${this.config}
+          @rooms-changed=${(e: CustomEvent<RoomsPatch>) => this.change(e.detail)}></ad-room-settings>
+      </div>
+    </details>`
   }
 
   private renderHome() {
@@ -284,6 +295,7 @@ export class AdStrategyEditor extends LitElement {
           [['auto', 'ed.theme_auto'], ['dark', 'ed.theme_dark'], ['light', 'ed.theme_light']],
           c.theme ?? 'auto', theme => this.change({ theme })))}
         ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}
+        ${isHexColor(c.primary_color) ? this.toggle(this.l('ed.ha_colors'), c.ha_colors !== false, ha_colors => this.change({ ha_colors })) : nothing}
         ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}
         ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],

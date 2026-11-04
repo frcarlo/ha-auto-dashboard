@@ -18,3 +18,16 @@ describe('cleanConfig', () => {
       .toEqual({ type: 'custom:auto-dashboard', theme: 'dark', glass: true, nav_position: 'left' })
   })
 })
+
+describe('room settings', () => {
+  it('drops empty lists, empty card slots and rooms left empty', () => {
+    const out = cleanConfig({
+      type: 'custom:auto-dashboard',
+      rooms: {
+        wohnzimmer: { hide_groups: [], order: ['light.a'], cards: { top: [], bottom: [{ type: 'markdown' }] } },
+        kuche: { hide_groups: [], cards: {} },
+      },
+    })
+    expect(out.rooms).toEqual({ wohnzimmer: { order: ['light.a'], cards: { bottom: [{ type: 'markdown' }] } } })
+  })
+})

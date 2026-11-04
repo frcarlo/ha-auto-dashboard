@@ -109,3 +109,35 @@ export function applyPalette(el: HTMLElement, vars: Record<string, string> | und
     else el.style.removeProperty(name)
   }
 }
+
+/**
+ * HA's own theme variables from the same palette, so the header, sidebar and HA's dialogs
+ * (more-info, editors) match the cards. Same names as themes/harmony.yaml.
+ */
+export function haThemeVars(hex: string, dark: boolean): Record<string, string> | undefined {
+  const p = paletteVars(hex, dark)
+  if (!p) return undefined
+  const text = p['--ad-on-surface']
+  const primary = `rgb(${p['--ad-primary']})`
+  return {
+    '--primary-color': primary,
+    '--accent-color': primary,
+    '--primary-background-color': p['--ad-bg'],
+    '--lovelace-background': p['--ad-bg'],
+    '--secondary-background-color': p['--ad-surface-variant'],
+    '--card-background-color': p['--ad-surface'],
+    '--ha-card-background': p['--ad-surface'],
+    '--primary-text-color': `rgb(${text})`,
+    '--secondary-text-color': `rgba(${text}, 0.62)`,
+    '--divider-color': `rgba(${text}, 0.08)`,
+    '--app-header-background-color': p['--ad-bg'],
+    '--app-header-text-color': `rgb(${text})`,
+    '--sidebar-background-color': p['--ad-bg'],
+    '--sidebar-text-color': `rgba(${text}, 0.8)`,
+    '--sidebar-icon-color': `rgba(${text}, 0.6)`,
+    '--sidebar-selected-text-color': primary,
+    '--sidebar-selected-icon-color': primary,
+    '--mdc-theme-primary': primary,
+    '--state-icon-active-color': primary,
+  }
+}

@@ -36,6 +36,8 @@ export interface AreaRegistryEntry {
   /** Sensors picked for the area in HA (Settings → Areas) */
   temperature_entity_id?: string | null
   humidity_entity_id?: string | null
+  /** Picture uploaded for the area in HA */
+  picture?: string | null
 }
 
 export interface FloorRegistryEntry {
@@ -62,6 +64,24 @@ export interface HomeAssistant {
 }
 
 export type ThemeMode = 'auto' | 'dark' | 'light'
+
+/** Groups on a room page, by what the entities do */
+export type GroupKey =
+  | 'light' | 'climate' | 'shading' | 'opening' | 'gate' | 'lock' | 'media' | 'switch'
+  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene'
+
+/** Where own cards go on a room page: top, bottom, or at the end of a group */
+export type CardSlot = 'top' | 'bottom' | GroupKey
+
+/** Per-room settings under `rooms: <area_id>:` */
+export interface RoomSettings {
+  hide_groups?: GroupKey[]
+  group_order?: GroupKey[]
+  /** Entity ids in the order they should appear within their group */
+  order?: string[]
+  /** Plain Lovelace card configs */
+  cards?: Partial<Record<CardSlot, Record<string, unknown>[]>>
+}
 
 /** What the viewing user may operate. Only shapes the UI; HA itself does not enforce it. */
 export type Access = 'full' | 'no_critical' | 'read_only'
@@ -104,10 +124,15 @@ export interface StrategyConfig extends CardLook {
   hide_domains?: string[]
   /** Label ids: entities, devices and areas with one of them are left out */
   hide_labels?: string[]
+  /** Single entities left out everywhere (set per room in the editor) */
+  hide_entities?: string[]
+  rooms?: Record<string, RoomSettings>
   /** Entities shown on Home and, for those in a room, at the top of the room page */
   favorites?: string[]
   /** Scenes and scripts in the row on Home; unset = every visible scene */
   scenes?: string[]
+  /** With primary_color: false keeps HA's header, sidebar and dialogs in HA's theme */
+  ha_colors?: boolean
   /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */
   outdoor_areas?: string[]
 }

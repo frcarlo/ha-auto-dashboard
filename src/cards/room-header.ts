@@ -4,7 +4,7 @@ import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { canBulk } from '../access'
-import { areaEntities, entityIndex, quickGroups, roomSummary, type QuickKey } from '../model'
+import { areaEntities, entityIndex, hideOf, quickGroups, roomSummary, type QuickKey } from '../model'
 import { HVAC_ICONS, domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -13,6 +13,7 @@ interface RoomHeaderConfig extends BaseConfig {
   area: string
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
 }
 
 const QUICK_ICONS: Record<QuickKey, [on: string, off: string]> = {
@@ -38,6 +39,13 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     :host { display: block; container-type: inline-size; }
     .wrap { padding: 8px 4px 4px; display: flex; flex-direction: column; gap: 12px; }
     .top { display: flex; align-items: flex-end; gap: 12px; }
+    /* Area picture: the name sits on the photo, darkened at the bottom so it stays readable */
+    .top.photo {
+      min-height: 150px; box-sizing: border-box; padding: 16px; border-radius: var(--ad-radius); color: #fff;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.05) 70%), var(--photo) center / cover no-repeat;
+    }
+    .photo h1 ha-icon { opacity: 0.8; }
+    .photo .value { background: rgba(0, 0, 0, 0.35); color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
     h1 { flex: 1; min-width: 0; margin: 0; font-size: 28px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.15; }
     h1 ha-icon { --mdc-icon-size: 26px; opacity: 0.5; margin-right: 6px; vertical-align: -3px; }
     .values { display: flex; gap: 6px; }
@@ -90,7 +98,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
   }
 
   private get roomEntities() {
-    return areaEntities(this.hass!, this.config!.area, { domains: this.config!.hide_domains, labels: this.config!.hide_labels })
+    return areaEntities(this.hass!, this.config!.area, hideOf(this.config!))
   }
 
   protected watched() {
@@ -192,7 +200,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const climate = this.thermostat
     const quick = quickGroups(entities)
     return html`<div class="wrap">
-      <div class="top">
+      <div class="top ${area.picture ? 'photo' : ''}" style=${area.picture ? `--photo: url('${area.picture}')` : ''}>
         <h1>${area.icon ? html`<ha-icon icon=${area.icon}></ha-icon>` : nothing}${area.name}</h1>
         <div class="values">
           ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer')}

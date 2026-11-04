@@ -2,7 +2,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { allEntities, batteryEntities, deviceName, entityAreaId, entityIndex, homeStatus, unavailableDevices, type StatusKey } from '../model'
+import { allEntities, batteryEntities, deviceName, entityAreaId, entityIndex, hideOf, homeStatus, unavailableDevices, type StatusKey } from '../model'
 import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -10,6 +10,7 @@ import type { HassEntity } from '../types'
 interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
   /** Only count entities in these areas (dashboard filtered to rooms or floors) */
   areas?: string[]
   /** Status keys whose list ends with a link to a view showing all of them */
@@ -76,8 +77,8 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   }
 
   protected watched() {
-    const { areas, hide_labels: labels } = this.config!
-    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels).map(e => e.entity_id)]
+    const { areas, hide_labels: labels, hide_entities: hidden } = this.config!
+    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id)]
   }
 
   private areaName(entity: HassEntity) {
@@ -87,9 +88,9 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   }
 
   protected render() {
-    const { hide_domains: domains, hide_labels: labels, areas } = this.config!
-    const hide = { domains, labels }
-    const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas, labels), unavailableDevices(this.hass!, hide, areas))
+    const { hide_labels: labels, hide_entities: hidden, areas } = this.config!
+    const hide = hideOf(this.config!)
+    const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas, labels, hidden), unavailableDevices(this.hass!, hide, areas))
     const openItem = items.find(i => i.key === this.open)
     const link = openItem && this.config!.links?.[openItem.key]
     return html`

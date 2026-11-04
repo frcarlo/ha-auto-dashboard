@@ -65,6 +65,8 @@ const extras: HassEntity[] = [
   { entity_id: 'script.gute_nacht', state: 'off', attributes: { friendly_name: 'Gute Nacht', icon: 'mdi:weather-night', last_triggered: new Date(Date.now() - 15 * 3600_000).toISOString() } },
   { entity_id: 'sensor.kuche_fenster_batterie', state: '34', attributes: { friendly_name: 'Küche Fenster Batterie', device_class: 'battery', unit_of_measurement: '%' } },
   { entity_id: 'update.zigbee_router', state: 'on', attributes: { friendly_name: 'Zigbee Router Firmware', installed_version: '1.2.0', latest_version: '1.3.1' } },
+  { entity_id: 'sensor.netz_leistung', state: '1.42', attributes: { friendly_name: 'Netz Leistung', device_class: 'power', unit_of_measurement: 'kW' } },
+  { entity_id: 'sensor.pv_leistung', state: '860', attributes: { friendly_name: 'PV Leistung', device_class: 'power', unit_of_measurement: 'W' } },
   { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo' } },
   { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni' } },
   { entity_id: 'alarm_control_panel.haus', state: 'armed_home', attributes: { friendly_name: 'Alarmanlage' } },
@@ -93,7 +95,8 @@ export function createHass(dark: boolean): HomeAssistant {
     devices: {},
     areas: {
       wohnzimmer: { area_id: 'wohnzimmer', name: 'Wohnzimmer', icon: 'mdi:sofa', floor_id: 'eg', temperature_entity_id: 'sensor.wohnzimmer_temperatur', humidity_entity_id: 'sensor.wohnzimmer_luftfeuchte' },
-      kuche: { area_id: 'kuche', name: 'Küche', icon: 'mdi:countertop', floor_id: 'eg' },
+      // Stand-in for an uploaded area picture
+      kuche: { area_id: 'kuche', name: 'Küche', icon: 'mdi:countertop', floor_id: 'eg', picture: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="300"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#b45309"/><stop offset="1" stop-color="#1e3a8a"/></linearGradient></defs><rect width="800" height="300" fill="url(#g)"/><circle cx="620" cy="90" r="60" fill="#fde68a" opacity=".6"/></svg>')}` },
       esszimmer: { area_id: 'esszimmer', name: 'Esszimmer', icon: 'mdi:table-chair', floor_id: 'eg' },
       eingangstur: { area_id: 'eingangstur', name: 'Eingangstür', icon: 'mdi:door', floor_id: 'eg' },
       schlafzimmer: { area_id: 'schlafzimmer', name: 'Schlafzimmer', icon: 'mdi:bed', floor_id: 'og' },
@@ -122,6 +125,12 @@ export function createHass(dark: boolean): HomeAssistant {
     },
     callService: async () => undefined,
     callWS: async <T,>(msg: Record<string, unknown>) => {
+      if (msg.type === 'energy/get_prefs') return {
+        energy_sources: [
+          { type: 'grid', stat_rate: 'sensor.netz_leistung' },
+          { type: 'solar', stat_rate: 'sensor.pv_leistung' },
+        ],
+      } as T
       if (msg.type === 'config/label_registry/list') return [
         { label_id: 'ad_hide', name: 'ad_hide' },
         { label_id: 'technik', name: 'Technik' },

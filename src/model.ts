@@ -1,5 +1,5 @@
 // Pure functions that turn the HA registries into rooms, groups and counts.
-import type { AreaRegistryEntry, FloorRegistryEntry, HassEntity, HomeAssistant, StrategyConfig } from './types'
+import type { AreaRegistryEntry, FloorRegistryEntry, GroupKey, HassEntity, HomeAssistant, RoomSettings, StrategyConfig } from './types'
 import { OPENING_CLASSES, deviceClassOf, domainOf, isActive } from './presentation'
 
 export const HIDE_LABEL = 'ad_hide'
@@ -9,11 +9,22 @@ export interface Hide {
   domains?: string[]
   /** Label ids; an entity is left out when it, its device or its area carries one */
   labels?: string[]
+  /** Single entities hidden in the room settings */
+  entities?: string[]
 }
 
-export type GroupKey =
-  | 'light' | 'climate' | 'shading' | 'opening' | 'gate' | 'lock' | 'media' | 'switch'
-  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene'
+/** The hide options as cards and the strategy config carry them. */
+export interface HideOptions {
+  hide_domains?: string[]
+  hide_labels?: string[]
+  hide_entities?: string[]
+}
+
+export const hideOf = (c: HideOptions): Hide => ({ domains: c.hide_domains, labels: c.hide_labels, entities: c.hide_entities })
+
+const shown = (hide: Hide) => (id: string) => !hide.domains?.includes(domainOf(id)) && !hide.entities?.includes(id)
+
+export type { GroupKey } from './types'
 
 /** Order in which groups appear on a room page. */
 export const GROUP_ORDER: GroupKey[] = [
@@ -124,7 +135,7 @@ export function entityIndex(hass: HomeAssistant, hideLabels: string[] = []): Ind
 
 export function areaEntities(hass: HomeAssistant, areaId: string, hide: Hide = {}): HassEntity[] {
   return (entityIndex(hass, hide.labels).byArea.get(areaId) ?? [])
-    .filter(id => !hide.domains?.includes(domainOf(id)))
+    .filter(shown(hide))
     .map(id => hass.states[id]!)
     .filter(Boolean)
 }
@@ -133,7 +144,7 @@ export function areaEntities(hass: HomeAssistant, areaId: string, hide: Hide = {
 export function allEntities(hass: HomeAssistant, hide: Hide = {}, areaIds?: string[]): HassEntity[] {
   if (areaIds) return areaIds.flatMap(id => areaEntities(hass, id, hide))
   return entityIndex(hass, hide.labels).all
-    .filter(id => !hide.domains?.includes(domainOf(id)))
+    .filter(shown(hide))
     .map(id => hass.states[id]!)
     .filter(Boolean)
 }
@@ -163,7 +174,7 @@ export interface FloorGroup {
 /** Areas with at least one visible entity, grouped by floor (highest level first, as in a house). */
 export function floorsWithAreas(
   hass: HomeAssistant,
-  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains' | 'hide_labels' | 'areas' | 'floors'> = {},
+  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains' | 'hide_labels' | 'hide_entities' | 'areas' | 'floors'> = {},
 ): FloorGroup[] {
   const order = config.area_order ?? []
   const rank = (area: AreaRegistryEntry) => {
@@ -174,7 +185,7 @@ export function floorsWithAreas(
     .filter(area => !config.areas?.length || config.areas.includes(area.area_id))
     .filter(area => !config.floors?.length || config.floors.includes(area.floor_id ?? ''))
     .filter(area => !config.hide_areas?.includes(area.area_id))
-    .filter(area => areaEntities(hass, area.area_id, { domains: config.hide_domains, labels: config.hide_labels }).some(e => groupOf(e)))
+    .filter(area => areaEntities(hass, area.area_id, hideOf(config)).some(e => groupOf(e)))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
 
   const floors = Object.values(hass.floors ?? {})
@@ -228,11 +239,11 @@ export interface StatusItem {
 export const LOW_BATTERY = 20
 
 /** Battery sensors are usually diagnostic entities, so they are not in the index. */
-export function batteryEntities(hass: HomeAssistant, areaIds?: string[], hideLabels: string[] = []): HassEntity[] {
+export function batteryEntities(hass: HomeAssistant, areaIds?: string[], hideLabels: string[] = [], hideEntities: string[] = []): HassEntity[] {
   const labels = [HIDE_LABEL, ...hideLabels]
   return Object.values(hass.states).filter(e =>
     domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === 'battery' && !hass.entities[e.entity_id]?.hidden &&
-    !labelled(hass, e.entity_id, labels) &&
+    !labelled(hass, e.entity_id, labels) && !hideEntities.includes(e.entity_id) &&
     (!areaIds || areaIds.includes(entityAreaId(hass, e.entity_id) ?? '')))
 }
 
@@ -248,7 +259,7 @@ export function unavailableDevices(hass: HomeAssistant, hide: Hide = {}, areaIds
     if (areaIds && !areaIds.includes(areaId)) continue
     for (const id of ids) {
       const entity = hass.states[id]
-      if (!entity || hide.domains?.includes(domainOf(id))) continue
+      if (!entity || !shown(hide)(id)) continue
       const deviceId = hass.entities[id]?.device_id
       if (!deviceId) {
         if (entity.state === 'unavailable') loose.push(entity)
@@ -347,6 +358,11 @@ export function bulkControl(entities: HassEntity[]): { control?: GroupControl; e
 /** Current power in watts, or undefined for anything that is not a numeric power sensor. */
 export function powerW(entity: HassEntity): number | undefined {
   if (domainOf(entity.entity_id) !== 'sensor' || deviceClassOf(entity) !== 'power') return undefined
+  return watts(entity)
+}
+
+/** A power reading in watts from W, kW or MW. */
+function watts(entity: HassEntity): number | undefined {
   const value = Number(entity.state)
   if (entity.state === '' || !Number.isFinite(value)) return undefined
   const unit = String(entity.attributes.unit_of_measurement ?? 'W')
@@ -407,3 +423,72 @@ export function pendingUpdates(hass: HomeAssistant, hideLabels: string[] = []): 
   return Object.values(hass.states).filter(e =>
     domainOf(e.entity_id) === 'update' && e.state === 'on' && !hass.entities[e.entity_id]?.hidden && !labelled(hass, e.entity_id, labels))
 }
+
+/**
+ * A room page's groups after its settings: hidden groups left out, groups and entities in the chosen order.
+ * Anything not in an order list keeps the default place after the ordered ones.
+ */
+export function arrangeRoom(groups: Map<GroupKey, HassEntity[]>, room: RoomSettings = {}): [GroupKey, HassEntity[]][] {
+  const rank = <T,>(order: T[] | undefined, fallback: (x: T) => number) => (x: T) => {
+    const i = order?.indexOf(x) ?? -1
+    return i === -1 ? (order?.length ?? 0) + fallback(x) : i
+  }
+  const groupRank = rank(room.group_order, key => GROUP_ORDER.indexOf(key) / 100)
+  return [...groups]
+    .filter(([key]) => !room.hide_groups?.includes(key))
+    .sort(([a], [b]) => groupRank(a) - groupRank(b))
+    .map(([key, entities]) => {
+      const order = room.order ?? []
+      const pos = (e: HassEntity) => order.indexOf(e.entity_id)
+      // Stable sort: unordered entities keep their name order behind the ordered ones
+      return [key, [...entities].sort((a, b) => {
+        const pa = pos(a), pb = pos(b)
+        if (pa === -1 && pb === -1) return 0
+        if (pa === -1) return 1
+        if (pb === -1) return -1
+        return pa - pb
+      })]
+    })
+}
+
+/** Power sensors from HA's energy settings (their stat_rate), by source type. */
+export interface PowerSources {
+  home?: string[]
+  grid?: string[]
+  solar?: string[]
+  battery?: string[]
+}
+
+export interface EnergyPrefs {
+  energy_sources?: { type: string; stat_rate?: string }[]
+}
+
+/** The power sensors HA's energy settings name, keeping only those that exist. */
+export function powerSources(hass: HomeAssistant, prefs: EnergyPrefs | undefined): PowerSources | undefined {
+  const out: PowerSources = {}
+  for (const source of prefs?.energy_sources ?? []) {
+    const type = source.type as keyof PowerSources
+    if (!source.stat_rate || !hass.states[source.stat_rate] || !['home', 'grid', 'solar', 'battery'].includes(type)) continue
+    ;(out[type] ??= []).push(source.stat_rate)
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+/**
+ * The house's consumption from the energy settings: the home sensor when there is one,
+ * else grid (import positive) + solar + battery (discharge positive). Undefined without readings.
+ */
+export function housePower(hass: HomeAssistant, sources?: PowerSources) {
+  if (!sources) return undefined
+  const sum = (ids?: string[]) => {
+    const values = (ids ?? []).map(id => hass.states[id]).filter((e): e is HassEntity => !!e).map(watts).filter((w): w is number => w !== undefined)
+    return values.length ? values.reduce((a, b) => a + b, 0) : undefined
+  }
+  const parts = { grid: sum(sources.grid), solar: sum(sources.solar), battery: sum(sources.battery) }
+  const home = sum(sources.home)
+  const flows = Object.values(parts).filter((w): w is number => w !== undefined)
+  if (home === undefined && !flows.length) return undefined
+  return { total: home ?? Math.max(0, flows.reduce((a, b) => a + b, 0)), ...parts }
+}
+
+export const sourceIds = (sources?: PowerSources) => Object.values(sources ?? {}).flat()

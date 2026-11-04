@@ -4,7 +4,7 @@ import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { formatWatts } from './house-info'
 import { t } from '../i18n'
-import { entityIndex, roomPower, type RoomPower } from '../model'
+import { entityIndex, hideOf, housePower, roomPower, sourceIds, type PowerSources, type RoomPower } from '../model'
 import { entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { AreaRegistryEntry } from '../types'
@@ -15,9 +15,14 @@ interface PowerConfig extends BaseConfig {
   areas: string[]
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
   /** Room without a graph next to it: take the whole row */
   wide?: boolean
+  /** Sensors from HA's energy settings; the house total comes from them when set */
+  power_sources?: PowerSources
 }
+
+const FLOW_ICONS = { grid: 'mdi:transmission-tower', solar: 'mdi:solar-power-variant', battery: 'mdi:home-battery-outline' }
 
 export class AdPower extends BaseCard<PowerConfig> {
   static styles = [tokens, css`
@@ -29,6 +34,10 @@ export class AdPower extends BaseCard<PowerConfig> {
     .total { font-size: 28px; font-weight: 300; letter-spacing: -0.03em; white-space: nowrap; }
     .total small, .w small { font-size: 13px; opacity: 0.6; margin-left: 2px; letter-spacing: 0; }
     .top { font-size: 12px; opacity: 0.6; }
+    .flows { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+    .flows span { display: inline-flex; align-items: center; gap: 4px; }
+    .flows ha-icon { --mdc-icon-size: 16px; opacity: 0.6; }
+    .flows small { font-size: 11px; opacity: 0.6; margin-left: 1px; }
     .rows { display: flex; flex-direction: column; gap: 8px; }
     .rowx { all: unset; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; cursor: pointer; font-size: 13px; }
     .rowx:focus-visible { outline: 2px solid rgb(var(--ad-primary)); border-radius: 6px; }
@@ -49,12 +58,12 @@ export class AdPower extends BaseCard<PowerConfig> {
 
   private get rooms(): RoomPower[] {
     const areas = this.config!.areas.map(id => this.hass!.areas[id]).filter((a): a is AreaRegistryEntry => !!a)
-    return roomPower(this.hass!, areas, { domains: this.config!.hide_domains, labels: this.config!.hide_labels })
+    return roomPower(this.hass!, areas, hideOf(this.config!))
   }
 
   protected watched() {
     const index = entityIndex(this.hass!, this.config!.hide_labels).byArea
-    return this.config!.areas.flatMap(id => index.get(id) ?? [])
+    return [...this.config!.areas.flatMap(id => index.get(id) ?? []), ...sourceIds(this.config!.power_sources)]
   }
 
   private watts(w: number) {
@@ -87,13 +96,16 @@ export class AdPower extends BaseCard<PowerConfig> {
         ${this.rows(room)}
       </div>`
     }
-    const total = rooms.reduce((sum, room) => sum + room.total, 0)
+    const house = housePower(this.hass!, this.config!.power_sources)
+    const total = house?.total ?? rooms.reduce((sum, room) => sum + room.total, 0)
     const top = rooms[0]
+    const flows = house ? (['grid', 'solar', 'battery'] as const).filter(k => house[k] !== undefined) : []
     return html`<div class="card">
       <div class="head">
         <span class="title"><ha-icon icon="mdi:home-lightning-bolt-outline"></ha-icon>${t(this.hass, 'whole_house')}</span>
         <span class="total">${this.watts(total)}</span>
       </div>
+      ${flows.length ? html`<div class="flows">${flows.map(k => html`<span><ha-icon icon=${FLOW_ICONS[k]}></ha-icon>${t(this.hass, `flow.${k}`)} ${this.watts(house![k]!)}</span>`)}</div>` : nothing}
       ${top ? html`<span class="top">${t(this.hass, 'top_room')}: ${top.area.name} · ${this.watts(top.total)}</span>
         ${this.rows(top, 3)}` : nothing}
     </div>`

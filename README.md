@@ -2,7 +2,7 @@
 
 Lovelace-Dashboard-Strategy, die das Dashboard aus Areas, Floors, Devices und Entities erzeugt. Idee wie bei Dwains Dashboard, aber ohne Blueprints, Wandtablet-Modus und Zusatzkarten. Die Optik kommt aus HArmony: Slate-Palette, Indigo-Akzent, Amber-Glow bei Licht, runde Status-Buttons.
 
-Ein ES-Modul (~125 KB, ~34 KB gzip), einzige Abhängigkeit ist Lit. Keine anderen Custom Cards nötig.
+Ein ES-Modul (~140 KB, ~39 KB gzip), einzige Abhängigkeit ist Lit. Keine anderen Custom Cards nötig.
 
 ## Was erzeugt wird
 
@@ -18,7 +18,7 @@ Ein ES-Modul (~125 KB, ~34 KB gzip), einzige Abhängigkeit ist Lit. Keine andere
 
 **Läuft gerade:** erscheint, sobald ein Player spielt, mit Cover, Titel, Raum, Play/Pause und Weiter. Bei mehreren Playern schaltet „+N“ weiter. Ein pausierter Player bleibt fünf Minuten stehen. Mit `hide_domains: [media_player]` verschwindet die Leiste.
 
-**Innen, Außen, Strom:** „Innen“ ist der Durchschnitt aller Räume, „Außen“ der Durchschnitt der Bereiche in `outdoor_areas` (Garten, Terrasse). Außenbereiche zählen innen nicht mit. „Strom“ ist die Summe aller Leistungssensoren (`device_class: power`) in den Räumen. Hängt ein Gesamtzähler in einem Raum, zählt er doppelt; dann den Zähler per Label ausblenden.
+**Innen, Außen, Strom:** „Innen“ ist der Durchschnitt aller Räume, „Außen“ der Durchschnitt der Bereiche in `outdoor_areas` (Garten, Terrasse). Außenbereiche zählen innen nicht mit. „Strom“ kommt aus HAs Energieeinstellungen, wenn dort Leistungssensoren eingetragen sind: der Hausverbrauch, sonst Netz + Solar + Akku. Die Energieseite zeigt die drei dann einzeln. Ohne diese Angaben (oder für Nutzer ohne Zugriff darauf) ist „Strom“ die Summe aller Leistungssensoren (`device_class: power`) in den Räumen; ein Gesamtzähler in einem Raum zählt dann doppelt und lässt sich per Label ausblenden.
 
 **Personen und Alarm:** Alle sichtbaren `person`-Entities als Avatar, unterwegs ausgegraut, dazu die erste Alarmanlage als Chip (ausgelöst rot und blinkend, scharf blau, unscharf grün). Ausblenden mit `hide_domains: [person]` bzw. `[alarm_control_panel]` oder dem Label `ad_hide`.
 
@@ -69,6 +69,7 @@ strategy:
   theme: auto              # auto | dark | light, auto folgt dem HA-Dunkelmodus
   glass: false             # Milchglas-Karten (auf Touch-Geräten ohne Blur)
   primary_color: "#14b8a6" # Akzentfarbe, alles andere wird daraus abgeleitet
+  ha_colors: true          # mit primary_color auch HA-Kopfzeile, Seitenleiste und Dialoge färben
   nav_position: bottom     # bottom | top | left | right
   areas: [wohnzimmer]      # nur diese Räume
   floors: [obergeschoss]   # nur Räume auf diesen Etagen
@@ -79,11 +80,27 @@ strategy:
   favorites: [light.flur, lock.haustuer]       # Startseite und oben im jeweiligen Raum
   scenes: [scene.kino, script.gute_nacht]      # Zeile auf der Startseite
   outdoor_areas: [garten]  # Durchschnitt als „Außen“
+  hide_entities: [light.deko]   # einzelne Geräte überall ausblenden
+  rooms:                   # Einstellungen pro Raumseite, siehe unten
+    wohnzimmer:
+      hide_groups: [sensor]
+      group_order: [media, light]
+      order: [light.decke, light.stehlampe]
+      cards:
+        top:
+          - type: markdown
+            content: Willkommen
+        light: []          # am Ende einer Gruppe
+        bottom: []
 ```
+
+**Raumseiten anpassen:** Am einfachsten im Editor unter „Raumseiten“. Raum wählen, dann Gruppen und Geräte mit den Pfeilen sortieren und mit dem Auge ausblenden. Ausgeblendete Geräte (`hide_entities`) verschwinden überall im Dashboard, ausgeblendete Gruppen (`hide_groups`) nur auf dieser Raumseite. Eigene Karten sind normale Lovelace-Karten und landen oben (`top`), unten (`bottom`) oder am Ende einer Gruppe (Gruppenname wie `light`, `climate`, `shading`, `opening`, `gate`, `lock`, `media`, `switch`, `select`, `motion`, `safety`, `sensor`, `scene`). „Raum zurücksetzen“ macht die Seite wieder automatisch.
+
+**Raumbild:** Hat ein Bereich in HA ein Bild (Einstellungen → Bereiche → Bereich bearbeiten), steht der Raumname auf diesem Bild.
 
 **Szenen und Skripte:** Ohne `scenes` zeigt die Startseite alle sichtbaren Szenen, alphabetisch. Skripte erscheinen nur, wenn sie in `scenes` stehen. Mit `hide_domains: [scene]` verschwindet die Zeile.
 
-**Akzentfarbe:** `primary_color` nimmt eine Hex-Farbe. Daraus entstehen für hell und dunkel der Seitenhintergrund, die Kartenflächen, die Schrift, der Akzent (aktive Navigation, Play-Knopf, Status-Punkte) und das Info-Blau. Die Flächen bekommen einen leichten Stich des Farbtons, wie das Schiefergrau beim voreingestellten Indigo; ein Grau als Akzent ergibt neutrale Grautöne. Bei hellen Akzenten wird die Schrift darauf dunkel. Gelb für Licht und Heizen, Rot für Alarm und Grün für „in Ordnung“ bleiben gleich, damit man sie auf einen Blick erkennt. Ohne die Option bleibt die HArmony-Palette und der Seitenhintergrund kommt aus dem HA-Theme. Im Editor gibt es dafür Farbvorschläge und einen Farbwähler.
+**Akzentfarbe:** `primary_color` nimmt eine Hex-Farbe. Daraus entstehen für hell und dunkel der Seitenhintergrund, die Kartenflächen, die Schrift, der Akzent (aktive Navigation, Play-Knopf, Status-Punkte) und das Info-Blau. Die Flächen bekommen einen leichten Stich des Farbtons, wie das Schiefergrau beim voreingestellten Indigo; ein Grau als Akzent ergibt neutrale Grautöne. Bei hellen Akzenten wird die Schrift darauf dunkel. Gelb für Licht und Heizen, Rot für Alarm und Grün für „in Ordnung“ bleiben gleich, damit man sie auf einen Blick erkennt. Solange das Dashboard offen ist, übernehmen auch HAs Kopfzeile, Seitenleiste und Dialoge (z. B. der Detail-Dialog) die Farben; beim Verlassen kommt das HA-Theme zurück. Mit `ha_colors: false` bleibt HA, wie es ist. Ohne die Option bleibt die HArmony-Palette und der Seitenhintergrund kommt aus dem HA-Theme. Im Editor gibt es dafür Farbvorschläge und einen Farbwähler.
 
 **Navigationsleiste:** `left` und `right` sind eine senkrechte Leiste am Rand, ab 1024 px Breite. Der Inhalt rückt dafür ein. Auf schmaleren Bildschirmen sitzt die Leiste unten. `top` setzt sie unter die HA-Kopfzeile.
 

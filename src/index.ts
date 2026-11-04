@@ -12,6 +12,7 @@ import { AdHouseInfo } from './cards/house-info'
 import { AdPower } from './cards/power'
 import { AdMaintenanceList } from './cards/maintenance-list'
 import { AdStrategyEditor } from './editor'
+import { AdRoomSettings } from './editor-rooms'
 import type { HomeAssistant, StrategyConfig } from './types'
 
 declare const __VERSION__: string
@@ -60,6 +61,7 @@ define('ad-house-info', AdHouseInfo)
 define('ad-power', AdPower)
 define('ad-maintenance-list', AdMaintenanceList)
 define('ad-strategy-editor', AdStrategyEditor)
+define('ad-room-settings', AdRoomSettings)
 
 // Lists the dashboard under "Community dashboards" in HA's Add dashboard dialog (HA 2026.5+)
 window.customStrategies ??= []

@@ -23,6 +23,7 @@ interface HeaderConfig extends BaseConfig {
   action?: HeaderAction
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
 }
 
 const ALARM_ICONS: Record<string, string> = {
@@ -118,7 +119,7 @@ export class AdHeader extends BaseCard<HeaderConfig> {
   private visible(domain: string) {
     if (this.config!.hide_domains?.includes(domain)) return []
     return entityIndex(this.hass!, this.config!.hide_labels).all
-      .filter(id => domainOf(id) === domain)
+      .filter(id => domainOf(id) === domain && !this.config!.hide_entities?.includes(id))
       .map(id => this.hass!.states[id]!)
       .filter(Boolean)
   }

@@ -3,7 +3,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { allEntities, entityAreaId } from '../model'
+import { allEntities, entityAreaId, hideOf } from '../model'
 import { domainOf, entityName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -11,6 +11,7 @@ import type { HassEntity } from '../types'
 interface NowPlayingConfig extends BaseConfig {
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
   areas?: string[]
 }
 
@@ -70,8 +71,7 @@ export class AdNowPlaying extends BaseCard<NowPlayingConfig> {
   }
 
   private get players() {
-    const { hide_domains: domains, hide_labels: labels, areas } = this.config!
-    return allEntities(this.hass!, { domains, labels }, areas).filter(e => domainOf(e.entity_id) === 'media_player')
+    return allEntities(this.hass!, hideOf(this.config!), this.config!.areas).filter(e => domainOf(e.entity_id) === 'media_player')
   }
 
   protected watched() {

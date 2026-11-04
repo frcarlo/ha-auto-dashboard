@@ -1,7 +1,7 @@
 // Port of HArmony's RoomCardWidget.vue, fed from the area instead of hand-picked entities.
 import { css, html, nothing } from 'lit'
 import { BaseCard, gestures, type BaseConfig } from './base'
-import { areaEntities, entityIndex, roomSummary, type RoomSummary } from '../model'
+import { areaEntities, entityIndex, hideOf, roomSummary, type RoomSummary } from '../model'
 import { HVAC_ICONS, entityIcon, entityName, hvacColor, isActive, isUnavailable, stateColor } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -12,6 +12,7 @@ interface RoomCardConfig extends BaseConfig {
   path?: string
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
 }
 
 export class AdRoomCard extends BaseCard<RoomCardConfig> {
@@ -61,7 +62,7 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
   }
 
   private get summary() {
-    return roomSummary(areaEntities(this.hass!, this.config!.area, { domains: this.config!.hide_domains, labels: this.config!.hide_labels }))
+    return roomSummary(areaEntities(this.hass!, this.config!.area, hideOf(this.config!)))
   }
 
   private toggleLights() {

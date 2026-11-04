@@ -228,3 +228,56 @@ describe('primary color', () => {
     expect(dark.views[0]!.background).toMatch(/^rgb\(/)
   })
 })
+
+describe('room settings, own cards and energy settings', () => {
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+
+  it('applies hidden groups, order and own cards on the room page', async () => {
+    const config = {
+      type: 'custom:auto-dashboard',
+      hide_entities: ['light.wohnzimmer_stehlampe'],
+      rooms: {
+        wohnzimmer: {
+          hide_groups: ['sensor' as const],
+          group_order: ['media' as const],
+          cards: { top: [{ type: 'markdown', content: 'oben' }], light: [{ type: 'markdown', content: 'licht' }], bottom: [{ type: 'markdown', content: 'unten' }] },
+        },
+      },
+    }
+    const { views } = await generateDashboard(config, createHass(true))
+    const room = views.find(v => v.path === 'area-wohnzimmer')!
+    const sections = room.sections as { cards: Record<string, any>[] }[]
+    const flat = cards(room)
+    expect(sections[1]!.cards[0]).toMatchObject({ content: 'oben' })
+    expect(sections.at(-2)!.cards[0]).toMatchObject({ content: 'unten' })
+    const headings = flat.filter(c => c.type === 'custom:ad-group-heading').map(c => c.title)
+    expect(headings[0]).toBe('Medien')
+    expect(headings).not.toContain('Sensoren')
+    const lightSection = sections.find(s => s.cards[0]?.title === 'Licht')!
+    expect(lightSection.cards.at(-1)).toMatchObject({ content: 'licht' })
+    expect(flat.map(c => c.entity)).not.toContain('light.wohnzimmer_stehlampe')
+    // Hidden everywhere, not only in the room
+    expect(cards(views.find(v => v.path === 'lights')!).map(c => c.entity)).not.toContain('light.wohnzimmer_stehlampe')
+    expect(cards(views[0]!).find(c => c.type === 'custom:ad-room-card')).toMatchObject({ hide_entities: ['light.wohnzimmer_stehlampe'] })
+  })
+
+  it('passes the energy settings to the house cards', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const sources = { grid: ['sensor.netz_leistung'], solar: ['sensor.pv_leistung'] }
+    expect(cards(views[0]!).find(c => c.type === 'custom:ad-house-info')!.power_sources).toEqual(sources)
+    expect(cards(views.find(v => v.path === 'energy')!).find(c => c.variant === 'house')!.power_sources).toEqual(sources)
+  })
+
+  it('without access to the energy settings the rooms still count', async () => {
+    const hass = createHass(true)
+    hass.callWS = async () => { throw new Error('unauthorized') }
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
+    expect(views.map(v => v.path)).toContain('energy')
+    expect(cards(views[0]!).find(c => c.type === 'custom:ad-house-info')!.power_sources).toBeUndefined()
+  })
+
+  it('ha_colors: false reaches the nav bar', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#14b8a6', ha_colors: false }, createHass(true))
+    expect(cards(views[0]!).find(c => c.type === 'custom:ad-nav-bar')).toMatchObject({ ha_colors: false })
+  })
+})

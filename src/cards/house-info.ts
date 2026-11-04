@@ -3,7 +3,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { averageClimate, entityIndex, roomPower } from '../model'
+import { averageClimate, entityIndex, hideOf, housePower, roomPower, sourceIds, type PowerSources } from '../model'
 import { tokens } from '../styles/tokens'
 import type { AreaRegistryEntry } from '../types'
 
@@ -13,6 +13,8 @@ interface HouseInfoConfig extends BaseConfig {
   outdoor?: string[]
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
+  power_sources?: PowerSources
   /** View paths the tiles open */
   links?: { climate?: string; energy?: string }
 }
@@ -55,7 +57,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
   }
 
   private get hide() {
-    return { domains: this.config!.hide_domains, labels: this.config!.hide_labels }
+    return hideOf(this.config!)
   }
 
   protected watched() {
@@ -63,7 +65,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
     return this.areas([...this.config!.areas, ...(this.config!.outdoor ?? [])]).flatMap(area => [
       ...(index.get(area.area_id) ?? []),
       ...[area.temperature_entity_id, area.humidity_entity_id].filter((id): id is string => !!id),
-    ])
+    ]).concat(sourceIds(this.config!.power_sources))
   }
 
   private tile(icon: string, label: string, value: unknown, link?: string) {
@@ -84,12 +86,14 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
   protected render() {
     const c = this.config!
     const rooms = roomPower(this.hass!, this.areas(c.areas), this.hide)
-    const watts = rooms.reduce((sum, room) => sum + room.total, 0)
+    // HA's energy settings know the whole house; the rooms' sum misses what has no own sensor
+    const house = housePower(this.hass!, c.power_sources)
+    const watts = house?.total ?? rooms.reduce((sum, room) => sum + room.total, 0)
     const power = formatWatts(watts, this.hass!.locale?.language ?? this.hass!.language)
     return html`<div class="row">
       ${this.climate('mdi:home-thermometer-outline', t(this.hass, 'inside'), c.areas, c.links?.climate)}
       ${c.outdoor?.length ? this.climate('mdi:tree-outline', t(this.hass, 'outside'), c.outdoor) : nothing}
-      ${rooms.length ? this.tile('mdi:flash', t(this.hass, 'power'), html`${power.value}<small>${power.unit}</small>`, c.links?.energy) : nothing}
+      ${rooms.length || house ? this.tile('mdi:flash', t(this.hass, 'power'), html`${power.value}<small>${power.unit}</small>`, c.links?.energy) : nothing}
     </div>`
   }
 }

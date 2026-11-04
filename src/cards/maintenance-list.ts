@@ -3,7 +3,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { LOW_BATTERY, batteryEntities, deviceName, entityAreaId, pendingUpdates, unavailableDevices } from '../model'
+import { LOW_BATTERY, batteryEntities, deviceName, entityAreaId, hideOf, pendingUpdates, unavailableDevices } from '../model'
 import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -13,6 +13,7 @@ interface MaintenanceConfig extends BaseConfig {
   areas?: string[]
   hide_domains?: string[]
   hide_labels?: string[]
+  hide_entities?: string[]
 }
 
 export class AdMaintenanceList extends BaseCard<MaintenanceConfig> {
@@ -42,13 +43,13 @@ export class AdMaintenanceList extends BaseCard<MaintenanceConfig> {
   }
 
   private items(): HassEntity[] {
-    const { source, areas, hide_domains: domains, hide_labels: labels } = this.config!
+    const { source, areas, hide_labels: labels, hide_entities: hidden } = this.config!
     if (source === 'battery') {
-      return batteryEntities(this.hass!, areas, labels)
+      return batteryEntities(this.hass!, areas, labels, hidden)
         .filter(e => e.state !== '' && Number.isFinite(Number(e.state)))
         .sort((a, b) => Number(a.state) - Number(b.state))
     }
-    if (source === 'unavailable') return unavailableDevices(this.hass!, { domains, labels }, areas)
+    if (source === 'unavailable') return unavailableDevices(this.hass!, hideOf(this.config!), areas)
     return pendingUpdates(this.hass!, labels)
   }
 
