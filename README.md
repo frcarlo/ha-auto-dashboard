@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/icon.png" width="96" height="96" alt="">
+
 # HA Auto Dashboard
 
 Lovelace-Dashboard-Strategy, die das Dashboard aus Areas, Floors, Devices und Entities erzeugt. Idee wie bei Dwains Dashboard, aber ohne Blueprints, Wandtablet-Modus und Zusatzkarten. Die Optik kommt aus HArmony: Slate-Palette, Indigo-Akzent, Amber-Glow bei Licht, runde Status-Buttons.
