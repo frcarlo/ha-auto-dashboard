@@ -24,6 +24,7 @@ export interface DeviceRegistryEntry {
   name?: string | null
   name_by_user?: string | null
   area_id?: string | null
+  labels?: string[]
 }
 
 export interface AreaRegistryEntry {
@@ -96,4 +97,6 @@ export interface StrategyConfig extends CardLook {
   hide_areas?: string[]
   area_order?: string[]
   hide_domains?: string[]
+  /** Label ids: entities, devices and areas with one of them are left out */
+  hide_labels?: string[]
 }

@@ -34,6 +34,7 @@ const config: StrategyConfig = {
   glass: params.has('glass'),
   areas: list('areas'),
   floors: list('floors'),
+  hide_labels: list('labels'),
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
   // ?as=leni&users={"leni":{"read_only":true}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,

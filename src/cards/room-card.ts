@@ -11,6 +11,7 @@ interface RoomCardConfig extends BaseConfig {
   /** View path of the room page */
   path?: string
   hide_domains?: string[]
+  hide_labels?: string[]
 }
 
 export class AdRoomCard extends BaseCard<RoomCardConfig> {
@@ -56,11 +57,11 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
   }
 
   protected watched() {
-    return entityIndex(this.hass!).byArea.get(this.config!.area) ?? []
+    return entityIndex(this.hass!, this.config!.hide_labels).byArea.get(this.config!.area) ?? []
   }
 
   private get summary() {
-    return roomSummary(areaEntities(this.hass!, this.config!.area, this.config!.hide_domains))
+    return roomSummary(areaEntities(this.hass!, this.config!.area, { domains: this.config!.hide_domains, labels: this.config!.hide_labels }))
   }
 
   private toggleLights() {

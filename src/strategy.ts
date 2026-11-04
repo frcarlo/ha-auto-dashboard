@@ -42,7 +42,12 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
     ...(config.glass ? { glass: true } : {}),
     ...(access !== 'full' ? { access } : {}),
   }
-  const hide = config.hide_domains ?? []
+  const hide = { domains: config.hide_domains, labels: config.hide_labels }
+  // Cards filter on their own, so they get the same options
+  const hideOpts = {
+    ...(config.hide_domains?.length ? { hide_domains: config.hide_domains } : {}),
+    ...(config.hide_labels?.length ? { hide_labels: config.hide_labels } : {}),
+  }
   const floors = floorsWithAreas(hass, config)
   const areas = floors.flatMap(f => f.areas)
   // areas/floors narrow the whole dashboard, e.g. to one room for a wall tablet
@@ -117,7 +122,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
       fullWidth([
         { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...look },
         {
-          type: 'custom:ad-status-bar', hide_domains: hide, ...(areaIds ? { areas: areaIds } : {}), ...look,
+          type: 'custom:ad-status-bar', ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look,
           links: { lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate') },
         },
       ]),
@@ -129,7 +134,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
         column_span: 2,
         cards: [
           heading(group.floor?.name ?? (floors.length > 1 ? t(hass, 'other_rooms') : t(hass, 'rooms')), group.floor?.icon),
-          ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), hide_domains: hide, ...look })),
+          ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })),
         ],
       })),
     ]),

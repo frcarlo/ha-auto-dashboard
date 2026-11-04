@@ -60,6 +60,9 @@ export function createHass(dark: boolean): HomeAssistant {
     states[entity_id] = { entity_id, state, attributes }
     entities[entity_id] = { entity_id, area_id: area, labels: [] }
   }
+  // ?labels=technik hides these
+  entities['switch.kuche_kaffee']!.labels = ['technik']
+  entities['sensor.buro_keller_leistung']!.labels = ['technik']
   for (const e of extras) {
     states[e.entity_id] = e
     entities[e.entity_id] = { entity_id: e.entity_id, entity_category: e.entity_id.startsWith('sensor.') ? 'diagnostic' : null }
@@ -99,6 +102,11 @@ export function createHass(dark: boolean): HomeAssistant {
     },
     callService: async () => undefined,
     callWS: async <T,>(msg: Record<string, unknown>) => {
+      if (msg.type === 'config/label_registry/list') return [
+        { label_id: 'ad_hide', name: 'ad_hide' },
+        { label_id: 'technik', name: 'Technik' },
+        { label_id: 'gast', name: 'Gast' },
+      ] as T
       if (msg.type !== 'config/auth/list') throw new Error(`mock: ${msg.type}`)
       return [
         { id: 'u-frank', name: 'Frank Carlo', system_generated: false, is_active: true, group_ids: ['system-admin'] },

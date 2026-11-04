@@ -2,6 +2,7 @@
 // Only admins can edit dashboards, so only admins reach it. Uses HA's theme variables to fit the dialog.
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig } from './config'
+import { HIDE_LABEL } from './model'
 import { t, type Key } from './i18n'
 import type { AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
@@ -11,6 +12,11 @@ interface HaUser {
   system_generated: boolean
   is_active?: boolean
   group_ids?: string[]
+}
+
+interface HaLabel {
+  label_id: string
+  name: string
 }
 
 interface Option {
@@ -29,11 +35,13 @@ export class AdStrategyEditor extends LitElement {
     hass: { attribute: false },
     config: { state: true },
     users: { state: true },
+    labels: { state: true },
   }
 
   hass?: HomeAssistant
   config: StrategyConfig = { type: 'custom:auto-dashboard' }
   users: HaUser[] = []
+  labels: HaLabel[] = []
   private usersRequested = false
 
   static styles = css`
@@ -106,6 +114,10 @@ export class AdStrategyEditor extends LitElement {
       this.hass.callWS<HaUser[]>({ type: 'config/auth/list' })
         .then(users => { this.users = users.filter(u => !u.system_generated && u.is_active !== false) })
         .catch(() => { this.users = [] })
+      // hass carries label ids on entities, devices and areas, but not the label names
+      this.hass.callWS<HaLabel[]>({ type: 'config/label_registry/list' })
+        .then(labels => { this.labels = labels.filter(l => l.label_id !== HIDE_LABEL) })
+        .catch(() => { this.labels = [] })
     }
   }
 
@@ -153,6 +165,13 @@ export class AdStrategyEditor extends LitElement {
   }
 
   // Data from HA
+
+  /** Known labels, plus selected ones that were deleted in HA meanwhile, so they can be removed. */
+  private get labelOptions(): Option[] {
+    const known = this.labels.map(l => ({ id: l.label_id, label: l.name })).sort((a, b) => a.label.localeCompare(b.label))
+    const gone = (this.config.hide_labels ?? []).filter(id => !this.labels.some(l => l.label_id === id)).map(id => ({ id, label: id }))
+    return [...known, ...gone]
+  }
 
   private get floorOptions(): Option[] {
     return Object.values(this.hass?.floors ?? {})
@@ -228,6 +247,8 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.hide_areas'), this.chips([], c.hide_areas, hide_areas => this.change({ hide_areas }), this.areasByFloor))}
         ${this.field(this.l('ed.hide_domains'), this.chips(
           DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
+        ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
+          this.labelOptions, c.hide_labels, hide_labels => this.change({ hide_labels })), this.l('ed.hide_labels_hint')) : nothing}
         ${this.field(this.l('ed.order'), html`<div class="order">
           ${ordered.map((area, i) => html`<div>
             <span>${area.name}</span>

@@ -4,6 +4,13 @@ import { OPENING_CLASSES, deviceClassOf, domainOf, isActive } from './presentati
 
 export const HIDE_LABEL = 'ad_hide'
 
+/** What the dashboard leaves out besides hidden and diagnostic entities. */
+export interface Hide {
+  domains?: string[]
+  /** Label ids; an entity is left out when it, its device or its area carries one */
+  labels?: string[]
+}
+
 export type GroupKey = 'light' | 'climate' | 'cover' | 'media' | 'switch' | 'scene' | 'security' | 'sensor'
 
 /** Order in which groups appear on a room page. */
@@ -46,7 +53,7 @@ interface Index {
   all: string[]
 }
 
-const indexCache = new WeakMap<object, Index>()
+const indexCache = new WeakMap<object, Map<string, Index>>()
 
 /** The entity's own area, falling back to its device's area. */
 export function entityAreaId(hass: HomeAssistant, entityId: string): string | undefined {
@@ -55,19 +62,30 @@ export function entityAreaId(hass: HomeAssistant, entityId: string): string | un
   return entry.area_id ?? (entry.device_id ? hass.devices[entry.device_id]?.area_id ?? undefined : undefined)
 }
 
+/** Whether the entity, its device or its area carries one of the labels. */
+function labelled(hass: HomeAssistant, entityId: string, labels: string[]) {
+  const entry = hass.entities[entityId]
+  const has = (own?: string[]) => !!own?.some(l => labels.includes(l))
+  return has(entry?.labels) || has(hass.devices[entry?.device_id ?? '']?.labels) || has(hass.areas[entityAreaId(hass, entityId) ?? '']?.labels)
+}
+
 /**
  * Entities that should show up anywhere, keyed by area. Area comes from the entity,
- * falling back to its device. Cached per registry object, so cheap to call on every render.
+ * falling back to its device. Cached per registry object and label set, so cheap to call on every render.
  * States are looked up later, so entities without a state yet simply drop out.
  */
-export function entityIndex(hass: HomeAssistant): Index {
-  const cached = indexCache.get(hass.entities)
+export function entityIndex(hass: HomeAssistant, hideLabels: string[] = []): Index {
+  const labels = [HIDE_LABEL, ...hideLabels]
+  const key = labels.join('\n')
+  let byLabels = indexCache.get(hass.entities)
+  if (!byLabels) indexCache.set(hass.entities, (byLabels = new Map()))
+  const cached = byLabels.get(key)
   if (cached) return cached
 
   const byArea = new Map<string, string[]>()
   const all: string[] = []
   for (const entry of Object.values(hass.entities)) {
-    if (entry.hidden || entry.entity_category || entry.labels?.includes(HIDE_LABEL)) continue
+    if (entry.hidden || entry.entity_category || labelled(hass, entry.entity_id, labels)) continue
     all.push(entry.entity_id)
     const areaId = entityAreaId(hass, entry.entity_id)
     if (!areaId) continue
@@ -76,22 +94,22 @@ export function entityIndex(hass: HomeAssistant): Index {
     else byArea.set(areaId, [entry.entity_id])
   }
   const index = { byArea, all }
-  indexCache.set(hass.entities, index)
+  byLabels.set(key, index)
   return index
 }
 
-export function areaEntities(hass: HomeAssistant, areaId: string, hideDomains: string[] = []): HassEntity[] {
-  return (entityIndex(hass).byArea.get(areaId) ?? [])
-    .filter(id => !hideDomains.includes(domainOf(id)))
+export function areaEntities(hass: HomeAssistant, areaId: string, hide: Hide = {}): HassEntity[] {
+  return (entityIndex(hass, hide.labels).byArea.get(areaId) ?? [])
+    .filter(id => !hide.domains?.includes(domainOf(id)))
     .map(id => hass.states[id]!)
     .filter(Boolean)
 }
 
 /** All visible entities, or only those in the given areas when a filter is set. */
-export function allEntities(hass: HomeAssistant, hideDomains: string[] = [], areaIds?: string[]): HassEntity[] {
-  if (areaIds) return areaIds.flatMap(id => areaEntities(hass, id, hideDomains))
-  return entityIndex(hass).all
-    .filter(id => !hideDomains.includes(domainOf(id)))
+export function allEntities(hass: HomeAssistant, hide: Hide = {}, areaIds?: string[]): HassEntity[] {
+  if (areaIds) return areaIds.flatMap(id => areaEntities(hass, id, hide))
+  return entityIndex(hass, hide.labels).all
+    .filter(id => !hide.domains?.includes(domainOf(id)))
     .map(id => hass.states[id]!)
     .filter(Boolean)
 }
@@ -121,7 +139,7 @@ export interface FloorGroup {
 /** Areas with at least one visible entity, grouped by floor (highest level first, as in a house). */
 export function floorsWithAreas(
   hass: HomeAssistant,
-  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains' | 'areas' | 'floors'> = {},
+  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains' | 'hide_labels' | 'areas' | 'floors'> = {},
 ): FloorGroup[] {
   const order = config.area_order ?? []
   const rank = (area: AreaRegistryEntry) => {
@@ -132,7 +150,7 @@ export function floorsWithAreas(
     .filter(area => !config.areas?.length || config.areas.includes(area.area_id))
     .filter(area => !config.floors?.length || config.floors.includes(area.floor_id ?? ''))
     .filter(area => !config.hide_areas?.includes(area.area_id))
-    .filter(area => areaEntities(hass, area.area_id, config.hide_domains).some(e => groupOf(e)))
+    .filter(area => areaEntities(hass, area.area_id, { domains: config.hide_domains, labels: config.hide_labels }).some(e => groupOf(e)))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
 
   const floors = Object.values(hass.floors ?? {})
@@ -184,9 +202,11 @@ export interface StatusItem {
 export const LOW_BATTERY = 20
 
 /** Battery sensors are usually diagnostic entities, so they are not in the index. */
-export function batteryEntities(hass: HomeAssistant, areaIds?: string[]): HassEntity[] {
+export function batteryEntities(hass: HomeAssistant, areaIds?: string[], hideLabels: string[] = []): HassEntity[] {
+  const labels = [HIDE_LABEL, ...hideLabels]
   return Object.values(hass.states).filter(e =>
     domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === 'battery' && !hass.entities[e.entity_id]?.hidden &&
+    !labelled(hass, e.entity_id, labels) &&
     (!areaIds || areaIds.includes(entityAreaId(hass, e.entity_id) ?? '')))
 }
 
@@ -195,14 +215,14 @@ export function batteryEntities(hass: HomeAssistant, areaIds?: string[]): HassEn
  * Only devices and entities placed in an area count, so leftovers without a room don't add noise.
  * Entities without a device count on their own.
  */
-export function unavailableDevices(hass: HomeAssistant, hideDomains: string[] = [], areaIds?: string[]): HassEntity[] {
+export function unavailableDevices(hass: HomeAssistant, hide: Hide = {}, areaIds?: string[]): HassEntity[] {
   const byDevice = new Map<string, HassEntity[]>()
   const loose: HassEntity[] = []
-  for (const [areaId, ids] of entityIndex(hass).byArea) {
+  for (const [areaId, ids] of entityIndex(hass, hide.labels).byArea) {
     if (areaIds && !areaIds.includes(areaId)) continue
     for (const id of ids) {
       const entity = hass.states[id]
-      if (!entity || hideDomains.includes(domainOf(id))) continue
+      if (!entity || hide.domains?.includes(domainOf(id))) continue
       const deviceId = hass.entities[id]?.device_id
       if (!deviceId) {
         if (entity.state === 'unavailable') loose.push(entity)

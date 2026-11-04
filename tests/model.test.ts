@@ -63,8 +63,23 @@ describe('areaEntities', () => {
   })
 
   it('respects hide_domains', () => {
-    const ids = areaEntities(fakeHass(), 'wohnzimmer', ['light']).map(e => e.entity_id)
+    const ids = areaEntities(fakeHass(), 'wohnzimmer', { domains: ['light'] }).map(e => e.entity_id)
     expect(ids).not.toContain('light.wz_decke')
+  })
+
+  it('hides entities whose own, device or area labels match hide_labels', () => {
+    const hass = fakeHass()
+    hass.entities['climate.wz']!.labels = ['gast']
+    hass.devices.dev_wz!.labels = ['gast']
+    hass.areas.flur!.labels = ['gast']
+    const ids = areaEntities(hass, 'wohnzimmer', { labels: ['gast'] }).map(e => e.entity_id)
+    expect(ids).not.toContain('climate.wz')
+    expect(ids).not.toContain('light.wz_decke')
+    expect(ids).toContain('sensor.wz_temp')
+    expect(areaEntities(hass, 'flur', { labels: ['gast'] })).toEqual([])
+    expect(floorsWithAreas(hass, { hide_labels: ['gast'] }).flatMap(f => f.areas).map(a => a.area_id)).not.toContain('flur')
+    // Without the option, labels change nothing
+    expect(areaEntities(hass, 'wohnzimmer').map(e => e.entity_id)).toContain('climate.wz')
   })
 })
 

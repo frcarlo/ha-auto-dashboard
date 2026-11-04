@@ -32,6 +32,16 @@ describe('generateDashboard', () => {
     const header = (views[0]!.sections as { cards: Record<string, any>[] }[])[0]!.cards[0]!
     expect(header).toMatchObject({ theme: 'light', glass: true })
   })
+
+  it('hide_labels drops labelled entities from room pages and reaches the cards', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', hide_labels: ['technik'] }, createHass(true))
+    const entities = (path: string) => JSON.stringify(views.find(v => v.path === path)!.sections)
+    expect(entities('area-kuche')).not.toContain('switch.kuche_kaffee')
+    expect(entities('area-kuche')).toContain('light.kuche')
+    const cards = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    expect(cards.find(c => c.type === 'custom:ad-status-bar')).toMatchObject({ hide_labels: ['technik'] })
+    expect(cards.filter(c => c.type === 'custom:ad-room-card').every(c => c.hide_labels?.[0] === 'technik')).toBe(true)
+  })
 })
 
 describe('filters and nav position', () => {
