@@ -1,7 +1,7 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { t } from './i18n'
-import { allEntities, areaEntities, bulkControl, entityAreaId, favoriteEntities, floorsWithAreas, groupEntities, groupOf, sceneEntities } from './model'
-import { OPENING_CLASSES, domainOf } from './presentation'
+import { SECURITY_GROUPS, allEntities, areaEntities, bulkControl, coverKind, entityAreaId, favoriteEntities, floorsWithAreas, groupEntities, groupOf, sceneEntities } from './model'
+import { domainOf } from './presentation'
 import type { NavItem } from './cards/nav-bar'
 import type { HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
@@ -92,14 +92,15 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
     },
     {
       path: 'covers', icon: 'mdi:window-shutter', title: t(hass, 'covers'),
-      pick: (e: HassEntity) => domainOf(e.entity_id) === 'cover',
+      // Shading only: garage doors and window drives belong to security, so "all down" never moves them
+      pick: (e: HassEntity) => domainOf(e.entity_id) === 'cover' && coverKind(e) === 'shading',
       count_label: 'n_open', action: { label: 'all_close', icon: 'mdi:arrow-down', service: 'close_cover' },
     },
     {
       path: 'security', icon: 'mdi:shield-home-outline', title: t(hass, 'security'),
-      pick: (e: HassEntity) => groupOf(e) === 'security', count_label: 'n_open',
-      // Motion and smoke are not "open"; only openings and locks count
-      counts: (e: HassEntity) => domainOf(e.entity_id) === 'lock' || OPENING_CLASSES.includes(e.attributes.device_class),
+      pick: (e: HassEntity) => SECURITY_GROUPS.includes(groupOf(e)!), count_label: 'n_open',
+      // Motion and smoke are not "open"; only openings, gates and locks count
+      counts: (e: HassEntity) => ['opening', 'gate', 'lock'].includes(groupOf(e)!),
     },
   ]
     .filter(page => !rule?.hide_pages?.includes(page.path as PagePath))
@@ -140,11 +141,13 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
     max_columns: MAX_COLUMNS,
     sections: withNav([
       fullWidth([
-        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...look },
+        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...hideOpts, ...look },
         {
           type: 'custom:ad-status-bar', ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look,
           links: { lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate') },
         },
+        // Hides itself while nothing plays
+        { type: 'custom:ad-now-playing', ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look },
         ...(scenes.length ? [{ type: 'custom:ad-scenes', entities: scenes.map(e => e.entity_id), ...look }] : []),
       ]),
       ...(singleRoom ? [] : favoritesSection(favorites)),

@@ -11,7 +11,8 @@ const defs: Def[] = [
   ['sensor.wohnzimmer_luftfeuchte', '48', { friendly_name: 'Wohnzimmer Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' }, 'wohnzimmer'],
   ['sensor.wohnzimmer_co2', '612', { friendly_name: 'Wohnzimmer CO2', device_class: 'carbon_dioxide', unit_of_measurement: 'ppm' }, 'wohnzimmer'],
   ['binary_sensor.wohnzimmer_fenster', 'on', { friendly_name: 'Wohnzimmer Fenster', device_class: 'window' }, 'wohnzimmer'],
-  ['media_player.wohnzimmer_sonos', 'playing', { friendly_name: 'Wohnzimmer Sonos', media_title: 'Teardrop', media_artist: 'Massive Attack' }, 'wohnzimmer'],
+  ['media_player.wohnzimmer_sonos', 'playing', { friendly_name: 'Wohnzimmer Sonos', media_title: 'Teardrop', media_artist: 'Massive Attack', supported_features: 16417 }, 'wohnzimmer'],
+  ['cover.wohnzimmer_dachfenster', 'closed', { friendly_name: 'Wohnzimmer Dachfenster', device_class: 'window', current_position: 0 }, 'wohnzimmer'],
   ['cover.wohnzimmer_rollo', 'open', { friendly_name: 'Wohnzimmer Rollo', current_position: 70 }, 'wohnzimmer'],
   ['switch.wohnzimmer_steckdose', 'off', { friendly_name: 'Wohnzimmer Steckdose', device_class: 'outlet' }, 'wohnzimmer'],
   ['scene.wohnzimmer_kino', new Date(Date.now() - 2 * 3600_000).toISOString(), { friendly_name: 'Wohnzimmer Kino' }, 'wohnzimmer'],
@@ -21,6 +22,7 @@ const defs: Def[] = [
   ['light.kuche_theke', 'off', { friendly_name: 'Küche Theke', supported_color_modes: ['onoff'] }, 'kuche'],
   ['sensor.kuche_temperatur', '20.1', { friendly_name: 'Küche Temperatur', device_class: 'temperature', unit_of_measurement: '°C' }, 'kuche'],
   ['binary_sensor.kuche_fenster', 'off', { friendly_name: 'Küche Fenster', device_class: 'window' }, 'kuche'],
+  ['media_player.kuche_radio', 'paused', { friendly_name: 'Küche Radio', app_name: 'Radio Bremen', supported_features: 16417 }, 'kuche'],
   ['switch.kuche_kaffee', 'on', { friendly_name: 'Kaffeemaschine', device_class: 'outlet' }, 'kuche'],
 
   ['light.esszimmer', 'on', { friendly_name: 'Esszimmer', brightness: 90, supported_color_modes: ['brightness'] }, 'esszimmer'],
@@ -47,11 +49,16 @@ const defs: Def[] = [
 
   ['light.garage', 'off', { friendly_name: 'Garage', supported_color_modes: ['onoff'] }, 'garage'],
   ['binary_sensor.garage_tor', 'on', { friendly_name: 'Garagentor', device_class: 'garage_door' }, 'garage'],
+  ['cover.garage_tor', 'open', { friendly_name: 'Garagentorantrieb', device_class: 'garage' }, 'garage'],
+  ['binary_sensor.garage_rauch', 'off', { friendly_name: 'Garage Rauchmelder', device_class: 'smoke' }, 'garage'],
 ]
 
 const extras: HassEntity[] = [
   { entity_id: 'sensor.flur_batterie', state: '9', attributes: { friendly_name: 'Flur Bewegungsmelder Batterie', device_class: 'battery', unit_of_measurement: '%' } },
   { entity_id: 'script.gute_nacht', state: 'off', attributes: { friendly_name: 'Gute Nacht', icon: 'mdi:weather-night', last_triggered: new Date(Date.now() - 15 * 3600_000).toISOString() } },
+  { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo' } },
+  { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni' } },
+  { entity_id: 'alarm_control_panel.haus', state: 'armed_home', attributes: { friendly_name: 'Alarmanlage' } },
   { entity_id: 'weather.home', state: 'partlycloudy', attributes: { friendly_name: 'Zuhause', temperature: 11.2, temperature_unit: '°C' } },
 ]
 
@@ -59,7 +66,8 @@ export function createHass(dark: boolean): HomeAssistant {
   const states: Record<string, HassEntity> = {}
   const entities: HomeAssistant['entities'] = {}
   for (const [entity_id, state, attributes, area] of defs) {
-    states[entity_id] = { entity_id, state, attributes }
+    const minutesAgo = entity_id === 'media_player.kuche_radio' ? 2 : 10
+    states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - minutesAgo * 60_000).toISOString() }
     entities[entity_id] = { entity_id, area_id: area, labels: [] }
   }
   // ?labels=technik hides these
@@ -97,7 +105,7 @@ export function createHass(dark: boolean): HomeAssistant {
     formatEntityState: (e: HassEntity) => {
       const map: Record<string, string> = {
         on: 'An', off: 'Aus', open: 'Offen', closed: 'Geschlossen', locked: 'Verriegelt', unlocked: 'Entriegelt',
-        playing: 'Spielt', paused: 'Pausiert', heat: 'Heizen', partlycloudy: 'Teilweise bewölkt', unavailable: 'Nicht verfügbar',
+        playing: 'Spielt', paused: 'Pausiert', heat: 'Heizen', armed_home: 'Scharf (zu Hause)', disarmed: 'Unscharf', triggered: 'Ausgelöst', partlycloudy: 'Teilweise bewölkt', unavailable: 'Nicht verfügbar',
       }
       const unit = e.attributes.unit_of_measurement
       return map[e.state] ?? (unit ? `${e.state} ${unit}` : e.state)

@@ -11,35 +11,59 @@ export interface Hide {
   labels?: string[]
 }
 
-export type GroupKey = 'light' | 'climate' | 'cover' | 'media' | 'switch' | 'scene' | 'security' | 'sensor'
+export type GroupKey =
+  | 'light' | 'climate' | 'shading' | 'opening' | 'gate' | 'lock' | 'media' | 'switch'
+  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene'
 
 /** Order in which groups appear on a room page. */
-export const GROUP_ORDER: GroupKey[] = ['light', 'climate', 'cover', 'media', 'switch', 'security', 'sensor', 'scene']
+export const GROUP_ORDER: GroupKey[] = [
+  'light', 'climate', 'shading', 'opening', 'gate', 'lock', 'media', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene',
+]
+
+/** Groups the security page collects. */
+export const SECURITY_GROUPS: GroupKey[] = ['opening', 'gate', 'lock', 'motion', 'safety']
 
 const GROUP_BY_DOMAIN: Record<string, GroupKey> = {
   light: 'light',
   climate: 'climate',
   humidifier: 'climate',
-  cover: 'cover',
   media_player: 'media',
   switch: 'switch',
   fan: 'switch',
   input_boolean: 'switch',
   vacuum: 'switch',
-  lock: 'security',
-  alarm_control_panel: 'security',
+  lock: 'lock',
+  alarm_control_panel: 'safety',
+  select: 'select',
+  input_select: 'select',
   scene: 'scene',
   script: 'scene',
   sensor: 'sensor',
 }
 
-const SECURITY_CLASSES = [...OPENING_CLASSES, 'motion', 'occupancy', 'presence', 'smoke', 'moisture', 'gas', 'safety', 'tamper']
+const BINARY_GROUPS: Record<string, GroupKey> = {
+  door: 'opening', window: 'opening', opening: 'opening',
+  garage_door: 'gate', gate: 'gate',
+  motion: 'motion', moving: 'motion', occupancy: 'motion', presence: 'motion',
+  smoke: 'safety', gas: 'safety', carbon_monoxide: 'safety', moisture: 'safety', safety: 'safety',
+  tamper: 'safety', problem: 'safety', heat: 'safety', cold: 'safety',
+}
+
+/**
+ * Covers by what they do, so "all down" for blinds never moves the garage door:
+ * windows and doors, gates (garage, gate), and shading (blinds, shutters, awnings, covers without a class).
+ */
+export function coverKind(entity: HassEntity): 'shading' | 'opening' | 'gate' {
+  const deviceClass = deviceClassOf(entity) ?? ''
+  if (['door', 'window'].includes(deviceClass)) return 'opening'
+  if (['garage', 'gate'].includes(deviceClass)) return 'gate'
+  return 'shading'
+}
 
 export function groupOf(entity: HassEntity): GroupKey | undefined {
   const domain = domainOf(entity.entity_id)
-  if (domain === 'binary_sensor') {
-    return SECURITY_CLASSES.includes(deviceClassOf(entity) ?? '') ? 'security' : undefined
-  }
+  if (domain === 'binary_sensor') return BINARY_GROUPS[deviceClassOf(entity) ?? '']
+  if (domain === 'cover') return coverKind(entity)
   if (domain === 'sensor') {
     // Plain text sensors and battery levels are noise on a room page
     if (deviceClassOf(entity) === 'battery') return undefined
@@ -259,18 +283,23 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [],
   return items.filter(item => item.entities.length)
 }
 
-export type QuickKey = 'light' | 'switch' | 'cover'
+export type QuickKey = 'light' | 'switch' | 'shading' | 'opening' | 'gate'
 
-const QUICK_DOMAINS: Record<QuickKey, string[]> = {
-  light: ['light'],
-  switch: ['switch', 'fan', 'input_boolean'],
-  cover: ['cover'],
+const isDomain = (...domains: string[]) => (e: HassEntity) => domains.includes(domainOf(e.entity_id))
+const isCover = (kind: ReturnType<typeof coverKind>) => (e: HassEntity) => domainOf(e.entity_id) === 'cover' && coverKind(e) === kind
+
+const QUICK: Record<QuickKey, (e: HassEntity) => boolean> = {
+  light: isDomain('light'),
+  switch: isDomain('switch', 'fan', 'input_boolean'),
+  shading: isCover('shading'),
+  opening: isCover('opening'),
+  gate: isCover('gate'),
 }
 
-/** Entities a room can switch together: all lights, all switches, all covers. Empty groups are left out. */
+/** Entities a room can switch together: lights, switches, and each kind of cover on its own. Empty groups are left out. */
 export function quickGroups(entities: HassEntity[]): { key: QuickKey; entities: HassEntity[] }[] {
-  return (Object.keys(QUICK_DOMAINS) as QuickKey[])
-    .map(key => ({ key, entities: entities.filter(e => QUICK_DOMAINS[key].includes(domainOf(e.entity_id))) }))
+  return (Object.keys(QUICK) as QuickKey[])
+    .map(key => ({ key, entities: entities.filter(QUICK[key]) }))
     .filter(group => group.entities.length)
 }
 
@@ -303,7 +332,7 @@ export function bulkControl(entities: HassEntity[]): { control?: GroupControl; e
   const many = (list: HassEntity[]) => list.length > 1
   if (!many(entities)) return { entities }
   if ([...domains].every(d => ['light', 'switch', 'fan', 'input_boolean'].includes(d))) return { control: 'toggle', entities }
-  if (domains.size === 1 && domains.has('cover')) return { control: 'cover', entities }
+  if (domains.size === 1 && domains.has('cover') && new Set(entities.map(coverKind)).size === 1) return { control: 'cover', entities }
   const locks = entities.filter(e => domainOf(e.entity_id) === 'lock')
   if (many(locks) && [...domains].every(d => ['lock', 'binary_sensor', 'alarm_control_panel'].includes(d))) return { control: 'lock', entities: locks }
   return { entities }

@@ -18,7 +18,9 @@ interface RoomHeaderConfig extends BaseConfig {
 const QUICK_ICONS: Record<QuickKey, [on: string, off: string]> = {
   light: ['mdi:lightbulb-group', 'mdi:lightbulb-group-outline'],
   switch: ['mdi:toggle-switch', 'mdi:toggle-switch-off-outline'],
-  cover: ['mdi:window-shutter-open', 'mdi:window-shutter'],
+  shading: ['mdi:window-shutter-open', 'mdi:window-shutter'],
+  opening: ['mdi:window-open-variant', 'mdi:window-closed-variant'],
+  gate: ['mdi:garage-open-variant', 'mdi:garage-variant'],
 }
 
 const HVAC_ACTIONS = ['heating', 'cooling', 'drying', 'fan', 'idle', 'off']
@@ -160,14 +162,15 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const active = entities.filter(e => isActive(e))
     const allowed = canBulk(this.config!.access, ids) && ids.every(id => this.canControl(id))
     const label = t(this.hass, `quick.${key}`)
-    const sub = key === 'cover'
+    const covers = key !== 'light' && key !== 'switch'
+    const sub = covers
       ? t(this.hass, 'n_open', { n: active.length })
       : entities.length > 1 ? t(this.hass, 'n_of_on', { n: active.length, total: entities.length }) : (active.length ? t(this.hass, 'on') : t(this.hass, 'off'))
     const icon = QUICK_ICONS[key][active.length ? 0 : 1]
     const content = html`<span class="dot ${active.length ? 'warning' : ''}"><ha-icon icon=${icon}></ha-icon></span>
       <div class="text"><span class="label">${label}</span><span class="sub">${sub}</span></div>`
 
-    if (key === 'cover') {
+    if (covers) {
       return html`<div class="tile static ${active.length ? 'on' : ''}">${content}
         ${allowed ? html`
           <button class="btn" aria-label=${t(this.hass, 'all_open')} @click=${() => this.call('cover', 'open_cover', ids)}><ha-icon icon="mdi:arrow-up"></ha-icon></button>

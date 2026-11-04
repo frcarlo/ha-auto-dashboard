@@ -101,7 +101,7 @@ describe('floorsWithAreas', () => {
 describe('groupEntities', () => {
   it('orders groups for a room page', () => {
     const groups = groupEntities(areaEntities(fakeHass(), 'wohnzimmer'))
-    expect([...groups.keys()]).toEqual(['light', 'climate', 'security', 'sensor'])
+    expect([...groups.keys()]).toEqual(['light', 'climate', 'opening', 'sensor'])
   })
 })
 
@@ -170,7 +170,28 @@ describe('room controls', () => {
 
   it('quick groups collect lights, switches and covers', () => {
     const entities = [st('light.a', 'on'), st('fan.b', 'off'), st('switch.c', 'on'), st('cover.d', 'open'), st('sensor.e', '1')]
-    expect(quickGroups(entities).map(g => [g.key, g.entities.length])).toEqual([['light', 1], ['switch', 2], ['cover', 1]])
+    expect(quickGroups(entities).map(g => [g.key, g.entities.length])).toEqual([['light', 1], ['switch', 2], ['shading', 1]])
+  })
+
+  it('splits covers by what they do', () => {
+    const entities = [
+      st('cover.blind', 'open'), st('cover.awning', 'open', { device_class: 'awning' }),
+      st('cover.window', 'open', { device_class: 'window' }), st('cover.garage', 'closed', { device_class: 'garage' }),
+      st('binary_sensor.garage', 'off', { device_class: 'garage_door' }), st('binary_sensor.pir', 'on', { device_class: 'motion' }),
+      st('binary_sensor.smoke', 'off', { device_class: 'smoke' }), st('select.mode', 'a'),
+    ]
+    expect(Object.fromEntries([...groupEntities(entities)].map(([k, v]) => [k, v.map(e => e.entity_id)]))).toEqual({
+      shading: ['cover.awning', 'cover.blind'],
+      opening: ['cover.window'],
+      gate: ['binary_sensor.garage', 'cover.garage'],
+      select: ['select.mode'],
+      motion: ['binary_sensor.pir'],
+      safety: ['binary_sensor.smoke'],
+    })
+    expect(quickGroups(entities).map(g => g.key)).toEqual(['shading', 'opening', 'gate'])
+    // Blinds and the garage door never share an "all down"
+    expect(bulkControl([entities[0]!, entities[3]!]).control).toBeUndefined()
+    expect(bulkControl([entities[0]!, entities[1]!]).control).toBe('cover')
   })
 
   it('bulk control fits the group, and needs two entities', () => {

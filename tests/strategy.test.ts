@@ -142,3 +142,23 @@ describe('room page, favorites and scenes', () => {
     expect(cards(views[0]!).find(c => c.type === 'custom:ad-scenes')!.entities).toEqual(['script.gute_nacht'])
   })
 })
+
+describe('groups by function and now playing', () => {
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+
+  it('the covers page only has shading; garage and window drives go to security', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const tiles = (path: string) => cards(views.find(v => v.path === path)!).filter(c => c.type === 'custom:ad-tile').map(c => c.entity)
+    expect(tiles('covers')).not.toContain('cover.garage_tor')
+    expect(tiles('covers')).not.toContain('cover.wohnzimmer_dachfenster')
+    expect(tiles('covers')).toContain('cover.wohnzimmer_rollo')
+    expect(tiles('security')).toEqual(expect.arrayContaining(['cover.garage_tor', 'cover.wohnzimmer_dachfenster', 'binary_sensor.garage_rauch']))
+  })
+
+  it('Home has the now playing bar and passes hide options to the header', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', hide_domains: ['person'] }, createHass(true))
+    const home = cards(views[0]!)
+    expect(home.find(c => c.type === 'custom:ad-now-playing')).toBeDefined()
+    expect(home.find(c => c.type === 'custom:ad-header')).toMatchObject({ hide_domains: ['person'] })
+  })
+})
