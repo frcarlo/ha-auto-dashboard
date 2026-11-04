@@ -142,11 +142,15 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
     }).filter(section => section.cards.length)
     const placed = new Set(areas.flatMap(area => inArea(area.area_id)))
     const rest = page.entities.filter(e => !placed.has(e))
+    // Subviews like the rooms: with only Home as a top-level view HA shows no tab bar,
+    // and the nav bar is the one navigation
     return {
       type: 'sections',
       title: page.title,
       path: page.path,
       icon: page.icon,
+      subview: true,
+      back_path: `/${dashboardPath()}/home`,
       max_columns: MAX_COLUMNS,
       sections: [
         fullWidth([{

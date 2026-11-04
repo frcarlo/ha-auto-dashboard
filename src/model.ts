@@ -175,8 +175,36 @@ export function batteryEntities(hass: HomeAssistant): HassEntity[] {
     domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === 'battery' && !hass.entities[e.entity_id]?.hidden)
 }
 
+/**
+ * One entity per device that is gone: every visible entity of the device is unavailable.
+ * Only devices and entities placed in an area count, so leftovers without a room don't add noise.
+ * Entities without a device count on their own.
+ */
+export function unavailableDevices(hass: HomeAssistant, hideDomains: string[] = []): HassEntity[] {
+  const byDevice = new Map<string, HassEntity[]>()
+  const loose: HassEntity[] = []
+  for (const ids of entityIndex(hass).byArea.values()) {
+    for (const id of ids) {
+      const entity = hass.states[id]
+      if (!entity || hideDomains.includes(domainOf(id))) continue
+      const deviceId = hass.entities[id]?.device_id
+      if (!deviceId) {
+        if (entity.state === 'unavailable') loose.push(entity)
+        continue
+      }
+      const list = byDevice.get(deviceId)
+      if (list) list.push(entity)
+      else byDevice.set(deviceId, [entity])
+    }
+  }
+  const dead = [...byDevice.values()]
+    .filter(list => list.every(e => e.state === 'unavailable'))
+    .map(list => list[0]!)
+  return [...dead, ...loose]
+}
+
 /** Things worth a glance on the home page. Only non-empty items are returned. */
-export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = []): StatusItem[] {
+export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [], unavailable: HassEntity[] = []): StatusItem[] {
   const is = (domain: string) => (e: HassEntity) => domainOf(e.entity_id) === domain
   const items: StatusItem[] = [
     { key: 'lights', entities: entities.filter(is('light')).filter(e => e.state === 'on') },
@@ -188,7 +216,7 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [])
       key: 'battery',
       entities: batteries.filter(e => e.state !== '' && Number(e.state) < LOW_BATTERY),
     },
-    { key: 'unavailable', entities: entities.filter(e => e.state === 'unavailable') },
+    { key: 'unavailable', entities: unavailable },
   ]
   return items.filter(item => item.entities.length)
 }

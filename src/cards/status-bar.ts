@@ -2,9 +2,10 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { allEntities, batteryEntities, entityIndex, homeStatus, type StatusKey } from '../model'
+import { allEntities, batteryEntities, entityIndex, homeStatus, unavailableDevices, type StatusKey } from '../model'
 import { entityIcon, entityName } from '../presentation'
 import { tokens } from '../styles/tokens'
+import type { HassEntity } from '../types'
 
 interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
@@ -71,6 +72,11 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     return [...entityIndex(this.hass!).all, ...batteryEntities(this.hass!).map(e => e.entity_id)]
   }
 
+  private deviceName(entity: HassEntity) {
+    const device = this.hass!.devices[this.hass!.entities[entity.entity_id]?.device_id ?? '']
+    return device?.name_by_user ?? device?.name ?? entityName(entity)
+  }
+
   private select(key: StatusKey) {
     const link = this.config?.links?.[key]
     if (link) return this.navigate(link)
@@ -78,7 +84,8 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   }
 
   protected render() {
-    const items = homeStatus(allEntities(this.hass!, this.config!.hide_domains), batteryEntities(this.hass!))
+    const hide = this.config!.hide_domains
+    const items = homeStatus(allEntities(this.hass!, hide), batteryEntities(this.hass!), unavailableDevices(this.hass!, hide))
     const openItem = items.find(i => i.key === this.open)
     return html`
       <div class="chips">
@@ -94,7 +101,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
         ${openItem.entities.map(e => html`
           <button class="item" @click=${() => this.moreInfo(e.entity_id)}>
             <ha-icon icon=${entityIcon(e)}></ha-icon>
-            <span>${entityName(e)}</span>
+            <span>${this.open === 'unavailable' ? this.deviceName(e) : entityName(e)}</span>
             <span class="s">${this.hass!.formatEntityState?.(e) ?? e.state}</span>
           </button>`)}
       </div>` : nothing}

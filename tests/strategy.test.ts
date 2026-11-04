@@ -8,7 +8,8 @@ describe('generateDashboard', () => {
     const paths = views.map(v => v.path)
     expect(paths.slice(0, 5)).toEqual(['home', 'lights', 'climate', 'covers', 'security'])
     expect(paths).toContain('area-wohnzimmer')
-    expect(views.filter(v => v.subview).length).toBe(paths.length - 5)
+    // Only Home is a top-level view, so HA shows no tab bar
+    expect(views.filter(v => !v.subview).map(v => v.path)).toEqual(['home'])
   })
 
   it('puts one room card per area under its floor, top floor first', async () => {

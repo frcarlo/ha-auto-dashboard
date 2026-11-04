@@ -9,7 +9,7 @@ Ein ES-Modul (~63 KB, ~19 KB gzip), einzige Abhängigkeit ist Lit. Keine anderen
 - **Zuhause**: Begrüßung, Uhrzeit, Wetter, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar), darunter eine Raumkarte pro Area, gruppiert nach Etage.
 - **Raumseiten** (`area-<area_id>`, Subview): Licht, Klima, Rollos, Medien, Schalter, Sicherheit, Sensoren, Szenen.
 - **Domain-Seiten**: Licht (mit „Alle aus“), Klima, Rollos (mit „Alle zu“), Sicherheit. Nach Raum gruppiert, nur wenn es passende Entities gibt.
-- **Navigation**: HA-Tabs auf dem Desktop, schwebende Bottom-Bar auf dem Handy (≤ 768 px).
+- **Navigation**: schwebende Leiste unten auf allen Geräten. Licht, Klima, Rollos, Sicherheit und die Räume sind Unteransichten, deshalb blendet HA seine eigene Tab-Leiste aus.
 
 Bedienung: Raumkarte antippen öffnet die Raumseite, Doppeltipp schaltet alle Lichter im Raum, ein Tipp auf einen Status-Kreis öffnet den More-Info-Dialog. Kacheln: Tippen schaltet Licht, Schalter und Szenen, alles andere öffnet More-Info. Lange drücken öffnet immer More-Info.
 

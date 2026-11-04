@@ -1,4 +1,4 @@
-// Mobile bottom bar. Rendered into document.body so no ancestor (transforms,
+// Floating bottom bar, the dashboard's only navigation. Rendered into document.body so no ancestor (transforms,
 // container queries) can break position: fixed. In place it only leaves a spacer.
 import { css, html, render } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
@@ -15,8 +15,10 @@ interface NavBarConfig extends BaseConfig {
 }
 
 const barStyles = css`
-  :host { position: fixed; z-index: 5; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); display: none; }
-  @media (max-width: 768px) { :host { display: block; } }
+  :host {
+    position: fixed; z-index: 5; bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 24px));
+  }
   nav {
     display: flex; justify-content: space-around; padding: 6px; border-radius: 26px;
     background: var(--ad-glass-bg); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -40,8 +42,8 @@ function currentView() {
 
 export class AdNavBar extends BaseCard<NavBarConfig> {
   static styles = [tokens, css`
-    :host { display: none; }
-    @media (max-width: 768px) { :host { display: block; height: 72px; } }
+    /* Keeps the last cards scrollable above the floating bar */
+    :host { display: block; height: 72px; }
   `]
 
   private onLocation = () => this.paint()
@@ -87,7 +89,8 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
   private paint() {
     if (!bar?.shadowRoot || !this.config) return
     bar.toggleAttribute('dark', this.hasAttribute('dark'))
-    const active = currentView()
+    // A bare dashboard URL shows the first view
+    const active = currentView() || this.config.items[0]?.path
     const dashboard = location.pathname.split('/')[1]
     render(html`
       <style>${tokens.cssText}${barStyles.cssText}</style>

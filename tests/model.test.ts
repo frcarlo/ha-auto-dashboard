@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, batteryEntities, floorsWithAreas, groupEntities, homeStatus, roomSummary } from '../src/model'
+import { areaEntities, batteryEntities, floorsWithAreas, groupEntities, homeStatus, roomSummary, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 
 const st = (entity_id: string, state: string, attributes: Record<string, unknown> = {}): HassEntity =>
@@ -121,5 +121,24 @@ describe('presentation', () => {
     expect(shortName('Wohnzimmer Decke', 'Wohnzimmer')).toBe('Decke')
     expect(shortName('Wohnzimmer', 'Wohnzimmer')).toBe('Wohnzimmer')
     expect(shortName('Stehlampe', 'Wohnzimmer')).toBe('Stehlampe')
+  })
+})
+
+describe('unavailableDevices', () => {
+  it('counts a device once, only when all its entities are gone, and only inside areas', () => {
+    const hass = fakeHass()
+    const add = (id: string, state: string, entry: Record<string, unknown>) => {
+      hass.states[id] = st(id, state)
+      hass.entities[id] = { entity_id: id, ...entry }
+    }
+    hass.devices.dead = { id: 'dead', area_id: 'kueche' }
+    hass.devices.half = { id: 'half', area_id: 'kueche' }
+    add('sensor.dead_a', 'unavailable', { device_id: 'dead' })
+    add('sensor.dead_b', 'unavailable', { device_id: 'dead' })
+    add('sensor.half_a', 'unavailable', { device_id: 'half' })
+    add('sensor.half_b', '3', { device_id: 'half' })
+    add('switch.loose', 'unavailable', { area_id: 'flur' })
+    add('switch.nowhere', 'unavailable', {})
+    expect(unavailableDevices(hass).map(e => e.entity_id)).toEqual(['sensor.dead_a', 'switch.loose'])
   })
 })
