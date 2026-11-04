@@ -2,8 +2,8 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { allEntities, batteryEntities, entityIndex, homeStatus, unavailableDevices, type StatusKey } from '../model'
-import { entityIcon, entityName } from '../presentation'
+import { allEntities, batteryEntities, entityAreaId, entityIndex, homeStatus, unavailableDevices, type StatusKey } from '../model'
+import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
 
@@ -11,7 +11,7 @@ interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
   /** Only count entities in these areas (dashboard filtered to rooms or floors) */
   areas?: string[]
-  /** Which status keys jump to a view instead of listing their entities */
+  /** Status keys whose list ends with a link to a view showing all of them */
   links?: Partial<Record<StatusKey, string>>
 }
 
@@ -59,7 +59,11 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: 13px; }
     .item:hover { background: rgba(var(--ad-on-surface), 0.06); }
     .item ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
-    .item .s { margin-left: auto; opacity: 0.55; font-size: 12px; }
+    .item .a { opacity: 0.45; font-size: 12px; white-space: nowrap; }
+    .item .s { margin-left: auto; opacity: 0.55; font-size: 12px; white-space: nowrap; }
+    .more { all: unset; align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; color: rgb(var(--ad-primary)); }
+    .more:hover { background: rgba(var(--ad-primary), 0.1); }
+    .more ha-icon { --mdc-icon-size: 16px; }
   `]
 
   getGridOptions() {
@@ -79,20 +83,21 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     return device?.name_by_user ?? device?.name ?? entityName(entity)
   }
 
-  private select(key: StatusKey) {
-    const link = this.config?.links?.[key]
-    if (link) return this.navigate(link)
-    this.open = this.open === key ? null : key
+  private areaName(entity: HassEntity) {
+    // A dashboard for one room needs no room names in the list
+    if (this.config?.areas?.length === 1) return undefined
+    return this.hass!.areas[entityAreaId(this.hass!, entity.entity_id) ?? '']?.name
   }
 
   protected render() {
     const { hide_domains: hide, areas } = this.config!
     const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas), unavailableDevices(this.hass!, hide, areas))
     const openItem = items.find(i => i.key === this.open)
+    const link = openItem && this.config!.links?.[openItem.key]
     return html`
       <div class="chips">
         ${items.length ? items.map(item => html`
-          <button class="chip ${COLORS[item.key]}" aria-expanded=${this.open === item.key} @click=${() => this.select(item.key)}>
+          <button class="chip ${COLORS[item.key]}" aria-expanded=${this.open === item.key} @click=${() => (this.open = this.open === item.key ? null : item.key)}>
             <ha-icon icon=${ICONS[item.key]}></ha-icon>
             <span class="n">${item.entities.length}</span>
             <span class="l">${t(this.hass, `status.${item.key}`)}</span>
@@ -100,12 +105,20 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
         : html`<span class="chip quiet"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="l">${t(this.hass, 'all_quiet')}</span></span>`}
       </div>
       ${openItem ? html`<div class="list card">
-        ${openItem.entities.map(e => html`
-          <button class="item" @click=${() => this.moreInfo(e.entity_id)}>
-            <ha-icon icon=${entityIcon(e)}></ha-icon>
-            <span>${this.open === 'unavailable' ? this.deviceName(e) : entityName(e)}</span>
-            <span class="s">${this.hass!.formatEntityState?.(e) ?? e.state}</span>
-          </button>`)}
+        ${openItem.entities.map(e => {
+          const area = this.areaName(e)
+          const name = shortName(this.open === 'unavailable' ? this.deviceName(e) : entityName(e), area)
+          return html`
+            <button class="item" @click=${() => this.moreInfo(e.entity_id)}>
+              <ha-icon icon=${entityIcon(e)}></ha-icon>
+              <span>${name}</span>
+              ${area && area !== name ? html`<span class="a">${area}</span>` : nothing}
+              <span class="s">${this.hass!.formatEntityState?.(e) ?? e.state}</span>
+            </button>`
+        })}
+        ${link ? html`<button class="more" @click=${() => this.navigate(link)}>
+          ${t(this.hass, 'show_all')}<ha-icon icon="mdi:chevron-right"></ha-icon>
+        </button>` : nothing}
       </div>` : nothing}
     `
   }

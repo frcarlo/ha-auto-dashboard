@@ -121,6 +121,7 @@ describe('presentation', () => {
     expect(shortName('Wohnzimmer Decke', 'Wohnzimmer')).toBe('Decke')
     expect(shortName('Wohnzimmer', 'Wohnzimmer')).toBe('Wohnzimmer')
     expect(shortName('Stehlampe', 'Wohnzimmer')).toBe('Stehlampe')
+    expect(shortName('Garagentor', 'Garage')).toBe('Garagentor')
   })
 })
 

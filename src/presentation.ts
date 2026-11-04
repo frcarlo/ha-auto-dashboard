@@ -103,10 +103,10 @@ export function entityName(entity: MinimalEntity | undefined, fallback = '') {
   return (entity?.attributes?.friendly_name as string | undefined) ?? (fallback || entity?.entity_id || '')
 }
 
-/** Strip the area name from an entity name ("Wohnzimmer Decke" → "Decke") for use inside a room. */
+/** Strip the area name from an entity name ("Wohnzimmer Decke" → "Decke") for use inside a room. Whole words only, "Garagentor" stays. */
 export function shortName(name: string, areaName?: string) {
   if (!areaName) return name
-  const stripped = name.replace(new RegExp(`^${areaName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'i'), '').trim()
+  const stripped = name.replace(new RegExp(`^${areaName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s+|$)`, 'i'), '').trim()
   return stripped ? stripped.charAt(0).toUpperCase() + stripped.slice(1) : name
 }
 
