@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Dashboard Harness</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Roboto, system-ui, sans-serif; background: #0f172a; color: #f1f5f9; }
+    body.light { background: #f8fafc; color: #0f172a; color-scheme: light; }
+    header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 4px; padding: 8px 12px; overflow-x: auto;
+      background: inherit; border-bottom: 1px solid rgba(127,127,127,.15); }
+    header button { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 13px; opacity: .7; white-space: nowrap; }
+    header button[aria-current=true] { opacity: 1; background: rgba(127,127,127,.18); }
+    header .spacer { flex: 1; }
+    .view { box-sizing: border-box; max-width: 1400px; margin: 0 auto; padding: 16px; display: grid; gap: 24px 8px; }
+    .section { display: grid; gap: 8px; grid-auto-rows: minmax(56px, auto); align-content: start; }
+    .heading { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; padding: 4px; cursor: default; }
+    .heading[data-nav] { cursor: pointer; }
+    .heading.subtitle { font-size: 13px; opacity: .7; padding-top: 8px; }
+    .heading ha-icon { --mdc-icon-size: 20px; opacity: .6; }
+    #toast { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px;
+      background: #334155; color: #fff; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+  </style>
+</head>
+<body>
+  <header id="tabs"></header>
+  <main id="view"></main>
+  <div id="toast"></div>
+  <script type="module" src="./harness.ts"></script>
+</body>
+</html>

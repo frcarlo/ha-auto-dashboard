@@ -1,0 +1,141 @@
+// Renders the generated dashboard roughly like HA's sections view, against mock data.
+import * as mdi from '@mdi/js'
+import '../src/index'
+import { generateDashboard } from '../src/strategy'
+import { applyService, createHass } from './mock'
+import type { HomeAssistant, StrategyConfig } from '../src/types'
+
+// Stand-ins for HA's own icon elements. Shadow DOM like the real ones: light-DOM
+// children would shift Lit's part indices while a template is being cloned.
+class HaIcon extends HTMLElement {
+  static observedAttributes = ['icon']
+  attributeChangedCallback() { this.paint() }
+  set icon(v: string) { this.setAttribute('icon', v) }
+  connectedCallback() { this.paint() }
+  paint() {
+    const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' })
+    const name = (this.getAttribute('icon') ?? '').replace(/^mdi:/, '')
+    const key = 'mdi' + name.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('')
+    const path = (mdi as Record<string, string>)[key] ?? mdi.mdiHelpCircleOutline
+    const size = 'var(--mdc-icon-size, 24px)'
+    root.innerHTML = `<style>:host{display:inline-flex}</style><svg viewBox="0 0 24 24" style="width:${size};height:${size};fill:currentColor"><path d="${path}"/></svg>`
+  }
+}
+customElements.define('ha-icon', HaIcon)
+customElements.define('ha-state-icon', class extends HaIcon {
+  connectedCallback() { this.setAttribute('icon', 'mdi:weather-partly-cloudy') }
+})
+
+const params = new URLSearchParams(location.search)
+let dark = params.get('theme') !== 'light'
+const config: StrategyConfig = { type: 'custom:auto-dashboard', glass: params.has('glass') }
+let hass: HomeAssistant = createHass(dark)
+let views: any[] = []
+const cards: any[] = []
+
+hass.callService = callService
+async function callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>) {
+  toast(`${domain}.${service} → ${JSON.stringify(target?.entity_id)}`)
+  hass = { ...applyService(hass, domain, service, data, target), callService }
+  for (const card of cards) card.hass = hass
+}
+
+function toast(text: string) {
+  const el = document.getElementById('toast')!
+  el.textContent = text
+  el.style.opacity = '1'
+  clearTimeout((el as any).t)
+  ;(el as any).t = setTimeout(() => (el.style.opacity = '0'), 1600)
+}
+
+window.addEventListener('hass-more-info', (e: any) => toast(`more-info: ${e.detail.entityId}`))
+window.addEventListener('location-changed', () => render())
+window.addEventListener('popstate', () => render())
+window.addEventListener('resize', () => render())
+
+function currentPath() {
+  const p = location.pathname.split('/')[2] ?? ''
+  return views.some(v => v.path === p) ? p : views[0].path
+}
+
+function go(path: string) {
+  history.pushState(null, '', `/dev/${path}${location.search}`)
+  render()
+}
+
+function createCard(conf: any) {
+  if (conf.type === 'heading') {
+    const el = document.createElement('div')
+    el.className = `heading ${conf.heading_style ?? ''}`
+    el.innerHTML = `${conf.icon ? `<ha-icon icon="${conf.icon}"></ha-icon>` : ''}<span>${conf.heading}</span>`
+    if (conf.tap_action) {
+      el.dataset.nav = ''
+      el.onclick = () => go(conf.tap_action.navigation_path.split('/')[2])
+    }
+    return { el, options: { columns: 'full', rows: 'auto' } }
+  }
+  const el: any = document.createElement(conf.type.replace('custom:', ''))
+  el.setConfig(conf)
+  el.hass = hass
+  cards.push(el)
+  return { el, options: el.getGridOptions?.() ?? { columns: 12, rows: 'auto' } }
+}
+
+function render() {
+  cards.length = 0
+  const path = currentPath()
+  const view = views.find(v => v.path === path)
+  const tabs = document.getElementById('tabs')!
+  tabs.innerHTML = ''
+  if (view.subview) {
+    const back = document.createElement('button')
+    back.textContent = '← Zurück'
+    back.onclick = () => go('home')
+    tabs.append(back)
+  }
+  for (const v of views.filter(v => !v.subview)) {
+    const b = document.createElement('button')
+    b.textContent = v.title
+    b.setAttribute('aria-current', String(v.path === path))
+    b.onclick = () => go(v.path)
+    tabs.append(b)
+  }
+  tabs.append(Object.assign(document.createElement('span'), { className: 'spacer' }))
+  const themeBtn = document.createElement('button')
+  themeBtn.textContent = dark ? 'Hell' : 'Dunkel'
+  themeBtn.onclick = () => { dark = !dark; hass = { ...hass, themes: { darkMode: dark } }; document.body.classList.toggle('light', !dark); render() }
+  tabs.append(themeBtn)
+
+  const main = document.getElementById('view')!
+  main.innerHTML = ''
+  const width = main.clientWidth || window.innerWidth
+  const cols = Math.max(1, Math.min(view.max_columns ?? 4, Math.floor((width - 32 + 8) / (320 + 8))))
+  const grid = document.createElement('div')
+  grid.className = 'view'
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
+  for (const section of view.sections) {
+    const span = Math.min(section.column_span ?? 1, cols)
+    const gridCols = 12 * span
+    const s = document.createElement('div')
+    s.className = 'section'
+    s.style.gridColumn = `span ${span}`
+    s.style.gridTemplateColumns = `repeat(${gridCols}, minmax(0, 1fr))`
+    for (const conf of section.cards) {
+      const { el, options } = createCard(conf)
+      const c = options.columns === 'full' ? gridCols : Math.min(Number(options.columns), gridCols)
+      el.style.gridColumn = `span ${c}`
+      if (options.rows !== 'auto') el.style.height = `${options.rows * 56 + (options.rows - 1) * 8}px`
+      if (options.rows !== 'auto') el.style.gridRow = `span ${options.rows}`
+      el.style.display = el.style.display || 'block'
+      s.append(el)
+    }
+    grid.append(s)
+  }
+  main.append(grid)
+}
+
+document.body.classList.toggle('light', !dark)
+generateDashboard(config, hass).then(result => {
+  views = result.views
+  render()
+})

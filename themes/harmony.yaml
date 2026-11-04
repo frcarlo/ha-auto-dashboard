@@ -1,0 +1,37 @@
+# HArmony-Palette als Home-Assistant-Theme, damit Hintergrund und Header zu den Karten passen.
+# Datei nach /config/themes/harmony.yaml legen (frontend: themes: !include_dir_merge_named themes)
+# und im Profil "HArmony" auswählen.
+HArmony:
+  modes:
+    dark:
+      primary-background-color: "#0f172a"
+      lovelace-background: "#0f172a"
+      secondary-background-color: "#1e293b"
+      card-background-color: "#1e293b"
+      ha-card-background: "#1e293b"
+      primary-color: "#6366f1"
+      accent-color: "#6366f1"
+      primary-text-color: "#f1f5f9"
+      secondary-text-color: "#94a3b8"
+      app-header-background-color: "#0f172a"
+      app-header-text-color: "#f1f5f9"
+      sidebar-background-color: "#0f172a"
+      divider-color: "rgba(241, 245, 249, 0.08)"
+      ha-card-border-radius: "24px"
+      ha-card-border-width: "0px"
+    light:
+      primary-background-color: "#f8fafc"
+      lovelace-background: "#f8fafc"
+      secondary-background-color: "#f1f5f9"
+      card-background-color: "#ffffff"
+      ha-card-background: "#ffffff"
+      primary-color: "#4f46e5"
+      accent-color: "#4f46e5"
+      primary-text-color: "#0f172a"
+      secondary-text-color: "#64748b"
+      app-header-background-color: "#f8fafc"
+      app-header-text-color: "#0f172a"
+      sidebar-background-color: "#f8fafc"
+      divider-color: "rgba(15, 23, 42, 0.08)"
+      ha-card-border-radius: "24px"
+      ha-card-border-width: "0px"
