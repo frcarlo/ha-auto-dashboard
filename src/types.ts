@@ -75,7 +75,7 @@ export interface CardLook {
   access?: Access
 }
 
-export type PagePath = 'lights' | 'climate' | 'covers' | 'security' | 'energy' | 'maintenance'
+export type PagePath = 'lights' | 'climate' | 'covers' | 'security' | 'cameras' | 'energy' | 'maintenance'
 
 /** Per-user rule under `users:`, keyed by user name, first name, user id or `default`. */
 export interface UserRule {

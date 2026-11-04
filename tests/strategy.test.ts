@@ -16,7 +16,7 @@ describe('generateDashboard', () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const sections = views[0]!.sections as { cards: Record<string, any>[] }[]
     const floors = sections.slice(1, -1).map(s => s.cards[0]!.heading)
-    expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume', 'Kameras', 'Listen'])
+    expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume', 'Listen'])
     const rooms = sections.flatMap(s => s.cards).filter(c => c.type === 'custom:ad-room-card').map(c => c.area)
     expect(new Set(rooms).size).toBe(rooms.length)
   })
@@ -197,14 +197,19 @@ describe('energy, maintenance, cameras and lists', () => {
     expect(cards(guest.views.find(v => v.path === 'maintenance')!).map(c => c.source)).not.toContain('updates')
   })
 
-  it('cameras and to-do lists use HA cards; hide_pages removes the new pages', async () => {
+  it('cameras get their own page in the nav; to-do lists stay on Home; hide_pages removes the new pages', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const home = cards(views[0]!)
-    expect(home.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage' })
+    expect(home.find(c => c.type === 'picture-entity')).toBeUndefined()
+    expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).toContain('cameras')
+    const page = cards(views.find(v => v.path === 'cameras')!)
+    expect(page.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage' })
+    expect(page.find(c => c.type === 'custom:ad-group-heading')).toMatchObject({ title: 'Garage', path: 'area-garage' })
     expect(home.find(c => c.type === 'todo-list')).toMatchObject({ entity: 'todo.einkauf' })
     expect(cards(views.find(v => v.path === 'area-garage')!).some(c => c.type === 'picture-entity')).toBe(true)
     const hass = createHass(true)
-    const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['energy', 'maintenance'] } } }, hass)
+    const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['energy', 'maintenance', 'cameras'] } } }, hass)
+    expect(ruled.views.map(v => v.path)).not.toContain('cameras')
     expect(ruled.views.map(v => v.path)).not.toContain('energy')
     expect(ruled.views.map(v => v.path)).not.toContain('maintenance')
   })

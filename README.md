@@ -6,12 +6,13 @@ Ein ES-Modul (~125 KB, ~34 KB gzip), einzige Abhängigkeit ist Lit. Keine andere
 
 ## Was erzeugt wird
 
-- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Personen (zu Hause oder unterwegs) und Alarmanlage, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar; ein Tipp klappt die Liste auf), Innen- und Außenklima und aktueller Stromverbrauch, „Läuft gerade“, eine Zeile mit Szenen und Skripten, Favoriten, darunter eine Raumkarte pro Area, gruppiert nach Etage. Ganz unten Kameras und To-do-Listen (HAs eigene Karten, Listen lassen sich direkt abhaken).
+- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Personen (zu Hause oder unterwegs) und Alarmanlage, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar; ein Tipp klappt die Liste auf), Innen- und Außenklima und aktueller Stromverbrauch, „Läuft gerade“, eine Zeile mit Szenen und Skripten, Favoriten, darunter eine Raumkarte pro Area, gruppiert nach Etage. Ganz unten die To-do-Listen (HAs eigene Karte, Listen lassen sich direkt abhaken).
 - **Raumseiten** (`area-<area_id>`, Subview): oben Temperatur, Luftfeuchte und, wenn der Raum genau ein Thermostat hat, Ist- und Solltemperatur mit −/+. Daneben Schnellkacheln „Licht 2 von 5 an“, „Schalter“ und „Rollos“, die alles im Raum auf einmal schalten. Darunter die Favoriten des Raums und die Gruppen Licht, Klima, Beschattung, Fenster & Türen, Tore, Schlösser, Medien, Schalter, Auswahl, Bewegung & Anwesenheit, Sicherheit & Alarm, Sensoren, Szenen. Gruppen mit mehreren Lichtern, Schaltern, Rollos oder Schlössern haben einen Sammelschalter in der Überschrift.
 - **Domain-Seiten**: Licht (mit „Alle aus“), Klima, Rollos (mit „Alle zu“, nur Beschattung), Sicherheit (Fenster, Türen, Tore, Schlösser, Bewegung, Rauch- und Wassermelder). Nach Raum gruppiert, nur wenn es passende Entities gibt. Jede Raum-Überschrift führt zur Raumseite und hat einen Schalter mit „2/5“, bei Rollos auf/zu, bei Schlössern verriegeln/entriegeln. Entriegeln fragt immer erst nach.
+- **Kameras** (`cameras`, mit Eintrag in der Navigationsleiste): alle Kameras mit Live-Bild, nach Etage und Raum gruppiert, jede Raum-Überschrift führt zur Raumseite. Die Kameras eines Raums stehen zusätzlich oben auf seiner Raumseite.
 - **Energie** (`energy`, nur mit Leistungssensoren): das ganze Haus mit dem Raum, der am meisten verbraucht, und dessen drei größten Verbrauchern. Darunter jeder Raum mit seinen Leistungssensoren und ihrem Anteil, daneben ein Verlauf der letzten 24 Stunden (HAs Statistik-Graph, nur für Sensoren mit `state_class`). Erreichbar über die Kachel „Strom“ auf der Startseite.
 - **Wartung** (`maintenance`): alle Batterien, schwächste zuerst, nicht erreichbare Geräte und, nur für Admins, ausstehende Updates. Erreichbar über die Chips „Batterie“ und „Nicht erreichbar“ → „Alle anzeigen“.
-- **Navigation**: schwebende Leiste unten auf allen Geräten. Licht, Klima, Rollos, Sicherheit und die Räume sind Unteransichten, deshalb blendet HA seine eigene Tab-Leiste aus.
+- **Navigation**: schwebende Leiste unten auf allen Geräten. Licht, Klima, Rollos, Sicherheit, Kameras und die Räume sind Unteransichten, deshalb blendet HA seine eigene Tab-Leiste aus.
 
 **Rollos nach Zweck:** Rollläden, Jalousien, Markisen und Rollos ohne Geräteklasse zählen als Beschattung. Rollos mit der Klasse `window` oder `door` gehören zu Fenster & Türen, `garage` und `gate` zu Tore. Jede Art hat ihre eigene Schnellkachel und ihren eigenen Sammelschalter, „Alle zu“ für die Beschattung fährt also nie das Garagentor. Die Geräteklasse lässt sich in HA in den Einstellungen des Entities unter „Anzeigen als“ ändern.
 
@@ -99,7 +100,7 @@ strategy:
     leni:                          # Vorname, voller Name oder User-ID
       areas: [zimmer_leni, wohnzimmer]
       floors: [obergeschoss]
-      hide_pages: [security]       # lights | climate | covers | security | energy | maintenance
+      hide_pages: [security]       # lights | climate | covers | security | cameras | energy | maintenance
       control_critical: false      # keine Schlösser, Alarmanlage, „Alle aus/zu“
     gast:
       read_only: true              # nur ansehen

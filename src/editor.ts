@@ -28,7 +28,7 @@ interface Option {
 /** Accent suggestions; the color picker covers everything else. Indigo is the default. */
 const SWATCHES = ['#6366f1', '#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f43f5e', '#a855f7', '#64748b']
 
-const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'energy', 'maintenance']
+const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
   'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor',

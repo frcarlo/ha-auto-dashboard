@@ -117,6 +117,10 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
       // Motion and smoke are not "open"; only openings, gates and locks count
       counts: (e: HassEntity) => ['opening', 'gate', 'lock'].includes(groupOf(e)!),
     },
+    {
+      path: 'cameras', icon: 'mdi:cctv', title: t(hass, 'cameras'),
+      pick: ofDomain('camera'), card: cameraCard,
+    },
   ]
     .filter(page => !rule?.hide_pages?.includes(page.path as PagePath))
     .map(page => ({ ...page, entities: all.filter(page.pick) }))
@@ -190,7 +194,6 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
           ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })),
         ],
       })),
-      ...(cameras.length && !singleRoom ? [fullWidth([heading(t(hass, 'cameras'), 'mdi:cctv'), ...cameras.map(cameraCard)])] : []),
       ...(todos.length ? [fullWidth([
         heading(t(hass, 'todos'), 'mdi:clipboard-list-outline'),
         ...todos.map(e => ({ type: 'todo-list', entity: e.entity_id, grid_options: { columns: 12 } })),
@@ -255,7 +258,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
           heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon),
           ...rooms.flatMap(({ area, entities }) => [
             groupHeading(area.name, entities, { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }),
-            ...entities.map(e => tile(e, area.name)),
+            ...entities.map(e => page.card ? page.card(e) : tile(e, area.name)),
           ]),
         ] : [],
       }
@@ -280,7 +283,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
           ...(page.action ? { action: page.action } : {}),
         }]),
         ...floorSections,
-        ...(rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => tile(e))] }] : []),
+        ...(rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => page.card ? page.card(e) : tile(e))] }] : []),
       ]),
     }
   })
