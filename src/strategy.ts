@@ -1,6 +1,6 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { t } from './i18n'
-import { allEntities, areaEntities, floorsWithAreas, groupEntities, groupOf } from './model'
+import { allEntities, areaEntities, bulkControl, entityAreaId, favoriteEntities, floorsWithAreas, groupEntities, groupOf, sceneEntities } from './model'
 import { OPENING_CLASSES, domainOf } from './presentation'
 import type { NavItem } from './cards/nav-bar'
 import type { HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -66,6 +66,16 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
 
   const tile = (entity: HassEntity, areaName?: string): Card =>
     ({ type: 'custom:ad-tile', entity: entity.entity_id, ...(areaName ? { area_name: areaName } : {}), ...look })
+  // Heading with one control for the whole group (all lights of a room, all covers, ...)
+  const groupHeading = (title: string, entities: HassEntity[], extra: Card = {}): Card => {
+    const bulk = bulkControl(entities)
+    return {
+      type: 'custom:ad-group-heading', title, entities: bulk.entities.map(e => e.entity_id),
+      ...(bulk.control ? { control: bulk.control } : {}), ...extra, ...look,
+    }
+  }
+  const favorites = favoriteEntities(hass, config.favorites, areaIds)
+  const scenes = sceneEntities(hass, config.scenes, hide, areaIds)
 
   // Domain pages: which entities, and how the header counts and acts on them
   const domainPages = [
@@ -105,11 +115,21 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
   const has = (path: string) => domainPages.some(p => p.path === path) ? path : undefined
 
-  const roomSections = (area: (typeof areas)[number]): Section[] =>
-    [...groupEntities(areaEntities(hass, area.area_id, hide))].map(([key, entities]) => ({
+  const favoritesSection = (entities: HassEntity[], areaName?: string): Section[] => entities.length ? [{
+    type: 'grid',
+    column_span: areaName ? 1 : MAX_COLUMNS,
+    cards: [
+      { type: 'custom:ad-group-heading', title: t(hass, 'favorites'), icon: 'mdi:star-outline', entities: [], ...look },
+      ...entities.map(e => tile(e, areaName)),
+    ],
+  }] : []
+  const roomSections = (area: (typeof areas)[number]): Section[] => [
+    ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
+    ...[...groupEntities(areaEntities(hass, area.area_id, hide))].map(([key, entities]): Section => ({
       type: 'grid',
-      cards: [heading(t(hass, `group.${key}`)), ...entities.map(e => tile(e, area.name))],
-    }))
+      cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name))],
+    })),
+  ]
   const singleRoom = scoped && areas.length === 1 ? areas[0] : undefined
 
   const home: View = {
@@ -125,7 +145,9 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
           type: 'custom:ad-status-bar', ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look,
           links: { lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate') },
         },
+        ...(scenes.length ? [{ type: 'custom:ad-scenes', entities: scenes.map(e => e.entity_id), ...look }] : []),
       ]),
+      ...(singleRoom ? [] : favoritesSection(favorites)),
       // One room: its content right on the home page instead of a single room card
       ...(singleRoom ? roomSections(singleRoom) : []),
       // Span 2: room cards (6 columns) sit 4-up on wide screens and 2-up on phones
@@ -141,7 +163,6 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
   }
 
   const roomViews: View[] = areas.map(area => {
-    const lights = areaEntities(hass, area.area_id, hide).filter(e => domainOf(e.entity_id) === 'light')
     return {
       type: 'sections',
       title: area.name,
@@ -151,10 +172,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
       back_path: `/${dashboardPath()}/home`,
       max_columns: MAX_COLUMNS,
       sections: withNav([
-        fullWidth([{
-          type: 'custom:ad-header', variant: 'page', title: area.name, icon: area.icon ?? undefined, ...look,
-          ...(lights.length ? { entities: lights.map(e => e.entity_id), count_label: 'n_on', action: domainPages[0]?.action } : {}),
-        }]),
+        fullWidth([{ type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look }]),
         ...roomSections(area),
       ]),
     }
@@ -171,7 +189,7 @@ export async function generateDashboard(baseConfig: StrategyConfig, hass: HomeAs
         cards: rooms.length ? [
           heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon),
           ...rooms.flatMap(({ area, entities }) => [
-            heading(area.name, area.icon, areaPath(area.area_id), 'subtitle'),
+            groupHeading(area.name, entities, { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }),
             ...entities.map(e => tile(e, area.name)),
           ]),
         ] : [],

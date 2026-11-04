@@ -33,6 +33,9 @@ export interface AreaRegistryEntry {
   icon?: string | null
   floor_id?: string | null
   labels?: string[]
+  /** Sensors picked for the area in HA (Settings → Areas) */
+  temperature_entity_id?: string | null
+  humidity_entity_id?: string | null
 }
 
 export interface FloorRegistryEntry {
@@ -99,4 +102,8 @@ export interface StrategyConfig extends CardLook {
   hide_domains?: string[]
   /** Label ids: entities, devices and areas with one of them are left out */
   hide_labels?: string[]
+  /** Entities shown on Home and, for those in a room, at the top of the room page */
+  favorites?: string[]
+  /** Scenes and scripts in the row on Home; unset = every visible scene */
+  scenes?: string[]
 }

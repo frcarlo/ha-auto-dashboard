@@ -176,7 +176,9 @@ export interface RoomSummary {
 const firstSensor = (entities: HassEntity[], deviceClass: string) =>
   entities.find(e => domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === deviceClass)
 
-export function roomSummary(entities: HassEntity[]): RoomSummary {
+/** Sensors chosen for the area in HA win over the first matching sensor in the room. */
+export function roomSummary(entities: HassEntity[], area?: AreaRegistryEntry, states?: Record<string, HassEntity>): RoomSummary {
+  const picked = (id?: string | null) => (id ? states?.[id] : undefined)
   const status = [
     ...entities.filter(e => domainOf(e.entity_id) === 'binary_sensor' && OPENING_CLASSES.includes(deviceClassOf(e) ?? '')),
     ...entities.filter(e => domainOf(e.entity_id) === 'lock'),
@@ -185,8 +187,8 @@ export function roomSummary(entities: HassEntity[]): RoomSummary {
   return {
     lights: entities.filter(e => domainOf(e.entity_id) === 'light'),
     climate: entities.find(e => domainOf(e.entity_id) === 'climate'),
-    temperature: firstSensor(entities, 'temperature'),
-    humidity: firstSensor(entities, 'humidity'),
+    temperature: picked(area?.temperature_entity_id) ?? firstSensor(entities, 'temperature'),
+    humidity: picked(area?.humidity_entity_id) ?? firstSensor(entities, 'humidity'),
     co2: firstSensor(entities, 'carbon_dioxide'),
     status: status.slice(0, 5),
   }
@@ -255,4 +257,54 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [],
     { key: 'unavailable', entities: unavailable },
   ]
   return items.filter(item => item.entities.length)
+}
+
+export type QuickKey = 'light' | 'switch' | 'cover'
+
+const QUICK_DOMAINS: Record<QuickKey, string[]> = {
+  light: ['light'],
+  switch: ['switch', 'fan', 'input_boolean'],
+  cover: ['cover'],
+}
+
+/** Entities a room can switch together: all lights, all switches, all covers. Empty groups are left out. */
+export function quickGroups(entities: HassEntity[]): { key: QuickKey; entities: HassEntity[] }[] {
+  return (Object.keys(QUICK_DOMAINS) as QuickKey[])
+    .map(key => ({ key, entities: entities.filter(e => QUICK_DOMAINS[key].includes(domainOf(e.entity_id))) }))
+    .filter(group => group.entities.length)
+}
+
+/** Picked favorites that exist and lie in the dashboard's rooms; favorites without a room always count. */
+export function favoriteEntities(hass: HomeAssistant, ids: string[] = [], areaIds?: string[]): HassEntity[] {
+  return ids
+    .map(id => hass.states[id])
+    .filter((e): e is HassEntity => !!e)
+    .filter(e => {
+      const area = entityAreaId(hass, e.entity_id)
+      return !areaIds || !area || areaIds.includes(area)
+    })
+}
+
+/** The scene row on Home: the picked scenes and scripts, else every visible scene by name. */
+export function sceneEntities(hass: HomeAssistant, ids: string[] | undefined, hide: Hide = {}, areaIds?: string[]): HassEntity[] {
+  if (ids?.length) return favoriteEntities(hass, ids, areaIds).filter(e => ['scene', 'script'].includes(domainOf(e.entity_id)))
+  return allEntities(hass, hide, areaIds).filter(e => domainOf(e.entity_id) === 'scene').sort(byName)
+}
+
+export type GroupControl = 'toggle' | 'cover' | 'lock'
+
+/**
+ * The bulk control for a group heading and the entities it acts on: on/off for lights and switches,
+ * up/down for covers, lock/unlock for the locks among other security entities.
+ * A single entity gets none; its own tile already has the control.
+ */
+export function bulkControl(entities: HassEntity[]): { control?: GroupControl; entities: HassEntity[] } {
+  const domains = new Set(entities.map(e => domainOf(e.entity_id)))
+  const many = (list: HassEntity[]) => list.length > 1
+  if (!many(entities)) return { entities }
+  if ([...domains].every(d => ['light', 'switch', 'fan', 'input_boolean'].includes(d))) return { control: 'toggle', entities }
+  if (domains.size === 1 && domains.has('cover')) return { control: 'cover', entities }
+  const locks = entities.filter(e => domainOf(e.entity_id) === 'lock')
+  if (many(locks) && [...domains].every(d => ['lock', 'binary_sensor', 'alarm_control_panel'].includes(d))) return { control: 'lock', entities: locks }
+  return { entities }
 }

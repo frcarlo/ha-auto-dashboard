@@ -4,6 +4,9 @@ import { AdRoomCard } from './cards/room-card'
 import { AdStatusBar } from './cards/status-bar'
 import { AdHeader } from './cards/header'
 import { AdNavBar } from './cards/nav-bar'
+import { AdGroupHeading } from './cards/group-heading'
+import { AdRoomHeader } from './cards/room-header'
+import { AdScenes } from './cards/scenes'
 import { AdStrategyEditor } from './editor'
 import type { HomeAssistant, StrategyConfig } from './types'
 
@@ -45,6 +48,9 @@ define('ad-room-card', AdRoomCard)
 define('ad-status-bar', AdStatusBar)
 define('ad-header', AdHeader)
 define('ad-nav-bar', AdNavBar)
+define('ad-group-heading', AdGroupHeading)
+define('ad-room-header', AdRoomHeader)
+define('ad-scenes', AdScenes)
 define('ad-strategy-editor', AdStrategyEditor)
 
 // Lists the dashboard under "Community dashboards" in HA's Add dashboard dialog (HA 2026.5+)

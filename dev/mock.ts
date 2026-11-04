@@ -14,7 +14,8 @@ const defs: Def[] = [
   ['media_player.wohnzimmer_sonos', 'playing', { friendly_name: 'Wohnzimmer Sonos', media_title: 'Teardrop', media_artist: 'Massive Attack' }, 'wohnzimmer'],
   ['cover.wohnzimmer_rollo', 'open', { friendly_name: 'Wohnzimmer Rollo', current_position: 70 }, 'wohnzimmer'],
   ['switch.wohnzimmer_steckdose', 'off', { friendly_name: 'Wohnzimmer Steckdose', device_class: 'outlet' }, 'wohnzimmer'],
-  ['scene.wohnzimmer_kino', 'scening', { friendly_name: 'Wohnzimmer Kino' }, 'wohnzimmer'],
+  ['scene.wohnzimmer_kino', new Date(Date.now() - 2 * 3600_000).toISOString(), { friendly_name: 'Wohnzimmer Kino' }, 'wohnzimmer'],
+  ['scene.esszimmer_abendessen', new Date(Date.now() - 26 * 3600_000).toISOString(), { friendly_name: 'Abendessen', icon: 'mdi:silverware-fork-knife' }, 'esszimmer'],
 
   ['light.kuche', 'off', { friendly_name: 'Küche Licht', supported_color_modes: ['brightness'] }, 'kuche'],
   ['light.kuche_theke', 'off', { friendly_name: 'Küche Theke', supported_color_modes: ['onoff'] }, 'kuche'],
@@ -50,6 +51,7 @@ const defs: Def[] = [
 
 const extras: HassEntity[] = [
   { entity_id: 'sensor.flur_batterie', state: '9', attributes: { friendly_name: 'Flur Bewegungsmelder Batterie', device_class: 'battery', unit_of_measurement: '%' } },
+  { entity_id: 'script.gute_nacht', state: 'off', attributes: { friendly_name: 'Gute Nacht', icon: 'mdi:weather-night', last_triggered: new Date(Date.now() - 15 * 3600_000).toISOString() } },
   { entity_id: 'weather.home', state: 'partlycloudy', attributes: { friendly_name: 'Zuhause', temperature: 11.2, temperature_unit: '°C' } },
 ]
 
@@ -73,7 +75,7 @@ export function createHass(dark: boolean): HomeAssistant {
     entities,
     devices: {},
     areas: {
-      wohnzimmer: { area_id: 'wohnzimmer', name: 'Wohnzimmer', icon: 'mdi:sofa', floor_id: 'eg' },
+      wohnzimmer: { area_id: 'wohnzimmer', name: 'Wohnzimmer', icon: 'mdi:sofa', floor_id: 'eg', temperature_entity_id: 'sensor.wohnzimmer_temperatur', humidity_entity_id: 'sensor.wohnzimmer_luftfeuchte' },
       kuche: { area_id: 'kuche', name: 'Küche', icon: 'mdi:countertop', floor_id: 'eg' },
       esszimmer: { area_id: 'esszimmer', name: 'Esszimmer', icon: 'mdi:table-chair', floor_id: 'eg' },
       eingangstur: { area_id: 'eingangstur', name: 'Eingangstür', icon: 'mdi:door', floor_id: 'eg' },
@@ -120,16 +122,18 @@ export function createHass(dark: boolean): HomeAssistant {
 }
 
 /** Applies a service call to the fake states, so the harness reacts like HA would. */
-export function applyService(hass: HomeAssistant, domain: string, service: string, data: Record<string, any> = {}, target: Record<string, any> = {}): HomeAssistant {
+export function applyService(hass: HomeAssistant, called: string, service: string, data: Record<string, any> = {}, target: Record<string, any> = {}): HomeAssistant {
   const ids: string[] = [].concat(target.entity_id ?? [])
   const states = { ...hass.states }
   for (const id of ids) {
     const e = states[id]
     if (!e) continue
+    // homeassistant.turn_on/off acts on each entity's own domain
+    const domain = called === 'homeassistant' ? id.split('.')[0]! : called
     let { state } = e
     const attributes = { ...e.attributes }
     if (service === 'toggle') state = state === 'on' ? 'off' : 'on'
-    if (service === 'turn_on') state = 'on'
+    if (service === 'turn_on') state = domain === 'scene' ? new Date().toISOString() : 'on'
     if (service === 'turn_off') state = 'off'
     if (domain === 'light' && data.brightness_pct) { state = 'on'; attributes.brightness = Math.round(data.brightness_pct * 2.55) }
     if (domain === 'light' && service === 'turn_on' && !attributes.brightness) attributes.brightness = 255

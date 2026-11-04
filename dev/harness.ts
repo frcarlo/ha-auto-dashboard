@@ -35,6 +35,9 @@ const config: StrategyConfig = {
   areas: list('areas'),
   floors: list('floors'),
   hide_labels: list('labels'),
+  // ?fav=light.flur,lock.eingangstur  ?scenes=script.gute_nacht,scene.wohnzimmer_kino
+  favorites: list('fav'),
+  scenes: list('scenes'),
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
   // ?as=leni&users={"leni":{"read_only":true}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,

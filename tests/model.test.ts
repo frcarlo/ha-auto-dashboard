@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, batteryEntities, floorsWithAreas, groupEntities, homeStatus, roomSummary, unavailableDevices } from '../src/model'
+import { areaEntities, batteryEntities, bulkControl, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 
 const st = (entity_id: string, state: string, attributes: Record<string, unknown> = {}): HassEntity =>
@@ -156,5 +156,52 @@ describe('unavailableDevices', () => {
     add('switch.loose', 'unavailable', { area_id: 'flur' })
     add('switch.nowhere', 'unavailable', {})
     expect(unavailableDevices(hass).map(e => e.entity_id)).toEqual(['sensor.dead_a', 'switch.loose'])
+  })
+})
+
+describe('room controls', () => {
+  it('prefers the sensors picked for the area', () => {
+    const hass = fakeHass()
+    hass.states['sensor.other_temp'] = st('sensor.other_temp', '19', { device_class: 'temperature' })
+    const area = { ...hass.areas.wohnzimmer!, temperature_entity_id: 'sensor.other_temp' }
+    expect(roomSummary(areaEntities(hass, 'wohnzimmer'), area, hass.states).temperature?.entity_id).toBe('sensor.other_temp')
+    expect(roomSummary(areaEntities(hass, 'wohnzimmer')).temperature?.entity_id).toBe('sensor.wz_temp')
+  })
+
+  it('quick groups collect lights, switches and covers', () => {
+    const entities = [st('light.a', 'on'), st('fan.b', 'off'), st('switch.c', 'on'), st('cover.d', 'open'), st('sensor.e', '1')]
+    expect(quickGroups(entities).map(g => [g.key, g.entities.length])).toEqual([['light', 1], ['switch', 2], ['cover', 1]])
+  })
+
+  it('bulk control fits the group, and needs two entities', () => {
+    expect(bulkControl([st('light.a', 'on'), st('switch.b', 'off')]).control).toBe('toggle')
+    expect(bulkControl([st('cover.a', 'open'), st('cover.b', 'closed')]).control).toBe('cover')
+    expect(bulkControl([st('light.a', 'on')]).control).toBeUndefined()
+    expect(bulkControl([st('climate.a', 'heat'), st('sensor.b', '1')]).control).toBeUndefined()
+    const security = bulkControl([st('lock.a', 'locked'), st('lock.b', 'locked'), st('binary_sensor.c', 'off')])
+    expect(security).toMatchObject({ control: 'lock' })
+    expect(security.entities.map(e => e.entity_id)).toEqual(['lock.a', 'lock.b'])
+  })
+})
+
+describe('favorites and scenes', () => {
+  it('keeps favorites that exist and lie in the dashboard rooms', () => {
+    const hass = fakeHass()
+    hass.states['script.x'] = st('script.x', 'off')
+    const ids = favoriteEntities(hass, ['light.flur', 'light.kueche', 'light.gone', 'script.x'], ['flur']).map(e => e.entity_id)
+    expect(ids).toEqual(['light.flur', 'script.x'])
+  })
+
+  it('shows every visible scene unless scenes and scripts are picked', () => {
+    const hass = fakeHass()
+    hass.states['scene.b'] = st('scene.b', '2026-01-01T00:00:00Z', { friendly_name: 'B' })
+    hass.states['scene.a'] = st('scene.a', '2026-01-01T00:00:00Z', { friendly_name: 'A' })
+    hass.states['script.s'] = st('script.s', 'off')
+    hass.entities['scene.b'] = { entity_id: 'scene.b', area_id: 'flur' }
+    hass.entities['scene.a'] = { entity_id: 'scene.a' }
+    hass.entities['script.s'] = { entity_id: 'script.s' }
+    expect(sceneEntities(hass, undefined).map(e => e.entity_id)).toEqual(['scene.a', 'scene.b'])
+    expect(sceneEntities(hass, undefined, { domains: ['scene'] })).toEqual([])
+    expect(sceneEntities(hass, ['script.s', 'light.flur']).map(e => e.entity_id)).toEqual(['script.s'])
   })
 })

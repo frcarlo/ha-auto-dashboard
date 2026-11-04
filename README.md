@@ -1,15 +1,19 @@
 # HA Auto Dashboard
 
-Lovelace-Dashboard-Strategy, die das Dashboard aus Areas, Floors, Devices und Entities erzeugt. Idee wie bei Dwains Dashboard, aber ohne Editor, Blueprints und Zusatzkarten. Die Optik kommt aus HArmony: Slate-Palette, Indigo-Akzent, Amber-Glow bei Licht, runde Status-Buttons.
+Lovelace-Dashboard-Strategy, die das Dashboard aus Areas, Floors, Devices und Entities erzeugt. Idee wie bei Dwains Dashboard, aber ohne Blueprints, Wandtablet-Modus und Zusatzkarten. Die Optik kommt aus HArmony: Slate-Palette, Indigo-Akzent, Amber-Glow bei Licht, runde Status-Buttons.
 
-Ein ES-Modul (~63 KB, ~19 KB gzip), einzige Abhängigkeit ist Lit. Keine anderen Custom Cards nötig.
+Ein ES-Modul (~100 KB, ~29 KB gzip), einzige Abhängigkeit ist Lit. Keine anderen Custom Cards nötig.
 
 ## Was erzeugt wird
 
-- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar), darunter eine Raumkarte pro Area, gruppiert nach Etage.
-- **Raumseiten** (`area-<area_id>`, Subview): Licht, Klima, Rollos, Medien, Schalter, Sicherheit, Sensoren, Szenen.
-- **Domain-Seiten**: Licht (mit „Alle aus“), Klima, Rollos (mit „Alle zu“), Sicherheit. Nach Raum gruppiert, nur wenn es passende Entities gibt.
+- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar; ein Tipp klappt die Liste auf), eine Zeile mit Szenen und Skripten, Favoriten, darunter eine Raumkarte pro Area, gruppiert nach Etage.
+- **Raumseiten** (`area-<area_id>`, Subview): oben Temperatur, Luftfeuchte und, wenn der Raum genau ein Thermostat hat, Ist- und Solltemperatur mit −/+. Daneben Schnellkacheln „Licht 2 von 5 an“, „Schalter“ und „Rollos“, die alles im Raum auf einmal schalten. Darunter die Favoriten des Raums und die Gruppen Licht, Klima, Rollos, Medien, Schalter, Sicherheit, Sensoren, Szenen. Gruppen mit mehreren Lichtern, Schaltern, Rollos oder Schlössern haben einen Sammelschalter in der Überschrift.
+- **Domain-Seiten**: Licht (mit „Alle aus“), Klima, Rollos (mit „Alle zu“), Sicherheit. Nach Raum gruppiert, nur wenn es passende Entities gibt. Jede Raum-Überschrift führt zur Raumseite und hat einen Schalter mit „2/5“, bei Rollos auf/zu, bei Schlössern verriegeln/entriegeln. Entriegeln fragt immer erst nach.
 - **Navigation**: schwebende Leiste unten auf allen Geräten. Licht, Klima, Rollos, Sicherheit und die Räume sind Unteransichten, deshalb blendet HA seine eigene Tab-Leiste aus.
+
+Temperatur und Luftfeuchte eines Raums kommen aus den Sensoren, die in HA beim Bereich eingetragen sind (Einstellungen → Bereiche → Bereich öffnen). Ohne diese Angabe nimmt das Dashboard den ersten passenden Sensor im Raum.
+
+Mehrere Tipps auf −/+ am Thermostat werden gesammelt und nach einer kurzen Pause als ein Befehl geschickt.
 
 Bedienung: Raumkarte antippen öffnet die Raumseite, Doppeltipp schaltet alle Lichter im Raum, ein Tipp auf einen Status-Kreis öffnet den More-Info-Dialog. Kacheln: Tippen schaltet Licht, Schalter und Szenen, alles andere öffnet More-Info. Lange drücken öffnet immer More-Info.
 
@@ -43,7 +47,7 @@ Updates kommen danach wie bei jedem HACS-Plugin.
 
 ## Optionen
 
-Am einfachsten über den Editor: Dashboard öffnen → Stift oben rechts → **Dashboard bearbeiten**. Dort lassen sich Darstellung, Räume und Nutzerregeln anklicken. Den Editor sehen nur Admins, weil nur sie Dashboards bearbeiten dürfen. Gespeichert wird dieselbe YAML-Konfiguration wie unten, ohne Standardwerte. Nutzerregeln aus dem Editor sind an die User-ID gebunden, eine Umbenennung bricht sie deshalb nicht.
+Am einfachsten über den Editor: Dashboard öffnen → Stift oben rechts → **Dashboard bearbeiten**. Dort lassen sich Darstellung, Startseite (Favoriten, Szenen), Räume und Nutzerregeln anklicken. Den Editor sehen nur Admins, weil nur sie Dashboards bearbeiten dürfen. Gespeichert wird dieselbe YAML-Konfiguration wie unten, ohne Standardwerte. Nutzerregeln aus dem Editor sind an die User-ID gebunden, eine Umbenennung bricht sie deshalb nicht.
 
 Alle Optionen, alle optional:
 
@@ -60,7 +64,11 @@ strategy:
   area_order: [wohnzimmer, kueche]   # sonst alphabetisch je Etage
   hide_domains: [fan, scene]
   hide_labels: [technik]   # Label-IDs, siehe unten
+  favorites: [light.flur, lock.haustuer]       # Startseite und oben im jeweiligen Raum
+  scenes: [scene.kino, script.gute_nacht]      # Zeile auf der Startseite
 ```
+
+**Szenen und Skripte:** Ohne `scenes` zeigt die Startseite alle sichtbaren Szenen, alphabetisch. Skripte erscheinen nur, wenn sie in `scenes` stehen. Mit `hide_domains: [scene]` verschwindet die Zeile.
 
 **Navigationsleiste:** `left` und `right` sind eine senkrechte Leiste am Rand, ab 1024 px Breite. Der Inhalt rückt dafür ein. Auf schmaleren Bildschirmen sitzt die Leiste unten. `top` setzt sie unter die HA-Kopfzeile.
 

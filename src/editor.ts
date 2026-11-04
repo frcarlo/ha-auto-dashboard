@@ -63,11 +63,12 @@ export class AdStrategyEditor extends LitElement {
     .field { display: flex; flex-direction: column; gap: 8px; }
     .label { font-size: 12px; color: var(--secondary-text-color, #94a3b8); letter-spacing: 0.02em; }
     .hint { font-size: 12px; color: var(--secondary-text-color, #94a3b8); line-height: 1.4; }
-    input[type=text], select {
+    input[type=text], select, textarea {
       font: inherit; color: inherit; background: var(--secondary-background-color, rgba(127, 127, 127, 0.1));
       border: 1px solid var(--ad-line); border-radius: 10px; padding: 9px 12px;
     }
     select option { color: #111; }
+    textarea { min-height: 72px; resize: vertical; font-family: var(--code-font-family, monospace); font-size: 12px; }
     .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ad-line); border-radius: 10px; overflow: hidden; align-self: flex-start; }
     .seg button { all: unset; cursor: pointer; padding: 7px 14px; font-size: 13px; }
     .seg button + button { border-left: 1px solid var(--ad-line); }
@@ -105,6 +106,20 @@ export class AdStrategyEditor extends LitElement {
 
   setConfig(config: StrategyConfig) {
     this.config = { ...config }
+  }
+
+  connectedCallback() {
+    super.connectedCallback()
+    // HA loads its entity picker with the first card editor; asking for the tile card's editor pulls it in
+    if (!customElements.get('ha-selector')) {
+      customElements.whenDefined('ha-selector').then(() => this.requestUpdate())
+      const helpers = (window as unknown as { loadCardHelpers?: () => Promise<{ createCardElement(c: object): HTMLElement }> }).loadCardHelpers
+      helpers?.().then(h => {
+        h.createCardElement({ type: 'tile', entity: 'sun.sun' })
+        return customElements.whenDefined('hui-tile-card')
+      }).then(() => (customElements.get('hui-tile-card') as unknown as { getConfigElement?: () => Promise<unknown> } | undefined)?.getConfigElement?.())
+        .catch(() => undefined)
+    }
   }
 
   protected updated() {
@@ -160,6 +175,17 @@ export class AdStrategyEditor extends LitElement {
       <span class="group">${name}</span>${items.map(chip)}`)}</div>`
   }
 
+  /** HA's own entity picker when it is loaded, else one entity id per line. */
+  private entityPicker(value: string[] | undefined, domains: string[] | undefined, onChange: (v: string[]) => void) {
+    if (customElements.get('ha-selector')) {
+      return html`<ha-selector .hass=${this.hass} .value=${value ?? []}
+        .selector=${{ entity: { multiple: true, ...(domains ? { filter: { domain: domains } } : {}) } }}
+        @value-changed=${(e: CustomEvent) => onChange((e.detail.value as string[] | undefined) ?? [])}></ha-selector>`
+    }
+    return html`<textarea .value=${(value ?? []).join('\n')} placeholder=${this.l('ed.ids_hint')}
+      @change=${(e: Event) => onChange((e.target as HTMLTextAreaElement).value.split(/[\s,]+/).filter(Boolean))}></textarea>`
+  }
+
   private field(label: string, content: TemplateResult, hint?: string) {
     return html`<div class="field"><span class="label">${label}</span>${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
   }
@@ -209,7 +235,18 @@ export class AdStrategyEditor extends LitElement {
 
   protected render() {
     if (!this.hass) return nothing
-    return html`${this.renderLook()}${this.renderRooms()}${this.renderUsers()}`
+    return html`${this.renderLook()}${this.renderHome()}${this.renderRooms()}${this.renderUsers()}`
+  }
+
+  private renderHome() {
+    const c = this.config
+    return html`<details ?open=${!!(c.favorites?.length || c.scenes?.length)}>
+      <summary>${this.l('ed.home')}</summary>
+      <div class="body">
+        ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
+        ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
+      </div>
+    </details>`
   }
 
   private renderLook() {

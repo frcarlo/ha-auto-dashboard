@@ -47,6 +47,11 @@ export function canControl(access: Access | undefined, entityId: string) {
   return true
 }
 
+/** Bulk actions ("all off", all covers of a room) need full access, as `control_critical: false` promises. */
+export function canBulk(access: Access | undefined, entityIds: string[]) {
+  return (access ?? 'full') === 'full' && entityIds.length > 0
+}
+
 /** More-info dialogs of controllable entities would let the user switch them anyway. */
 export function canOpen(access: Access | undefined, entityId: string) {
   return !CONTROL_DOMAINS.includes(domainOf(entityId)) || canControl(access, entityId)
