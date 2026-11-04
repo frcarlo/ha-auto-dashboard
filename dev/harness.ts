@@ -28,7 +28,14 @@ customElements.define('ha-state-icon', class extends HaIcon {
 
 const params = new URLSearchParams(location.search)
 let dark = params.get('theme') !== 'light'
-const config: StrategyConfig = { type: 'custom:auto-dashboard', glass: params.has('glass') }
+const list = (key: string) => params.get(key)?.split(',').filter(Boolean)
+const config: StrategyConfig = {
+  type: 'custom:auto-dashboard',
+  glass: params.has('glass'),
+  areas: list('areas'),
+  floors: list('floors'),
+  nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
+}
 let hass: HomeAssistant = createHass(dark)
 let views: any[] = []
 const cards: any[] = []
@@ -110,7 +117,8 @@ function render() {
   main.innerHTML = ''
   const width = main.clientWidth || window.innerWidth
   const cols = Math.max(1, Math.min(view.max_columns ?? 4, Math.floor((width - 32 + 8) / (320 + 8))))
-  const grid = document.createElement('div')
+  // Same tag as HA's view, so the nav bar finds it to make room for a side rail
+  const grid = document.createElement('hui-sections-view')
   grid.className = 'view'
   grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
   for (const section of view.sections) {

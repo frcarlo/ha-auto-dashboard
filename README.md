@@ -51,10 +51,17 @@ strategy:
   title: Zuhause
   theme: auto              # auto | dark | light, auto folgt dem HA-Dunkelmodus
   glass: false             # Milchglas-Karten (auf Touch-Geräten ohne Blur)
+  nav_position: bottom     # bottom | top | left | right
+  areas: [wohnzimmer]      # nur diese Räume
+  floors: [obergeschoss]   # nur Räume auf diesen Etagen
   hide_areas: [abstellraum]
   area_order: [wohnzimmer, kueche]   # sonst alphabetisch je Etage
   hide_domains: [fan, scene]
 ```
+
+**Navigationsleiste:** `left` und `right` sind eine senkrechte Leiste am Rand, ab 1024 px Breite. Der Inhalt rückt dafür ein. Auf schmaleren Bildschirmen sitzt die Leiste unten. `top` setzt sie unter die HA-Kopfzeile.
+
+**Nur ein Raum oder eine Etage:** `areas` und `floors` beschränken das ganze Dashboard, also Startseite, Status-Chips, Übersichten und Raumseiten. Beide zusammen ergeben die Schnittmenge. Mit genau einem Raum zeigt die Startseite gleich dessen Inhalt, praktisch für ein Wandtablet. Die IDs stehen unter Einstellungen → Bereiche, Etagen & Zonen in der URL des Bereichs bzw. der Etage.
 
 Einzelne Entities blendet man mit dem Label `ad_hide` aus. Versteckte Entities und Diagnose-/Konfigurations-Entities erscheinen ohnehin nicht. Die Area eines Entities ist seine eigene oder die seines Geräts.
 

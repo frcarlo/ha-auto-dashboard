@@ -13,6 +13,8 @@ interface HeaderAction {
 interface HeaderConfig extends BaseConfig {
   variant?: 'home' | 'page'
   title?: string
+  /** Rooms or floors the dashboard is filtered to, shown next to the date */
+  scope?: string
   icon?: string
   /** Entities counted in the subtitle and targeted by the action */
   entities?: string[]
@@ -92,7 +94,7 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     const weather = this.weather
     return html`<div class="wrap">
       <div class="text">
-        <div class="eyebrow">${now.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+        <div class="eyebrow">${now.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}${this.config!.scope ? ` · ${this.config!.scope}` : ''}</div>
         <h1>${this.greeting(now.getHours())}${name ? `, ${name}` : ''}</h1>
       </div>
       <div class="right">

@@ -64,9 +64,16 @@ export interface CardLook {
   glass?: boolean
 }
 
+export type NavPosition = 'bottom' | 'top' | 'left' | 'right'
+
 export interface StrategyConfig extends CardLook {
   type: string
   title?: string
+  /** Only these areas (e.g. a dashboard for one room) */
+  areas?: string[]
+  /** Only areas on these floors */
+  floors?: string[]
+  nav_position?: NavPosition
   hide_areas?: string[]
   area_order?: string[]
   hide_domains?: string[]

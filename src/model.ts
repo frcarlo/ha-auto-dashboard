@@ -48,6 +48,13 @@ interface Index {
 
 const indexCache = new WeakMap<object, Index>()
 
+/** The entity's own area, falling back to its device's area. */
+export function entityAreaId(hass: HomeAssistant, entityId: string): string | undefined {
+  const entry = hass.entities[entityId]
+  if (!entry) return undefined
+  return entry.area_id ?? (entry.device_id ? hass.devices[entry.device_id]?.area_id ?? undefined : undefined)
+}
+
 /**
  * Entities that should show up anywhere, keyed by area. Area comes from the entity,
  * falling back to its device. Cached per registry object, so cheap to call on every render.
@@ -62,7 +69,7 @@ export function entityIndex(hass: HomeAssistant): Index {
   for (const entry of Object.values(hass.entities)) {
     if (entry.hidden || entry.entity_category || entry.labels?.includes(HIDE_LABEL)) continue
     all.push(entry.entity_id)
-    const areaId = entry.area_id ?? (entry.device_id ? hass.devices[entry.device_id]?.area_id : undefined)
+    const areaId = entityAreaId(hass, entry.entity_id)
     if (!areaId) continue
     const list = byArea.get(areaId)
     if (list) list.push(entry.entity_id)
@@ -80,7 +87,9 @@ export function areaEntities(hass: HomeAssistant, areaId: string, hideDomains: s
     .filter(Boolean)
 }
 
-export function allEntities(hass: HomeAssistant, hideDomains: string[] = []): HassEntity[] {
+/** All visible entities, or only those in the given areas when a filter is set. */
+export function allEntities(hass: HomeAssistant, hideDomains: string[] = [], areaIds?: string[]): HassEntity[] {
+  if (areaIds) return areaIds.flatMap(id => areaEntities(hass, id, hideDomains))
   return entityIndex(hass).all
     .filter(id => !hideDomains.includes(domainOf(id)))
     .map(id => hass.states[id]!)
@@ -110,13 +119,18 @@ export interface FloorGroup {
 }
 
 /** Areas with at least one visible entity, grouped by floor (highest level first, as in a house). */
-export function floorsWithAreas(hass: HomeAssistant, config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains'> = {}): FloorGroup[] {
+export function floorsWithAreas(
+  hass: HomeAssistant,
+  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains' | 'areas' | 'floors'> = {},
+): FloorGroup[] {
   const order = config.area_order ?? []
   const rank = (area: AreaRegistryEntry) => {
     const i = order.indexOf(area.area_id)
     return i === -1 ? order.length : i
   }
   const areas = Object.values(hass.areas)
+    .filter(area => !config.areas?.length || config.areas.includes(area.area_id))
+    .filter(area => !config.floors?.length || config.floors.includes(area.floor_id ?? ''))
     .filter(area => !config.hide_areas?.includes(area.area_id))
     .filter(area => areaEntities(hass, area.area_id, config.hide_domains).some(e => groupOf(e)))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
@@ -170,9 +184,10 @@ export interface StatusItem {
 export const LOW_BATTERY = 20
 
 /** Battery sensors are usually diagnostic entities, so they are not in the index. */
-export function batteryEntities(hass: HomeAssistant): HassEntity[] {
+export function batteryEntities(hass: HomeAssistant, areaIds?: string[]): HassEntity[] {
   return Object.values(hass.states).filter(e =>
-    domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === 'battery' && !hass.entities[e.entity_id]?.hidden)
+    domainOf(e.entity_id) === 'sensor' && deviceClassOf(e) === 'battery' && !hass.entities[e.entity_id]?.hidden &&
+    (!areaIds || areaIds.includes(entityAreaId(hass, e.entity_id) ?? '')))
 }
 
 /**
@@ -180,10 +195,11 @@ export function batteryEntities(hass: HomeAssistant): HassEntity[] {
  * Only devices and entities placed in an area count, so leftovers without a room don't add noise.
  * Entities without a device count on their own.
  */
-export function unavailableDevices(hass: HomeAssistant, hideDomains: string[] = []): HassEntity[] {
+export function unavailableDevices(hass: HomeAssistant, hideDomains: string[] = [], areaIds?: string[]): HassEntity[] {
   const byDevice = new Map<string, HassEntity[]>()
   const loose: HassEntity[] = []
-  for (const ids of entityIndex(hass).byArea.values()) {
+  for (const [areaId, ids] of entityIndex(hass).byArea) {
+    if (areaIds && !areaIds.includes(areaId)) continue
     for (const id of ids) {
       const entity = hass.states[id]
       if (!entity || hideDomains.includes(domainOf(id))) continue

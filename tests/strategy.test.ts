@@ -33,3 +33,38 @@ describe('generateDashboard', () => {
     expect(header).toMatchObject({ theme: 'light', glass: true })
   })
 })
+
+describe('filters and nav position', () => {
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+
+  it('floors limits rooms, pages and the status bar to those floors', async () => {
+    const { title, views } = await generateDashboard({ type: 'custom:auto-dashboard', floors: ['og'] }, createHass(true))
+    expect(views.filter(v => String(v.path).startsWith('area-')).map(v => v.path)).toEqual(['area-bad', 'area-schlafzimmer'])
+    expect(title).toBe('Obergeschoss')
+    const home = cards(views[0]!)
+    expect(home.find(c => c.type === 'custom:ad-status-bar')!.areas).toEqual(['bad', 'schlafzimmer'])
+    expect(home.find(c => c.type === 'custom:ad-header')!.scope).toBe('Obergeschoss')
+    const lights = views.find(v => v.path === 'lights')!
+    expect(cards(lights).filter(c => c.type === 'custom:ad-tile').map(c => c.entity)).toEqual(['light.bad', 'light.schlafzimmer'])
+  })
+
+  it('a single area puts its content on the home page', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', areas: ['wohnzimmer'] }, createHass(true))
+    const home = cards(views[0]!)
+    expect(home.some(c => c.type === 'custom:ad-room-card')).toBe(false)
+    expect(home.filter(c => c.type === 'custom:ad-tile').length).toBeGreaterThan(5)
+  })
+
+  it('fails with a readable error when the filter matches nothing', async () => {
+    await expect(generateDashboard({ type: 'custom:auto-dashboard', areas: ['gibtsnicht'] }, createHass(true)))
+      .rejects.toThrow(/keine Räume/)
+  })
+
+  it('puts the nav first for the top position', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', nav_position: 'top' }, createHass(true))
+    for (const view of views) {
+      const first = (view.sections as { cards: Record<string, any>[] }[])[0]!.cards[0]!
+      expect(first).toMatchObject({ type: 'custom:ad-nav-bar', position: 'top' })
+    }
+  })
+})

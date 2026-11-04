@@ -29,9 +29,20 @@ const fullWidth = (cards: Card[]): Section => ({ type: 'grid', column_span: MAX_
 export async function generateDashboard(config: StrategyConfig, hass: HomeAssistant) {
   const look = { ...(config.theme ? { theme: config.theme } : {}), ...(config.glass ? { glass: true } : {}) }
   const hide = config.hide_domains ?? []
-  const all = allEntities(hass, hide)
   const floors = floorsWithAreas(hass, config)
   const areas = floors.flatMap(f => f.areas)
+  // areas/floors narrow the whole dashboard, e.g. to one room for a wall tablet
+  const scoped = !!(config.areas?.length || config.floors?.length)
+  if (scoped && !areas.length) {
+    throw new Error(`Auto Dashboard: keine Räume mit Geräten für areas ${JSON.stringify(config.areas ?? [])} / floors ${JSON.stringify(config.floors ?? [])}`)
+  }
+  const areaIds = scoped ? areas.map(a => a.area_id) : undefined
+  const all = allEntities(hass, hide, areaIds)
+  const scopeLabel = !scoped ? undefined
+    : config.floors?.length && !config.areas?.length
+      ? floors.map(f => f.floor?.name).filter(Boolean).join(', ')
+      : areas.map(a => a.name).join(', ')
+  const position = config.nav_position ?? 'bottom'
 
   const tile = (entity: HassEntity, areaName?: string): Card =>
     ({ type: 'custom:ad-tile', entity: entity.entity_id, ...(areaName ? { area_name: areaName } : {}), ...look })
@@ -68,8 +79,17 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
     { path: 'home', icon: 'mdi:home-outline', label: t(hass, 'home') },
     ...domainPages.map(p => ({ path: p.path, icon: p.icon, label: p.title })),
   ]
-  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, ...look }])
+  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...look }])
+  // The nav card also reserves room for the floating bar, so it goes where the bar sits
+  const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
   const has = (path: string) => domainPages.some(p => p.path === path) ? path : undefined
+
+  const roomSections = (area: (typeof areas)[number]): Section[] =>
+    [...groupEntities(areaEntities(hass, area.area_id, hide))].map(([key, entities]) => ({
+      type: 'grid',
+      cards: [heading(t(hass, `group.${key}`)), ...entities.map(e => tile(e, area.name))],
+    }))
+  const singleRoom = scoped && areas.length === 1 ? areas[0] : undefined
 
   const home: View = {
     type: 'sections',
@@ -77,16 +97,18 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
     path: 'home',
     icon: 'mdi:home-outline',
     max_columns: MAX_COLUMNS,
-    sections: [
+    sections: withNav([
       fullWidth([
-        { type: 'custom:ad-header', variant: 'home', ...look },
+        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...look },
         {
-          type: 'custom:ad-status-bar', hide_domains: hide, ...look,
+          type: 'custom:ad-status-bar', hide_domains: hide, ...(areaIds ? { areas: areaIds } : {}), ...look,
           links: { lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate') },
         },
       ]),
+      // One room: its content right on the home page instead of a single room card
+      ...(singleRoom ? roomSections(singleRoom) : []),
       // Span 2: room cards (6 columns) sit 4-up on wide screens and 2-up on phones
-      ...floors.map((group): Section => ({
+      ...(singleRoom ? [] : floors).map((group): Section => ({
         type: 'grid',
         column_span: 2,
         cards: [
@@ -94,13 +116,11 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
           ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), hide_domains: hide, ...look })),
         ],
       })),
-      nav,
-    ],
+    ]),
   }
 
   const roomViews: View[] = areas.map(area => {
-    const groups = groupEntities(areaEntities(hass, area.area_id, hide))
-    const lights = groups.get('light') ?? []
+    const lights = areaEntities(hass, area.area_id, hide).filter(e => domainOf(e.entity_id) === 'light')
     return {
       type: 'sections',
       title: area.name,
@@ -109,17 +129,13 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
       subview: true,
       back_path: `/${dashboardPath()}/home`,
       max_columns: MAX_COLUMNS,
-      sections: [
+      sections: withNav([
         fullWidth([{
           type: 'custom:ad-header', variant: 'page', title: area.name, icon: area.icon ?? undefined, ...look,
           ...(lights.length ? { entities: lights.map(e => e.entity_id), count_label: 'n_on', action: domainPages[0]?.action } : {}),
         }]),
-        ...[...groups].map(([key, entities]): Section => ({
-          type: 'grid',
-          cards: [heading(t(hass, `group.${key}`)), ...entities.map(e => tile(e, area.name))],
-        })),
-        nav,
-      ],
+        ...roomSections(area),
+      ]),
     }
   })
 
@@ -152,7 +168,7 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
       subview: true,
       back_path: `/${dashboardPath()}/home`,
       max_columns: MAX_COLUMNS,
-      sections: [
+      sections: withNav([
         fullWidth([{
           type: 'custom:ad-header', variant: 'page', title: page.title, icon: page.icon, ...look,
           entities: page.entities.filter(page.counts ?? (() => true)).map(e => e.entity_id),
@@ -161,13 +177,12 @@ export async function generateDashboard(config: StrategyConfig, hass: HomeAssist
         }]),
         ...floorSections,
         ...(rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => tile(e))] }] : []),
-        nav,
-      ],
+      ]),
     }
   })
 
   return {
-    title: config.title ?? t(hass, 'home'),
+    title: config.title ?? scopeLabel ?? t(hass, 'home'),
     views: [home, ...domainViews, ...roomViews],
   }
 }

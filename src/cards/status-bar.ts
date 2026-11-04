@@ -9,6 +9,8 @@ import type { HassEntity } from '../types'
 
 interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
+  /** Only count entities in these areas (dashboard filtered to rooms or floors) */
+  areas?: string[]
   /** Which status keys jump to a view instead of listing their entities */
   links?: Partial<Record<StatusKey, string>>
 }
@@ -69,7 +71,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   }
 
   protected watched() {
-    return [...entityIndex(this.hass!).all, ...batteryEntities(this.hass!).map(e => e.entity_id)]
+    return [...entityIndex(this.hass!).all, ...batteryEntities(this.hass!, this.config!.areas).map(e => e.entity_id)]
   }
 
   private deviceName(entity: HassEntity) {
@@ -84,8 +86,8 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   }
 
   protected render() {
-    const hide = this.config!.hide_domains
-    const items = homeStatus(allEntities(this.hass!, hide), batteryEntities(this.hass!), unavailableDevices(this.hass!, hide))
+    const { hide_domains: hide, areas } = this.config!
+    const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas), unavailableDevices(this.hass!, hide, areas))
     const openItem = items.find(i => i.key === this.open)
     return html`
       <div class="chips">
