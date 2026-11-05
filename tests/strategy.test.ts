@@ -224,7 +224,7 @@ describe('energy, maintenance, cameras and lists', () => {
     expect(home.find(c => c.type === 'picture-entity')).toBeUndefined()
     expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).toContain('cameras')
     const page = cards(views.find(v => v.path === 'cameras')!)
-    expect(page.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage' })
+    expect(page.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage', name: 'Kamera' })
     expect(page.find(c => c.type === 'custom:ad-group-heading')).toMatchObject({ title: 'Garage', path: 'area-garage' })
     expect(home.find(c => c.type === 'todo-list')).toMatchObject({ entity: 'todo.einkauf' })
     expect(cards(views.find(v => v.path === 'area-garage')!).some(c => c.type === 'picture-entity')).toBe(true)

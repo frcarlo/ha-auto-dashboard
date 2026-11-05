@@ -4,7 +4,7 @@
 import { css } from 'lit'
 
 export const materials = css`
-  /* Dimmer: light fills from the left up to --level, its edge glows like the light itself */
+  /* Dimmer: light fills from the left up to --level, with a clear edge where it ends */
   .light-fill {
     position: absolute; inset: 0 auto 0 0; z-index: 0; pointer-events: none; width: var(--level, 0%);
     background: linear-gradient(90deg, rgba(var(--ad-warning), 0.42), rgba(var(--ad-warning), 0.22));
@@ -12,7 +12,7 @@ export const materials = css`
   }
   .light-fill::after {
     content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 2px;
-    background: rgb(var(--ad-warning)); box-shadow: 0 0 14px 2px rgba(var(--ad-warning), 0.65);
+    background: rgb(var(--ad-warning));
   }
   .light-fill[data-full]::after { display: none; }
 
@@ -52,11 +52,11 @@ export const materials = css`
   .scale .now { left: var(--now); bottom: -3px; width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--ad-on-surface)); box-shadow: 0 0 0 2px var(--ad-surface); }
   .scale .goal { left: var(--goal); bottom: 0; width: 2px; height: 14px; background: rgb(var(--ad-on-surface)); opacity: 0.7; }
 
-  /* Pilot light: off is an empty ring, on glows in its color (--pilot, an r, g, b triplet) */
+  /* Pilot light: off is an empty ring, on a solid dot in its color (--pilot, an r, g, b triplet) */
   .pilot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(var(--ad-on-surface), 0.35); }
   .pilot.on {
     background: rgb(var(--pilot, var(--ad-primary)));
-    box-shadow: 0 0 0 3px rgba(var(--pilot, var(--ad-primary)), 0.18), 0 0 10px rgba(var(--pilot, var(--ad-primary)), 0.75);
+    box-shadow: none;
   }
 
   @media (prefers-reduced-motion: reduce) {

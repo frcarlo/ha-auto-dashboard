@@ -28,7 +28,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     .wrap { display: flex; align-items: baseline; gap: 10px; min-height: 40px; padding: 10px 4px 2px; }
     .title {
       all: unset; display: inline-flex; align-items: baseline; gap: 6px; min-width: 0;
-      font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+      font-size: 17px; font-weight: 500;
     }
     .sub .title { font-size: 15px; }
     .minor { min-height: 32px; padding-top: 2px; }
@@ -45,7 +45,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     .ctl { display: flex; align-items: center; gap: 4px; align-self: center; }
     /* Bulk actions are words, so it is clear what happens to the whole group */
     .act {
-      all: unset; cursor: pointer; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap;
+      all: unset; cursor: pointer; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap;
       background: rgba(var(--ad-on-surface), 0.07);
     }
     .act:hover { background: rgba(var(--ad-on-surface), 0.12); }

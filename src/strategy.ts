@@ -5,7 +5,7 @@ import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
-import { domainOf, entityName } from './presentation'
+import { domainOf, entityName, shortName } from './presentation'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -91,7 +91,15 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     : config.todo_lists?.length ? favoriteEntities(hass, config.todo_lists, areaIds).filter(ofDomain('todo'))
     : all.filter(ofDomain('todo'))
   // HA's own cards for what it draws best: camera streams, editable to-do lists, statistics graphs
-  const cameraCard = (e: HassEntity): Card => ({ type: 'picture-entity', entity: e.entity_id, show_state: false, camera_view: 'auto', grid_options: { columns: 12 } })
+  // Under its room's heading a camera named like the room shows no caption, a "Garage Einfahrt" just "Einfahrt"
+  const cameraCard = (e: HassEntity, areaName?: string): Card => {
+    const name = entityName(e)
+    const label = shortName(name, areaName)
+    return {
+      type: 'picture-entity', entity: e.entity_id, show_state: false, camera_view: 'auto', grid_options: { columns: 12 },
+      ...(areaName && name.trim().toLowerCase() === areaName.trim().toLowerCase() ? { show_name: false } : label !== name ? { name: label } : {}),
+    }
+  }
   const outdoor = config.outdoor_areas ?? []
   const indoor = areas.filter(a => !outdoor.includes(a.area_id))
   const pageAllowed = (path: PagePath) => !rule?.hide_pages?.includes(path)
@@ -153,7 +161,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const scopeOpts = { ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look }
   const subview = (path: string, title: string, icon: string, sections: Section[]): View => ({
     type: 'sections', title, path, icon, subview: true, back_path: `/${dashboardPath()}/home`, max_columns: MAX_COLUMNS,
-    sections: withNav([fullWidth([{ type: 'custom:ad-header', variant: 'page', title, icon, ...look }]), ...sections]),
+    sections: withNav([fullWidth([{ type: 'custom:ad-header', variant: 'page', title, ...look }]), ...sections]),
   })
 
   const favoritesSection = (entities: HassEntity[], areaName?: string): Section[] => entities.length ? [{
@@ -171,7 +179,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     return [
       ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
-      ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e)] })),
+      ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e, area.name)] })),
       ...arrangeRoom(groupEntities(areaEntities(hass, area.area_id, hide)), room).map(([key, entities]): Section => ({
         type: 'grid',
         cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name)), ...own(key)],
@@ -281,7 +289,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           ...rooms.flatMap(({ area, entities }) => {
             if (page.roomCard) return [page.roomCard(area, entities)]
             const roomHeading = { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }
-            const tiles = (list: HassEntity[]) => list.map(e => page.card ? page.card(e) : tile(e, area.name))
+            const tiles = (list: HassEntity[]) => list.map(e => page.card ? page.card(e, area.name) : tile(e, area.name))
             const kinds = page.split ? [...new Set(entities.map(page.split))] : []
             if (kinds.length < 2) return [groupHeading(area.name, entities, roomHeading), ...tiles(entities)]
             // Several kinds in one room: the room heading only names it, each kind brings its own control
@@ -310,7 +318,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       max_columns: MAX_COLUMNS,
       sections: withNav([
         fullWidth([{
-          type: 'custom:ad-header', variant: 'page', title: page.title, icon: page.icon, ...look,
+          type: 'custom:ad-header', variant: 'page', title: page.title, ...look,
           entities: page.entities.filter(page.counts ?? (() => true)).map(e => e.entity_id),
           ...(page.count_label ? { count_label: page.count_label } : {}),
           ...(page.action ? { action: page.action } : {}),

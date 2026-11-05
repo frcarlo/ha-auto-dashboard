@@ -16,7 +16,6 @@ interface HeaderConfig extends BaseConfig {
   title?: string
   /** Rooms or floors the dashboard is filtered to, shown next to the date */
   scope?: string
-  icon?: string
   /** Entities counted in the subtitle and targeted by the action */
   entities?: string[]
   count_label?: 'n_on' | 'n_open'
@@ -50,7 +49,8 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     .text { flex: 1; min-width: 0; }
     .eyebrow { font-size: 12px; opacity: 0.55; letter-spacing: 0.03em; }
     h1 { margin: 2px 0 0; font-size: 28px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.15; }
-    h1 ha-icon { --mdc-icon-size: 26px; opacity: 0.5; margin-right: 6px; vertical-align: -3px; }
+    /* A page's count sits under its title, as quiet as the date above the greeting */
+    .meta { margin-top: 4px; font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; }
     .clock { font-size: 40px; font-weight: 200; letter-spacing: -0.05em; line-height: 1; }
     .weather { display: flex; align-items: center; gap: 6px; font-size: 13px; opacity: 0.75; }
     .weather ha-icon { --mdc-icon-size: 22px; }
@@ -193,8 +193,8 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     const active = entities.filter(e => domainOf(e.entity_id) === 'lock' ? !isActive(e) : isActive(e))
     return html`<div class="wrap">
       <div class="text">
-        ${c.count_label ? html`<div class="eyebrow">${t(this.hass, c.count_label, { n: active.length })}</div>` : nothing}
-        <h1>${c.icon ? html`<ha-icon icon=${c.icon}></ha-icon>` : nothing}${c.title}</h1>
+        <h1>${c.title}</h1>
+        ${c.count_label ? html`<div class="meta">${t(this.hass, c.count_label, { n: active.length })}</div>` : nothing}
       </div>
       ${c.action && active.length && (c.access ?? 'full') === 'full' ? html`<button class="action"
         @click=${() => this.call(domainOf(active[0]!.entity_id), c.action!.service, active.map(e => e.entity_id))}>
