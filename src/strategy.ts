@@ -228,7 +228,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
   const powerOpts = { ...hideOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
-    { type: 'grid', column_span: 2, cards: [{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }] },
+    // The house sum spans the whole page, however many columns the floors below get
+    fullWidth([{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }]),
     ...floors.map((group): Section => {
       const cards = group.areas.flatMap(area => {
         const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)
