@@ -23,6 +23,9 @@ const HVAC_ACTIONS = ['heating', 'cooling', 'drying', 'fan', 'idle', 'off']
 /** Taps on −/+ are collected and sent as one set_temperature after this pause. */
 const SEND_DELAY = 700
 
+/** °C and °F show as a bare degree sign, like on the thermostats. */
+const degree = (unit: string) => (/^°[CF]$/.test(unit) ? '°' : unit)
+
 export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
   static properties = { ...BaseCard.properties, pending: { state: true } }
   /** Targets tapped in but not yet confirmed by HA, per thermostat */
@@ -31,16 +34,12 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
 
   static styles = [tokens, materials, css`
     :host { display: block; height: 100%; }
-    .card { display: flex; flex-direction: column; padding: 14px 16px 10px; }
-    /* Heating or cooling warms or cools the card from the top, like the light glow on light tiles */
-    .card::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 0.6s ease; }
-    .card.warning::before { opacity: 1; background: radial-gradient(ellipse 110% 70% at 50% 0%, rgba(var(--ad-warning), 0.2), transparent 70%); }
-    .card.info::before { opacity: 1; background: radial-gradient(ellipse 110% 70% at 50% 0%, rgba(var(--ad-info), 0.2), transparent 70%); }
+    .card { display: flex; flex-direction: column; padding: 16px 16px 12px; }
 
     .head { display: flex; align-items: center; gap: 8px; min-height: 28px; }
     .room {
-      all: unset; display: inline-flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer;
-      font-size: 15px; font-weight: 600;
+      all: unset; display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer;
+      font-size: 14px; font-weight: 500;
     }
     .room ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
     .room .chev { --mdc-icon-size: 16px; opacity: 0.4; }
@@ -50,26 +49,31 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     .mode.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
 
-    /* The thermostat: the room's one large number */
-    .dial { display: flex; flex-direction: column; align-items: center; padding: 10px 0 6px; }
+    /* The thermostat: the room's one large number. It takes the free height, so a short card next to a tall one stays balanced. */
+    .dial { flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0 4px; }
     .dial + .dial { border-top: 1px solid rgba(var(--ad-on-surface), 0.06); }
-    .dial .label { font-size: 12px; opacity: 0.6; margin-bottom: 2px; }
+    .dial .label { font-size: 12px; opacity: 0.6; margin-bottom: 4px; }
     .now {
-      all: unset; cursor: pointer; font-size: 52px; font-weight: 200; letter-spacing: -0.05em; line-height: 1.05;
+      all: unset; cursor: pointer; font-size: 48px; font-weight: 300; letter-spacing: -0.03em; line-height: 1;
       font-variant-numeric: tabular-nums;
     }
-    .now small { font-size: 22px; font-weight: 300; margin-left: 2px; opacity: 0.6; vertical-align: top; }
-    .set { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+    .now small { font-size: 24px; margin-left: 2px; opacity: 0.6; vertical-align: top; }
+    .set { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
     .target { min-width: 64px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
-    .target b { font-size: 17px; font-weight: 600; }
-    .target.pending { opacity: 0.55; }
-    .track { position: relative; align-self: stretch; height: 14px; margin-top: 8px; }
-    .track .scale { bottom: 5px; border-radius: 2px; }
+    .target span { opacity: 0.6; }
+    .target b { font-weight: 500; }
+    .target.pending b { opacity: 0.55; }
+    .track { position: relative; align-self: stretch; height: 20px; margin-top: 8px; }
+    .track .scale { bottom: 4px; border-radius: 2px; }
+    /* While heating or cooling, the dot and the stretch to the target light up: the only color on the card */
+    .scale .run { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+    .scale .run.warning, .scale.warning .now { background: rgb(var(--ad-warning)); }
+    .scale .run.info, .scale.info .now { background: rgb(var(--ad-info)); }
 
     /* Every other reading of the room */
-    .readings { display: flex; flex-direction: column; margin-top: 6px; border-top: 1px solid rgba(var(--ad-on-surface), 0.06); padding-top: 4px; }
+    .readings { display: flex; flex-direction: column; margin-top: 8px; border-top: 1px solid rgba(var(--ad-on-surface), 0.06); padding-top: 4px; }
     .reading {
-      all: unset; display: flex; align-items: center; gap: 10px; padding: 7px 2px; cursor: pointer; font-size: 13px;
+      all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; font-size: 14px;
     }
     .reading ha-icon { --mdc-icon-size: 18px; opacity: 0.55; flex: 0 0 auto; }
     .reading .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
@@ -140,7 +144,7 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     const target = pending ?? (a.temperature as number | undefined)
     const min = (a.min_temp as number | undefined) ?? 7
     const max = (a.max_temp as number | undefined) ?? 30
-    const at = (v: number) => `${Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100))}%`
+    const { color } = this.action(climate)
     const adjustable = target !== undefined && !isUnavailable(climate) && this.canControl(id)
     const targetText = target !== undefined ? `${this.number(target, Number.isInteger(target) ? 0 : 1)}°` : '–'
     return html`<div class="dial">
@@ -149,30 +153,42 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
         ${this.number(current)}<small>°</small></button>
       <div class="set">
         ${adjustable ? html`<button class="btn" aria-label="−" @click=${() => this.nudge(climate, -1)}><ha-icon icon="mdi:minus"></ha-icon></button>` : nothing}
-        <span class="target ${pending !== undefined ? 'pending' : ''}">${t(this.hass, 'target')} <b>${targetText}</b></span>
+        <span class="target ${pending !== undefined ? 'pending' : ''}"><span>${t(this.hass, 'target')}</span> <b>${targetText}</b></span>
         ${adjustable ? html`<button class="btn" aria-label="+" @click=${() => this.nudge(climate, 1)}><ha-icon icon="mdi:plus"></ha-icon></button>` : nothing}
       </div>
-      ${current !== undefined ? html`<div class="track"><div class="scale" style="--now:${at(current)};--goal:${at(target ?? current)}">
-        <span class="now"></span>${target !== undefined ? html`<span class="goal"></span>` : nothing}
-      </div></div>` : nothing}
+      ${current !== undefined ? this.renderScale(current, min, max, target, color === 'warning' || color === 'info' ? color : undefined) : nothing}
     </div>`
   }
 
-  /** Without a thermostat the room's main temperature takes the middle, read only. */
+  /** The cold-to-warm scale: a dot for the measured value, a tick for the target, and while heating or cooling the stretch between them in that color. */
+  private renderScale(current: number, min: number, max: number, target?: number, run?: string) {
+    const at = (v: number) => Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100))
+    const now = at(current)
+    const goal = at(target ?? current)
+    return html`<div class="track"><div class="scale ${run ?? ''}" style="--now:${now}%;--goal:${goal}%">
+      ${run ? html`<span class="run ${run}" style="left:${Math.min(now, goal)}%;width:${Math.abs(goal - now)}%"></span>` : nothing}
+      <span class="now"></span>${target !== undefined ? html`<span class="goal"></span>` : nothing}
+    </div></div>`
+  }
+
+  /** Without a thermostat the room's main temperature takes the middle, read only, on the same scale. */
   private renderMain(entity: HassEntity) {
     const { value, unit: own } = this.value(entity)
-    // Same degree sign as on the thermostats
-    const unit = /^°[CF]$/.test(own) ? '°' : own
+    const current = Number(entity.state)
+    const [min, max] = own === '°F' ? [45, 86] : [7, 30]
     return html`<div class="dial">
-      <button class="now" aria-label="${entityName(entity)}: ${value} ${unit}" @click=${() => this.moreInfo(entity.entity_id)}>
-        ${value}<small>${unit}</small></button>
+      <button class="now" aria-label="${entityName(entity)}: ${value} ${own}" @click=${() => this.moreInfo(entity.entity_id)}>
+        ${value}<small>${degree(own)}</small></button>
+      ${/^°[CF]$/.test(own) && Number.isFinite(current) ? this.renderScale(current, min, max) : nothing}
     </div>`
   }
 
   private renderReading(entity: HassEntity, areaName?: string) {
     const off = isUnavailable(entity)
     const domain = domainOf(entity.entity_id)
-    const { value, unit } = domain === 'sensor' ? this.value(entity) : { value: this.hass!.formatEntityState?.(entity) ?? entity.state, unit: '' }
+    const reading = domain === 'sensor' ? this.value(entity) : { value: this.hass!.formatEntityState?.(entity) ?? entity.state, unit: '' }
+    const { value } = reading
+    const unit = degree(reading.unit)
     const name = shortName(entityName(entity), areaName)
     return html`<button class="reading ${off ? 'off' : ''}" title=${entityName(entity)} @click=${() => this.moreInfo(entity.entity_id)}>
       <ha-icon icon=${entityIcon(entity)}></ha-icon>
@@ -189,11 +205,9 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     // The middle: the thermostats, or the room's temperature sensor when there is none
     const main = thermostats.length ? undefined : summary.temperature?.entity
     const readings = entities.filter(e => domainOf(e.entity_id) !== 'climate' && e !== main)
-    // The card glows while any thermostat heats or cools
-    const active = thermostats.map(c => this.action(c)).find(a => a.color === 'warning' || a.color === 'info')
     const single = thermostats.length === 1 ? this.action(thermostats[0]!) : undefined
     const path = this.config!.path
-    return html`<div class="card ${active?.color ?? ''}">
+    return html`<div class="card">
       <div class="head">
         <button class="room" ?disabled=${!path} @click=${() => path && this.navigate(path)}>
           ${area?.icon ? html`<ha-icon icon=${area.icon}></ha-icon>` : nothing}
