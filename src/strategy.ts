@@ -1,6 +1,6 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { normalizeConfig } from './config'
-import { t } from './i18n'
+import { t, type Key } from './i18n'
 import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
@@ -121,8 +121,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     },
     {
       path: 'covers', icon: 'mdi:window-shutter', title: t(hass, 'covers'),
-      // Shading only: garage doors and window drives belong to security, so "all down" never moves them
-      pick: (e: HassEntity) => domainOf(e.entity_id) === 'cover' && coverKind(e) === 'shading',
+      // Shading and awnings: garage doors and window drives belong to security, so "all down" never moves them
+      pick: (e: HassEntity) => domainOf(e.entity_id) === 'cover' && ['shading', 'awning'].includes(coverKind(e)),
+      // Blinds and awnings of a room each get their own heading, so up/down never mixes with out/in
+      split: (e: HassEntity) => coverKind(e),
       count_label: 'n_open', action: { label: 'all_close', icon: 'mdi:arrow-down', service: 'close_cover' },
     },
     {
@@ -276,10 +278,21 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         column_span: 2,
         cards: rooms.length ? [
           heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon),
-          ...rooms.flatMap(({ area, entities }) => page.roomCard ? [page.roomCard(area, entities)] : [
-            groupHeading(area.name, entities, { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }),
-            ...entities.map(e => page.card ? page.card(e) : tile(e, area.name)),
-          ]),
+          ...rooms.flatMap(({ area, entities }) => {
+            if (page.roomCard) return [page.roomCard(area, entities)]
+            const roomHeading = { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }
+            const tiles = (list: HassEntity[]) => list.map(e => page.card ? page.card(e) : tile(e, area.name))
+            const kinds = page.split ? [...new Set(entities.map(page.split))] : []
+            if (kinds.length < 2) return [groupHeading(area.name, entities, roomHeading), ...tiles(entities)]
+            // Several kinds in one room: the room heading only names it, each kind brings its own control
+            return [
+              groupHeading(area.name, [], roomHeading),
+              ...kinds.flatMap(kind => {
+                const ofKind = entities.filter(e => page.split!(e) === kind)
+                return [groupHeading(t(hass, `group.${kind}` as Key), ofKind, { minor: true }), ...tiles(ofKind)]
+              }),
+            ]
+          }),
         ] : [],
       }
     }).filter(section => section.cards.length)

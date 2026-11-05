@@ -1,5 +1,5 @@
 // Heading above a group of tiles (a room on a domain page, a group on a room page) with one control for all of them:
-// a switch with "2/5" for lights and switches, up/down for covers, lock/unlock for locks.
+// a switch with "2/5" for lights and switches, up/down for covers, out/in for awnings, lock/unlock for locks.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
@@ -18,6 +18,8 @@ interface GroupHeadingConfig extends BaseConfig {
   control?: GroupControl
   /** Smaller heading for rooms inside a floor section */
   sub?: boolean
+  /** Smallest: one kind within a room, e.g. its awnings next to its blinds */
+  minor?: boolean
 }
 
 export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
@@ -29,6 +31,8 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
       font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
     }
     .sub .title { font-size: 15px; }
+    .minor { min-height: 32px; padding-top: 2px; }
+    .minor .title { font-size: 13px; font-weight: 500; opacity: 0.75; }
     .title[role=link] { cursor: pointer; }
     .title[role=link]:hover .name { text-decoration: underline; text-underline-offset: 3px; }
     .title:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 3px; border-radius: 4px; }
@@ -90,6 +94,11 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
           ${this.act(t(this.hass, 'act_up'), () => this.call('cover', 'open_cover', ids))}
           ${this.act(t(this.hass, 'act_down'), () => this.call('cover', 'close_cover', ids))}
         </div>`
+      case 'awning':
+        return html`<div class="ctl">
+          ${this.act(t(this.hass, 'extend'), () => this.call('cover', 'open_cover', ids))}
+          ${this.act(t(this.hass, 'retract'), () => this.call('cover', 'close_cover', ids))}
+        </div>`
       case 'lock':
         return html`<div class="ctl">
           ${this.act(t(this.hass, 'do_lock'), () => this.call('lock', 'lock', ids))}
@@ -103,6 +112,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     if (!c.control || entities.length < 2) return undefined
     if (c.control === 'toggle') return t(this.hass, 'n_of_on', { n: entities.filter(e => e.state === 'on').length, total: entities.length })
     if (c.control === 'cover') return t(this.hass, 'n_open', { n: entities.filter(e => isActive(e)).length })
+    if (c.control === 'awning') return t(this.hass, 'n_out', { n: entities.filter(e => isActive(e)).length })
     return t(this.hass, 'n_open', { n: entities.filter(e => !isActive(e)).length })
   }
 
@@ -110,7 +120,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     const c = this.config!
     const entities = this.entities
     const count = this.countText(entities)
-    return html`<div class="wrap ${c.sub ? 'sub' : ''}">
+    return html`<div class="wrap ${c.sub ? 'sub' : ''} ${c.minor ? 'minor' : ''}">
       <span class="title" role=${c.path ? 'link' : nothing} tabindex=${c.path ? '0' : nothing}
         @click=${() => c.path && this.navigate(c.path)}
         @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && c.path && this.navigate(c.path)}>

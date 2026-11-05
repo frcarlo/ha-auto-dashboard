@@ -4,6 +4,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, gestures, type BaseConfig } from './base'
 import { t } from '../i18n'
+import { isAwning } from '../model'
 import { domainOf, entityIcon, entityName, hvacColor, isActive, isUnavailable, shortName, stateColor } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
@@ -75,6 +76,11 @@ export class AdTile extends BaseCard<TileConfig> {
     .climate { padding-bottom: 14px; gap: 2px; }
     .climate .big { font-size: 26px; }
     .climate .ctl { width: 100%; justify-content: space-between; }
+    /* Cover: the position above, the buttons across the bottom, so "100 %" and three buttons fit a narrow tile */
+    .cover { gap: 2px; }
+    .cover .bottom { flex-direction: column; align-items: stretch; gap: 4px; }
+    .cover .big { font-size: 26px; }
+    .cover .ctl { justify-content: space-between; }
 
     /* Media: the artwork is the tile */
     .media.art { color: #fff; }
@@ -297,15 +303,22 @@ export class AdTile extends BaseCard<TileConfig> {
     const open = isActive(entity)
     const position = (entity.attributes.current_position as number | undefined) ?? (open ? 100 : 0)
     const closed = 100 - position
+    // An awning opens outwards: its fabric rolls out as far as it is open, the buttons extend and retract it
+    const awning = isAwning(entity)
+    const [up, down] = awning
+      ? [{ icon: 'mdi:arrow-expand-horizontal', label: t(this.hass, 'extend') }, { icon: 'mdi:arrow-collapse-horizontal', label: t(this.hass, 'retract') }]
+      : [{ icon: 'mdi:arrow-up', label: t(this.hass, 'all_open') }, { icon: 'mdi:arrow-down', label: t(this.hass, 'all_close') }]
     return this.wrap(`cover ${off}`, html`
-      <div class="slats" style="--closed:${closed}%" data-closed=${closed}></div>
+      ${awning
+        ? html`<div class="awning" style="--out:${position}%" data-out=${position}></div>`
+        : html`<div class="slats" style="--closed:${closed}%" data-closed=${closed}></div>`}
       <div class="top"><span class="name">${this.label}</span></div>
       <div class="bottom">
         <span class="big">${position}<small>%</small></span>
         ${this.controllable ? html`<div class="ctl" @click=${this.stop} @pointerdown=${this.stop}>
-          <button class="btn" aria-label=${t(this.hass, 'all_open')} @click=${() => this.call('cover', 'open_cover', entity.entity_id)}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
+          <button class="btn" aria-label=${up.label} @click=${() => this.call('cover', 'open_cover', entity.entity_id)}><ha-icon icon=${up.icon}></ha-icon></button>
           <button class="btn" aria-label="Stop" @click=${() => this.call('cover', 'stop_cover', entity.entity_id)}><ha-icon icon="mdi:stop"></ha-icon></button>
-          <button class="btn" aria-label=${t(this.hass, 'all_close')} @click=${() => this.call('cover', 'close_cover', entity.entity_id)}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+          <button class="btn" aria-label=${down.label} @click=${() => this.call('cover', 'close_cover', entity.entity_id)}><ha-icon icon=${down.icon}></ha-icon></button>
         </div>` : nothing}
       </div>
     `, { label: `${this.label}: ${position} % ${t(this.hass, 'open').toLowerCase()}` })

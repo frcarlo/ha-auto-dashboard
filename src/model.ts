@@ -1,6 +1,6 @@
 // Pure functions that turn the HA registries into rooms, groups and counts.
 import type { AreaRegistryEntry, FloorRegistryEntry, GroupKey, HassEntity, HomeAssistant, RoomSettings, StrategyConfig } from './types'
-import { OPENING_CLASSES, deviceClassOf, domainOf, isActive } from './presentation'
+import { OPENING_CLASSES, deviceClassOf, domainOf, entityName, isActive } from './presentation'
 
 export const HIDE_LABEL = 'ad_hide'
 
@@ -28,7 +28,7 @@ export type { GroupKey } from './types'
 
 /** Order in which groups appear on a room page. */
 export const GROUP_ORDER: GroupKey[] = [
-  'light', 'climate', 'shading', 'opening', 'gate', 'lock', 'media', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene',
+  'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene',
 ]
 
 /** Groups the security page collects. */
@@ -61,15 +61,19 @@ const BINARY_GROUPS: Record<string, GroupKey> = {
 }
 
 /**
- * Covers by what they do, so "all down" for blinds never moves the garage door:
- * windows and doors, gates (garage, gate), and shading (blinds, shutters, awnings, covers without a class).
+ * Covers by what they do, so "all down" for blinds never moves the garage door or rolls out the awning:
+ * windows and doors, gates (garage, gate), awnings, and shading (blinds, shutters, covers without a class).
+ * Awning drives often come in as shutters (Shelly does this), so the name counts too.
  */
-export function coverKind(entity: HassEntity): 'shading' | 'opening' | 'gate' {
+export function coverKind(entity: HassEntity): 'shading' | 'awning' | 'opening' | 'gate' {
   const deviceClass = deviceClassOf(entity) ?? ''
   if (['door', 'window'].includes(deviceClass)) return 'opening'
   if (['garage', 'gate'].includes(deviceClass)) return 'gate'
+  if (deviceClass === 'awning' || /markise|awning/i.test(entityName(entity))) return 'awning'
   return 'shading'
 }
+
+export const isAwning = (entity: HassEntity) => domainOf(entity.entity_id) === 'cover' && coverKind(entity) === 'awning'
 
 export function groupOf(entity: HassEntity): GroupKey | undefined {
   const domain = domainOf(entity.entity_id)
@@ -328,7 +332,7 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [],
   return items.filter(item => item.entities.length)
 }
 
-export type QuickKey = 'light' | 'switch' | 'shading' | 'opening' | 'gate'
+export type QuickKey = 'light' | 'switch' | 'shading' | 'awning' | 'opening' | 'gate'
 
 const isDomain = (...domains: string[]) => (e: HassEntity) => domains.includes(domainOf(e.entity_id))
 
@@ -346,6 +350,7 @@ const QUICK: Record<QuickKey, (e: HassEntity) => boolean> = {
   light: isDomain('light'),
   switch: e => bulkSwitchable(e) && domainOf(e.entity_id) !== 'light',
   shading: isCover('shading'),
+  awning: isCover('awning'),
   opening: isCover('opening'),
   gate: isCover('gate'),
 }
@@ -374,11 +379,11 @@ export function sceneEntities(hass: HomeAssistant, ids: string[] | undefined, hi
   return allEntities(hass, hide, areaIds).filter(e => domainOf(e.entity_id) === 'scene').sort(byName)
 }
 
-export type GroupControl = 'toggle' | 'cover' | 'lock'
+export type GroupControl = 'toggle' | 'cover' | 'awning' | 'lock'
 
 /**
  * The bulk control for a group heading and the entities it acts on: on/off for lights and switches,
- * up/down for covers, lock/unlock for the locks among other security entities.
+ * up/down for covers, out/in for awnings, lock/unlock for the locks among other security entities.
  * A single entity gets none; its own tile already has the control.
  */
 export function bulkControl(entities: HassEntity[]): { control?: GroupControl; entities: HassEntity[] } {
@@ -389,7 +394,9 @@ export function bulkControl(entities: HassEntity[]): { control?: GroupControl; e
   // A switch group with sockets among settings: the sockets alone
   const sockets = entities.filter(bulkSwitchable)
   if (many(sockets) && [...domains].every(d => ['switch', 'fan', 'input_boolean'].includes(d))) return { control: 'toggle', entities: sockets }
-  if (domains.size === 1 && domains.has('cover') && new Set(entities.map(coverKind)).size === 1) return { control: 'cover', entities }
+  if (domains.size === 1 && domains.has('cover') && new Set(entities.map(coverKind)).size === 1) {
+    return { control: isAwning(entities[0]!) ? 'awning' : 'cover', entities }
+  }
   const locks = entities.filter(e => domainOf(e.entity_id) === 'lock')
   if (many(locks) && [...domains].every(d => ['lock', 'binary_sensor', 'alarm_control_panel'].includes(d))) return { control: 'lock', entities: locks }
   return { entities }

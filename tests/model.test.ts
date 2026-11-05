@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -194,17 +194,19 @@ describe('room controls', () => {
       st('binary_sensor.smoke', 'off', { device_class: 'smoke' }), st('select.mode', 'a'),
     ]
     expect(Object.fromEntries([...groupEntities(entities)].map(([k, v]) => [k, v.map(e => e.entity_id)]))).toEqual({
-      shading: ['cover.awning', 'cover.blind'],
+      shading: ['cover.blind'],
+      awning: ['cover.awning'],
       opening: ['cover.window'],
       gate: ['binary_sensor.garage', 'cover.garage'],
       select: ['select.mode'],
       motion: ['binary_sensor.pir'],
       safety: ['binary_sensor.smoke'],
     })
-    expect(quickGroups(entities).map(g => g.key)).toEqual(['shading', 'opening', 'gate'])
-    // Blinds and the garage door never share an "all down"
+    expect(quickGroups(entities).map(g => g.key)).toEqual(['shading', 'awning', 'opening', 'gate'])
+    // Blinds never share an "all down" with the garage door or the awning
     expect(bulkControl([entities[0]!, entities[3]!]).control).toBeUndefined()
-    expect(bulkControl([entities[0]!, entities[1]!]).control).toBe('cover')
+    expect(bulkControl([entities[0]!, entities[1]!]).control).toBeUndefined()
+    expect(bulkControl([entities[0]!, st('cover.blind2', 'closed')]).control).toBe('cover')
   })
 
   it('bulk control fits the group, and needs two entities', () => {
@@ -219,6 +221,17 @@ describe('room controls', () => {
     const security = bulkControl([st('lock.a', 'locked'), st('lock.b', 'locked'), st('binary_sensor.c', 'off')])
     expect(security).toMatchObject({ control: 'lock' })
     expect(security.entities.map(e => e.entity_id)).toEqual(['lock.a', 'lock.b'])
+  })
+
+  it('keeps awnings apart from blinds, by class or by name', () => {
+    const blind = st('cover.rollo', 'open', { device_class: 'shutter', friendly_name: 'Rollo Terrasse' })
+    const named = st('cover.shelly_1', 'closed', { device_class: 'shutter', friendly_name: 'Große Markise' })
+    const classed = st('cover.b', 'closed', { device_class: 'awning', friendly_name: 'Sonnenschutz' })
+    expect([blind, named, classed].map(coverKind)).toEqual(['shading', 'awning', 'awning'])
+    expect(bulkControl([named, classed]).control).toBe('awning')
+    expect(bulkControl([blind, named]).control).toBeUndefined()
+    expect(quickGroups([blind, named, classed]).map(g => g.key)).toEqual(['shading', 'awning'])
+    expect(coverKind(st('cover.g', 'closed', { device_class: 'garage', friendly_name: 'Markise Garage' }))).toBe('gate')
   })
 })
 

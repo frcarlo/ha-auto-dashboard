@@ -26,6 +26,19 @@ export const materials = css`
   }
   .slats[data-closed='0'] { border-bottom: 0; }
 
+  /* Awning: striped fabric rolls out from the top as far as it is extended (--out), with a scalloped valance */
+  .awning {
+    position: absolute; inset: 0 0 auto 0; z-index: 0; pointer-events: none; height: var(--out, 0%);
+    background: repeating-linear-gradient(90deg, rgba(var(--ad-on-surface), 0.13) 0 14px, rgba(var(--ad-on-surface), 0.04) 14px 28px);
+    transition: height 0.5s ease;
+  }
+  .awning::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 7px;
+    background: radial-gradient(circle at 7px 0, rgba(var(--ad-on-surface), 0.13) 6.5px, transparent 7px) 0 0 / 28px 7px repeat-x,
+      radial-gradient(circle at 21px 0, rgba(var(--ad-on-surface), 0.04) 6.5px, transparent 7px) 0 0 / 28px 7px repeat-x;
+  }
+  .awning[data-out='0']::after { display: none; }
+
   /* Level strip along the bottom edge, for percentages (humidity, battery) and the temperature scale */
   .level { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; z-index: 0; background: rgba(var(--ad-on-surface), 0.07); }
   .level > span { display: block; height: 100%; width: var(--level, 0%); background: rgba(var(--ad-on-surface), 0.45); transition: width 0.4s ease; }
@@ -47,6 +60,6 @@ export const materials = css`
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .light-fill, .slats, .level > span { transition: none; }
+    .light-fill, .slats, .awning, .level > span { transition: none; }
   }
 `

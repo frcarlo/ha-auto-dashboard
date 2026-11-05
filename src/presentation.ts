@@ -133,10 +133,22 @@ export function entityIcon(entity: MinimalEntity | undefined, active = isActive(
   if (domain === 'binary_sensor') return binarySensorIcon(entity, active)
   if (domain === 'sensor') return sensorIcon(entity)
   if (domain === 'climate') return HVAC_ICONS[entity.state] ?? 'mdi:thermostat'
+  if (domain === 'cover' && COVER_ICONS[deviceClassOf(entity) ?? '']) return COVER_ICONS[deviceClassOf(entity)!]![active ? 0 : 1]
   if (domain === 'switch' && deviceClassOf(entity) === 'outlet') return active ? 'mdi:power-plug' : 'mdi:power-plug-off-outline'
   const pair = DOMAIN_ICONS[domain]
   if (pair) return active ? pair[0] : pair[1]
   return active ? 'mdi:circle' : 'mdi:circle-outline'
+}
+
+/** Covers by what they move, [open, closed] like HA's own icons */
+const COVER_ICONS: Record<string, [string, string]> = {
+  awning: ['mdi:awning-outline', 'mdi:arrow-collapse-horizontal'],
+  blind: ['mdi:blinds-horizontal', 'mdi:blinds-horizontal-closed'],
+  curtain: ['mdi:curtains', 'mdi:curtains-closed'],
+  door: ['mdi:door-open', 'mdi:door-closed'],
+  garage: ['mdi:garage-open', 'mdi:garage'],
+  gate: ['mdi:gate-open', 'mdi:gate'],
+  window: ['mdi:window-open', 'mdi:window-closed'],
 }
 
 const DOMAIN_ICONS: Record<string, [string, string]> = {

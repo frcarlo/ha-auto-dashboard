@@ -169,21 +169,27 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const allowed = canBulk(this.config!.access, ids) && ids.every(id => this.canControl(id))
     const label = t(this.hass, `quick.${key}`)
     const covers = key !== 'light' && key !== 'switch'
+    const awning = key === 'awning'
     const sub = covers
-      ? t(this.hass, 'n_open', { n: active.length })
+      ? t(this.hass, awning ? 'n_out' : 'n_open', { n: active.length })
       : entities.length > 1 ? t(this.hass, 'n_of_on', { n: active.length, total: entities.length }) : (active.length ? t(this.hass, 'on') : t(this.hass, 'off'))
     const text = html`<div class="text"><span class="label">${label}</span><span class="sub">${sub}</span></div>`
 
     if (covers) {
-      // The slats show how far the covers are closed on average
+      // The slats show how far the covers are closed on average, the awning fabric how far they are out
       const positions = entities.map(e => (e.attributes.current_position as number | undefined) ?? (isActive(e) ? 100 : 0))
-      const closed = Math.round(100 - positions.reduce((a, b) => a + b, 0) / Math.max(positions.length, 1))
+      const open = Math.round(positions.reduce((a, b) => a + b, 0) / Math.max(positions.length, 1))
+      const [up, down] = awning
+        ? [{ icon: 'mdi:arrow-expand-horizontal', label: t(this.hass, 'extend') }, { icon: 'mdi:arrow-collapse-horizontal', label: t(this.hass, 'retract') }]
+        : [{ icon: 'mdi:arrow-up', label: t(this.hass, 'all_open') }, { icon: 'mdi:arrow-down', label: t(this.hass, 'all_close') }]
       return html`<div class="tile static">
-        <div class="slats" style="--closed:${closed}%" data-closed=${closed}></div>
+        ${awning
+          ? html`<div class="awning" style="--out:${open}%" data-out=${open}></div>`
+          : html`<div class="slats" style="--closed:${100 - open}%" data-closed=${100 - open}></div>`}
         ${text}
         ${allowed ? html`
-          <button class="btn" aria-label=${t(this.hass, 'all_open')} @click=${() => this.call('cover', 'open_cover', ids)}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
-          <button class="btn" aria-label=${t(this.hass, 'all_close')} @click=${() => this.call('cover', 'close_cover', ids)}><ha-icon icon="mdi:arrow-down"></ha-icon></button>` : nothing}
+          <button class="btn" aria-label=${up.label} @click=${() => this.call('cover', 'open_cover', ids)}><ha-icon icon=${up.icon}></ha-icon></button>
+          <button class="btn" aria-label=${down.label} @click=${() => this.call('cover', 'close_cover', ids)}><ha-icon icon=${down.icon}></ha-icon></button>` : nothing}
       </div>`
     }
     // Lights fill the tile by the share that is on; sockets show a pilot light

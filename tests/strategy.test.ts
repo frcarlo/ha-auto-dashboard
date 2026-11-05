@@ -30,6 +30,14 @@ describe('generateDashboard', () => {
     expect(cards.some(c => c.type === 'custom:ad-tile' && String(c.entity).startsWith('climate.wohnzimmer'))).toBe(false)
   })
 
+  it('gives blinds and awnings of one room their own headings on the covers page', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const cards = (views.find(v => v.path === 'covers')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    const kinds = cards.filter(c => c.type === 'custom:ad-group-heading' && c.minor)
+    expect(kinds.map(c => [c.title, c.entities])).toEqual([['Beschattung', ['cover.esszimmer']], ['Markisen', ['cover.esszimmer_markise']]])
+    expect(cards.find(c => c.type === 'custom:ad-group-heading' && c.title === 'Esszimmer')!.control).toBeUndefined()
+  })
+
   it('applies hide_areas, hide_domains and the look options', async () => {
     const { views } = await generateDashboard(
       { type: 'custom:auto-dashboard', hide_areas: ['garage'], hide_domains: ['cover'], theme: 'light', glass: true },
