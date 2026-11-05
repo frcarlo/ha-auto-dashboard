@@ -237,7 +237,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         // slide the next room's card next to this room's graph. The history graph needs no long-term statistics.
         return [
           { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], wide: true, ...powerOpts },
-          { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: 3 } },
+          // The legend grows with the sensors; the plot keeps about four rows of its own
+          { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: Math.min(10, 4 + Math.ceil(sensors.length / 2)) } },
         ]
       })
       return { type: 'grid', column_span: 2, cards: cards.length ? [heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon), ...cards] : [] }

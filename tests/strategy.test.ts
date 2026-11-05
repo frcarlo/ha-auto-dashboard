@@ -181,6 +181,10 @@ describe('energy, maintenance, cameras and lists', () => {
     const graphs = energy.filter(c => c.type === 'history-graph').flatMap(c => c.entities)
     expect(graphs).toContain('sensor.kuche_backofen')
     expect(graphs).toContain('sensor.wohnzimmer_tv_leistung')
+    // More sensors, longer legend, taller graph
+    const rows = energy.filter(c => c.type === 'history-graph').map(c => [c.entities.length, c.grid_options.rows])
+    expect(rows).toContainEqual([2, 5])
+    expect(rows).toContainEqual([1, 5])
     expect(energy.filter(c => c.type === 'custom:ad-power' && c.variant === 'room').map(c => c.areas[0]))
       .toEqual(expect.arrayContaining(['kuche', 'wohnzimmer', 'buro_keller']))
   })

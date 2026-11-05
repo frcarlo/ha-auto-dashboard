@@ -55,6 +55,23 @@ let users = 0
 
 let sidebarObserver: ResizeObserver | undefined
 
+/**
+ * The view that got room for a side rail. Module-wide like the bar: when HA rebuilds a view's cards,
+ * the new nav card joins before the old one leaves, so the old one must not take the room away again.
+ */
+let paddedView: HTMLElement | undefined
+
+function pad(view: HTMLElement | undefined, side: 'left' | 'right' | undefined) {
+  if (paddedView && paddedView !== view) {
+    paddedView.style.paddingLeft = ''
+    paddedView.style.paddingRight = ''
+  }
+  paddedView = view
+  if (!view) return
+  view.style.paddingLeft = side === 'left' ? '88px' : ''
+  view.style.paddingRight = side === 'right' ? '88px' : ''
+}
+
 /** HA variables this dashboard changed on <home-assistant>, with the inline values they had before. */
 let haColors: Map<string, string> | undefined
 
@@ -97,7 +114,6 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
 
   private onLocation = () => this.paint()
   private onResize = () => this.paint()
-  private paddedView?: HTMLElement
 
   /** HA's sections view this card lives in, found across shadow roots. */
   private findView(): HTMLElement | undefined {
@@ -114,10 +130,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     const side = this.config?.position === 'left' || this.config?.position === 'right' ? this.config.position : undefined
     const view = this.findView()
     if (!view) return
-    this.paddedView = view
-    const rail = side && window.innerWidth >= 1024
-    view.style.paddingLeft = rail && side === 'left' ? '88px' : ''
-    view.style.paddingRight = rail && side === 'right' ? '88px' : ''
+    pad(view, side && window.innerWidth >= 1024 ? side : undefined)
   }
 
   getGridOptions() {
@@ -145,6 +158,8 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     window.addEventListener('location-changed', this.onLocation)
     window.addEventListener('popstate', this.onLocation)
     window.addEventListener('resize', this.onResize)
+    // HA may move an unchanged card into a rebuilt view; nothing re-renders then, so place the rail again
+    if (this.hasUpdated) this.paint()
   }
 
   disconnectedCallback() {
@@ -152,12 +167,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     window.removeEventListener('location-changed', this.onLocation)
     window.removeEventListener('popstate', this.onLocation)
     window.removeEventListener('resize', this.onResize)
-    if (this.paddedView) {
-      this.paddedView.style.paddingLeft = ''
-      this.paddedView.style.paddingRight = ''
-      this.paddedView = undefined
-    }
-    // Defer, so switching views (old card leaves, new one joins) keeps the bar in place
+    // Defer, so switching views (old card leaves, new one joins) keeps the bar and the room in place
     users--
     setTimeout(() => {
       if (users === 0 && bar) {
@@ -166,6 +176,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
         sidebarObserver?.disconnect()
         sidebarObserver = undefined
         tintHa(undefined)
+        pad(undefined, undefined)
       }
     }, 0)
   }
