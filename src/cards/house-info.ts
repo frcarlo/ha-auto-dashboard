@@ -34,7 +34,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
       all: unset; flex: 1 0 auto; min-width: 120px; display: flex; align-items: center; gap: 10px; box-sizing: border-box;
       padding: 10px 14px 10px 10px; border-radius: 18px; background: var(--ad-surface); box-shadow: var(--ad-shadow);
     }
-    :host([glass]) .tile { background: var(--ad-glass-bg); }
+    :host([glass]) .tile { background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur); }
     .tile[role=link] { cursor: pointer; }
     .tile:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     .text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }

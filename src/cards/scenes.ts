@@ -25,7 +25,7 @@ export class AdScenes extends BaseCard<ScenesConfig> {
       all: unset; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; box-sizing: border-box;
       padding: 8px 14px 8px 8px; min-height: 44px; border-radius: 16px; background: var(--ad-surface); box-shadow: var(--ad-shadow);
     }
-    :host([glass]) button { background: var(--ad-glass-bg); }
+    :host([glass]) button { background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur); }
     button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     button[disabled] { cursor: default; opacity: 0.5; }
     .dot { width: 28px; height: 28px; }

@@ -73,7 +73,7 @@ export function paletteVars(hex: string, dark: boolean): Record<(typeof PALETTE_
       '--ad-on-primary': onPrimary,
       '--ad-info': info,
       '--ad-shadow': 'none',
-      '--ad-glass-bg': `rgba(${surface}, 0.62)`,
+      '--ad-glass-bg': `rgba(${surface}, 0.46)`,
       '--ad-glass-hi': 'rgba(255, 255, 255, 0.16)',
     }
   }
@@ -86,9 +86,35 @@ export function paletteVars(hex: string, dark: boolean): Record<(typeof PALETTE_
     '--ad-on-primary': onPrimary,
     '--ad-info': info,
     '--ad-shadow': `0 10px 28px rgba(${triplet([h, tint * 0.4, 65])}, 0.08)`,
-    '--ad-glass-bg': 'rgba(255, 255, 255, 0.82)',
+    '--ad-glass-bg': 'rgba(255, 255, 255, 0.56)',
     '--ad-glass-hi': 'rgba(255, 255, 255, 0.72)',
   }
+}
+
+/** The tokens' own page background, used when there is no accent to derive one from. */
+const DEFAULT_BG = { dark: '#0f172a', light: '#f8fafc' }
+
+const byTheme = (theme: 'auto' | 'dark' | 'light', dark: string, light: string) =>
+  theme === 'dark' ? dark : theme === 'light' ? light : `light-dark(${light}, ${dark})`
+
+/**
+ * Backdrop for frosted glass. Glass only shows what lies behind it, and on a plain page there is nothing to see,
+ * so the page gets soft light in the accent and two neighbouring hues, like a phone's wallpaper behind its widgets.
+ */
+export function glassBackground(hex: string | undefined, theme: 'auto' | 'dark' | 'light' = 'auto') {
+  const [h, s] = toHsl(parseHex(hex ?? '') ?? [99, 102, 241])
+  const sat = Math.max(Math.min(s, 85), s > 8 ? 60 : s)
+  const glow = (hue: number, at: string, size: string, dark: number, light: number) => {
+    const color = byTheme(theme, `rgba(${triplet([hue % 360, sat, 52])}, ${dark})`, `rgba(${triplet([hue % 360, sat, 72])}, ${light})`)
+    return `radial-gradient(${size} at ${at}, ${color}, transparent 70%)`
+  }
+  const base = (hex && pageBackground(hex, theme)) || byTheme(theme, DEFAULT_BG.dark, DEFAULT_BG.light)
+  return [
+    glow(h, '8% 4%', '65% 55%', 0.5, 0.55),
+    glow(h + 45, '96% 28%', '55% 50%', 0.32, 0.4),
+    glow(h + 320, '35% 100%', '75% 55%', 0.38, 0.45),
+    base,
+  ].join(', ')
 }
 
 /**
@@ -99,7 +125,7 @@ export function pageBackground(hex: string, theme: 'auto' | 'dark' | 'light' = '
   const dark = paletteVars(hex, true)?.['--ad-bg']
   const light = paletteVars(hex, false)?.['--ad-bg']
   if (!dark || !light) return undefined
-  return theme === 'dark' ? dark : theme === 'light' ? light : `light-dark(${light}, ${dark})`
+  return byTheme(theme, dark, light)
 }
 
 /** Set the palette on an element, or clear it when there is none. */

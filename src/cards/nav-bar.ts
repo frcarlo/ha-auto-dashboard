@@ -27,7 +27,7 @@ const barStyles = css`
   }
   nav {
     display: flex; justify-content: space-around; padding: 6px; border-radius: 26px;
-    background: var(--ad-glass-bg); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur, blur(30px) saturate(180%)); -webkit-backdrop-filter: var(--ad-glass-blur, blur(30px) saturate(180%));
     box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28), inset 0 1px 0 var(--ad-glass-hi);
   }
   a {

@@ -6,7 +6,7 @@ import {
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName } from './presentation'
-import { isHexColor, pageBackground } from './styles/palette'
+import { glassBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
@@ -304,8 +304,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     }
   })
 
-  // With an own accent the page behind the cards follows it too; without, HA's theme stays in charge
-  const background = look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
+  // With an own accent the page behind the cards follows it too; without, HA's theme stays in charge.
+  // Glass needs something to blur, so it brings its own lit backdrop.
+  const background = look.glass ? glassBackground(look.primary_color, config.theme)
+    : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
   const views = [home, ...domainViews, ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {
     title: config.title ?? scopeLabel ?? t(hass, 'home'),

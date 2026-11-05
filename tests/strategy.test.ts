@@ -231,6 +231,13 @@ describe('primary color', () => {
     const dark = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#0ea5e9', theme: 'dark' }, createHass(true))
     expect(dark.views[0]!.background).toMatch(/^rgb\(/)
   })
+
+  it('gives glass a lit backdrop, with or without an accent', async () => {
+    const plain = await generateDashboard({ type: 'custom:auto-dashboard', glass: true, theme: 'dark' }, createHass(true))
+    expect(plain.views[0]!.background).toMatch(/^radial-gradient\(.*#0f172a$/)
+    const tinted = await generateDashboard({ type: 'custom:auto-dashboard', glass: true, primary_color: '#0ea5e9' }, createHass(true))
+    expect(tinted.views.every(v => /^radial-gradient\(.*light-dark\(/.test(String(v.background)))).toBe(true)
+  })
 })
 
 describe('room settings, own cards and energy settings', () => {

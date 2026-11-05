@@ -53,7 +53,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
       min-width: 150px; min-height: 60px; padding: 10px 12px 10px 14px; box-sizing: border-box;
       border-radius: 18px; background: var(--ad-surface); box-shadow: var(--ad-shadow); cursor: pointer; user-select: none;
     }
-    :host([glass]) .tile { background: var(--ad-glass-bg); }
+    :host([glass]) .tile { background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur); }
     .tile.static { cursor: default; }
     .tile:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .tile > .text, .tile > .btn, .tile > .pilot, .tile > .now, .tile > .set { position: relative; z-index: 1; }

@@ -45,7 +45,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       padding: 7px 12px 7px 9px; border-radius: 999px; background: var(--ad-surface); box-shadow: var(--ad-shadow);
       font-size: 13px; transition: background 0.2s ease;
     }
-    :host([glass]) .chip { background: var(--ad-glass-bg); }
+    :host([glass]) .chip { background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur); }
     .chip ha-icon { --mdc-icon-size: 17px; }
     .chip .n { font-weight: 600; }
     .chip .l { opacity: 0.65; }

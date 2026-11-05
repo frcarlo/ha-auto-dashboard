@@ -15,7 +15,8 @@ export const tokens = css`
     --ad-error: 220, 38, 38;
     --ad-radius: 24px;
     --ad-shadow: 0 10px 28px rgba(148, 163, 184, 0.08);
-    --ad-glass-bg: rgba(255, 255, 255, 0.82);
+    --ad-glass-bg: rgba(255, 255, 255, 0.56);
+    --ad-glass-blur: blur(30px) saturate(180%);
     --ad-glass-hi: rgba(255, 255, 255, 0.72);
     color: rgb(var(--ad-on-surface));
     font-family: var(--ha-font-family-body, Roboto, system-ui, sans-serif);
@@ -33,7 +34,7 @@ export const tokens = css`
     --ad-success: 34, 197, 94;
     --ad-error: 239, 68, 68;
     --ad-shadow: none;
-    --ad-glass-bg: rgba(30, 41, 59, 0.62);
+    --ad-glass-bg: rgba(30, 41, 59, 0.46);
     --ad-glass-hi: rgba(255, 255, 255, 0.16);
   }
 
@@ -48,14 +49,16 @@ export const tokens = css`
     box-shadow: var(--ad-shadow);
     transition: background 0.4s ease;
   }
+  /* Frosted glass like iOS: the blurred page shines through, a thin light edge catches the top */
   :host([glass]) .card {
     background: var(--ad-glass-bg);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.24), inset 0 1px 0 var(--ad-glass-hi);
+    backdrop-filter: var(--ad-glass-blur);
+    -webkit-backdrop-filter: var(--ad-glass-blur);
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 var(--ad-glass-hi);
   }
-  @media (pointer: coarse), (prefers-reduced-motion: reduce) {
-    :host([glass]) .card { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  /* Asked for less transparency: solid surfaces again */
+  @media (prefers-reduced-transparency: reduce) {
+    :host([glass]) { --ad-glass-bg: var(--ad-surface); --ad-glass-blur: none; }
   }
 
   ha-icon { --mdc-icon-size: 20px; display: inline-flex; }
