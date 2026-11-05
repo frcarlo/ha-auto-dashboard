@@ -74,7 +74,7 @@ export function paletteVars(hex: string, dark: boolean): Record<(typeof PALETTE_
       '--ad-info': info,
       '--ad-shadow': 'none',
       '--ad-glass-bg': `rgba(${surface}, 0.46)`,
-      '--ad-glass-hi': 'rgba(255, 255, 255, 0.16)',
+      '--ad-glass-hi': 'rgba(255, 255, 255, 0.08)',
     }
   }
   return {
@@ -99,22 +99,30 @@ const byTheme = (theme: 'auto' | 'dark' | 'light', dark: string, light: string) 
 
 /**
  * Backdrop for frosted glass. Glass only shows what lies behind it, and on a plain page there is nothing to see,
- * so the page gets soft light in the accent and two neighbouring hues, like a phone's wallpaper behind its widgets.
+ * so the page gets one soft light from the upper left in a muted accent, like a lamp behind a frosted door.
  */
 export function glassBackground(hex: string | undefined, theme: 'auto' | 'dark' | 'light' = 'auto') {
   const [h, s] = toHsl(parseHex(hex ?? '') ?? [99, 102, 241])
-  const sat = Math.max(Math.min(s, 85), s > 8 ? 60 : s)
-  const glow = (hue: number, at: string, size: string, dark: number, light: number) => {
-    const color = byTheme(theme, `rgba(${triplet([hue % 360, sat, 52])}, ${dark})`, `rgba(${triplet([hue % 360, sat, 72])}, ${light})`)
-    return `radial-gradient(${size} at ${at}, ${color}, transparent 70%)`
-  }
+  const sat = Math.min(s, 35)
+  const light = byTheme(theme, `rgba(${triplet([h, sat, 52])}, 0.22)`, `rgba(${triplet([h, sat, 72])}, 0.3)`)
   const base = (hex && pageBackground(hex, theme)) || byTheme(theme, DEFAULT_BG.dark, DEFAULT_BG.light)
-  return [
-    glow(h, '8% 4%', '65% 55%', 0.5, 0.55),
-    glow(h + 45, '96% 28%', '55% 50%', 0.32, 0.4),
-    glow(h + 320, '35% 100%', '75% 55%', 0.38, 0.45),
-    base,
-  ].join(', ')
+  return `radial-gradient(90% 70% at 10% 0%, ${light}, transparent 70%), ${base}`
+}
+
+/**
+ * A picture of one's own as the page background, like a phone's wallpaper behind its widgets. A veil in the
+ * page color keeps text readable over bright or busy pictures; glass cards blur what lies behind them.
+ */
+export function imageBackground(url: string, hex: string | undefined, theme: 'auto' | 'dark' | 'light' = 'auto') {
+  const rgb = (dark: boolean) => {
+    const own = hex ? paletteVars(hex, dark)?.['--ad-bg'] : undefined
+    return own ? own.slice(4, -1) : parseHex(dark ? DEFAULT_BG.dark : DEFAULT_BG.light)!.join(', ')
+  }
+  const veil = byTheme(theme, `rgba(${rgb(true)}, 0.45)`, `rgba(${rgb(false)}, 0.35)`)
+  const base = byTheme(theme, `rgb(${rgb(true)})`, `rgb(${rgb(false)})`)
+  // Quotes, backslashes and line breaks would end the CSS string early
+  const src = url.trim().replace(/[\n\r]/g, '').replace(/["\\]/g, c => `\\${c}`)
+  return `linear-gradient(${veil}, ${veil}), url("${src}") center / cover no-repeat, ${base}`
 }
 
 /**
@@ -176,9 +184,9 @@ export function haGlassVars(hex: string | undefined, dark: boolean): Record<stri
   const own = hex ? paletteVars(hex, dark)?.['--ad-glass-bg'] : undefined
   return {
     '--ha-card-background': own ?? (dark ? 'rgba(30, 41, 59, 0.46)' : 'rgba(255, 255, 255, 0.56)'),
-    '--ha-card-backdrop-filter': 'blur(30px) saturate(180%)',
-    '--ha-card-border-color': dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.6)',
-    '--ha-card-box-shadow': `0 10px 36px rgba(0, 0, 0, 0.18), inset 0 1px 0 ${dark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.72)'}`,
+    '--ha-card-backdrop-filter': 'blur(30px) saturate(140%)',
+    '--ha-card-border-color': dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)',
+    '--ha-card-box-shadow': dark ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)' : '0 8px 24px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.72)',
     '--ha-card-border-radius': '24px',
   }
 }

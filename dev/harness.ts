@@ -32,6 +32,8 @@ const list = (key: string) => params.get(key)?.split(',').filter(Boolean)
 const config: StrategyConfig = {
   type: 'custom:auto-dashboard',
   glass: params.has('glass'),
+  // ?bg=/dev/some.jpg
+  background_image: params.get('bg') ?? undefined,
   areas: list('areas'),
   floors: list('floors'),
   hide_labels: list('labels'),

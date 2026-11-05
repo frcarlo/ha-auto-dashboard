@@ -71,7 +71,8 @@ strategy:
   type: custom:auto-dashboard
   title: Zuhause
   theme: auto              # auto | dark | light, auto folgt dem HA-Dunkelmodus
-  glass: false             # Milchglas-Karten über einem farbigen Hintergrund aus der Akzentfarbe
+  glass: false             # Milchglas-Karten, dahinter ein weiches Licht in der gedämpften Akzentfarbe
+  background_image: /local/garten.jpg   # Foto hinter den Karten, mit Schleier in der Seitenfarbe; ersetzt das Glas-Licht
   primary_color: "#14b8a6" # Akzentfarbe, alles andere wird daraus abgeleitet
   ha_colors: true          # mit primary_color auch HA-Kopfzeile, Seitenleiste und Dialoge färben
   nav_position: bottom     # bottom | top | left | right

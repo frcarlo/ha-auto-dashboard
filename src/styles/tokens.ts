@@ -16,8 +16,9 @@ export const tokens = css`
     --ad-radius: 24px;
     --ad-shadow: 0 10px 28px rgba(148, 163, 184, 0.08);
     --ad-glass-bg: rgba(255, 255, 255, 0.56);
-    --ad-glass-blur: blur(30px) saturate(180%);
+    --ad-glass-blur: blur(30px) saturate(140%);
     --ad-glass-hi: rgba(255, 255, 255, 0.72);
+    --ad-glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
     color: rgb(var(--ad-on-surface));
     font-family: var(--ha-font-family-body, Roboto, system-ui, sans-serif);
     font-size: 14px;
@@ -35,7 +36,9 @@ export const tokens = css`
     --ad-error: 239, 68, 68;
     --ad-shadow: none;
     --ad-glass-bg: rgba(30, 41, 59, 0.46);
-    --ad-glass-hi: rgba(255, 255, 255, 0.16);
+    --ad-glass-hi: rgba(255, 255, 255, 0.08);
+    /* On dark, depth comes from the surface and the hairline, not from a shadow */
+    --ad-glass-shadow: 0 0 0 transparent;
   }
 
   .card {
@@ -49,12 +52,12 @@ export const tokens = css`
     box-shadow: var(--ad-shadow);
     transition: background 0.4s ease;
   }
-  /* Frosted glass like iOS: the blurred page shines through, a thin light edge catches the top */
+  /* Frosted glass like iOS: the blurred page shines through, a hairline edge, a faint light along the top */
   :host([glass]) .card {
     background: var(--ad-glass-bg);
     backdrop-filter: var(--ad-glass-blur);
     -webkit-backdrop-filter: var(--ad-glass-blur);
-    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 var(--ad-glass-hi);
+    box-shadow: var(--ad-glass-shadow), inset 0 0 0 1px rgba(var(--ad-on-surface), 0.08), inset 0 1px 0 var(--ad-glass-hi);
   }
   /* Asked for less transparency: solid surfaces again */
   @media (prefers-reduced-transparency: reduce) {

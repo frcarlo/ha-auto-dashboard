@@ -6,7 +6,7 @@ import {
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName } from './presentation'
-import { glassBackground, isHexColor, pageBackground } from './styles/palette'
+import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
@@ -213,7 +213,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         type: 'grid',
         column_span: 2,
         cards: [
-          heading(group.floor?.name ?? (floors.length > 1 ? t(hass, 'other_rooms') : t(hass, 'rooms')), group.floor?.icon),
+          heading(group.floor?.name ?? (floors.length > 1 ? t(hass, 'other_rooms') : t(hass, 'rooms'))),
           ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })),
         ],
       })),
@@ -248,7 +248,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: Math.min(10, 4 + Math.ceil(sensors.length / 2)) } },
         ]
       })
-      return { type: 'grid', column_span: 2, cards: cards.length ? [heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon), ...cards] : [] }
+      return { type: 'grid', column_span: 2, cards: cards.length ? [heading(group.floor?.name ?? t(hass, 'other_rooms')), ...cards] : [] }
     }).filter(section => section.cards.length),
   ])
 
@@ -277,7 +277,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         type: 'grid' as const,
         column_span: 2,
         cards: rooms.length ? [
-          heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon),
+          heading(group.floor?.name ?? t(hass, 'other_rooms')),
           ...rooms.flatMap(({ area, entities }) => {
             if (page.roomCard) return [page.roomCard(area, entities)]
             const roomHeading = { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }
@@ -323,7 +323,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
 
   // With an own accent the page behind the cards follows it too; without, HA's theme stays in charge.
   // Glass needs something to blur, so it brings its own lit backdrop.
-  const background = look.glass ? glassBackground(look.primary_color, config.theme)
+  const background = config.background_image?.trim() ? imageBackground(config.background_image, look.primary_color, config.theme)
+    : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
   const views = [home, ...domainViews, ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {

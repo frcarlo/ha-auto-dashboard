@@ -255,6 +255,15 @@ describe('primary color', () => {
     const tinted = await generateDashboard({ type: 'custom:auto-dashboard', glass: true, primary_color: '#0ea5e9' }, createHass(true))
     expect(tinted.views.every(v => /^radial-gradient\(.*light-dark\(/.test(String(v.background)))).toBe(true)
   })
+
+  it('puts a background image under a veil, also instead of the glass light', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', glass: true, theme: 'dark', background_image: '/local/garten.jpg' }, createHass(true))
+    expect(views.every(v => v.background === 'linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), url("/local/garten.jpg") center / cover no-repeat, rgb(15, 23, 42)')).toBe(true)
+    const odd = await generateDashboard({ type: 'custom:auto-dashboard', background_image: '/local/a"b.jpg' }, createHass(true))
+    expect(String(odd.views[0]!.background)).toContain('url("/local/a\\"b.jpg")')
+    const blank = await generateDashboard({ type: 'custom:auto-dashboard', background_image: '  ' }, createHass(true))
+    expect(blank.views[0]!.background).toBeUndefined()
+  })
 })
 
 describe('room settings, own cards and energy settings', () => {

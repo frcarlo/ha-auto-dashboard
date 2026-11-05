@@ -232,6 +232,17 @@ export class AdStrategyEditor extends LitElement {
       @change=${(e: Event) => onChange((e.target as HTMLTextAreaElement).value.split(/[\s,]+/).filter(Boolean))}></textarea>`
   }
 
+  /** HA's image picker (upload or URL) when it is loaded, else a path. */
+  private imagePicker(value: string | undefined) {
+    const set = (background_image?: string) => this.change({ background_image: background_image?.trim() || undefined })
+    if (customElements.get('ha-selector')) {
+      return html`<ha-selector .hass=${this.hass} .value=${value} .selector=${{ image: { original: true } }}
+        @value-changed=${(e: CustomEvent) => set(e.detail.value as string | undefined)}></ha-selector>`
+    }
+    return html`<input type="text" .value=${value ?? ''} placeholder="/local/garten.jpg"
+      @change=${(e: Event) => set((e.target as HTMLInputElement).value)}>`
+  }
+
   private field(label: string, content: TemplateResult, hint?: string) {
     return html`<div class="field"><span class="label">${label}</span>${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
   }
@@ -316,6 +327,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}
         ${isHexColor(c.primary_color) ? this.toggle(this.l('ed.ha_colors'), c.ha_colors !== false, ha_colors => this.change({ ha_colors })) : nothing}
         ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}
+        ${this.field(this.l('ed.background'), this.imagePicker(c.background_image), this.l('ed.background_hint'))}
         ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
           c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}`
