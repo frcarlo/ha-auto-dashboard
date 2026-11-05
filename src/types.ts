@@ -135,7 +135,7 @@ export interface StrategyConfig extends CardLook {
   todo_lists?: string[]
   /** With primary_color: false keeps HA's header, sidebar and dialogs in HA's theme */
   ha_colors?: boolean
-  /** Picture behind the cards, e.g. /local/garten.jpg or an uploaded image; replaces the glass light */
+  /** Picture behind the cards: a URL like /local/garten.jpg or a media-source:// id from an upload; replaces the glass light */
   background_image?: string
   /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */
   outdoor_areas?: string[]

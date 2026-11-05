@@ -256,11 +256,13 @@ describe('primary color', () => {
     expect(tinted.views.every(v => /^radial-gradient\(.*light-dark\(/.test(String(v.background)))).toBe(true)
   })
 
-  it('puts a background image under a veil, also instead of the glass light', async () => {
-    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', glass: true, theme: 'dark', background_image: '/local/garten.jpg' }, createHass(true))
-    expect(views.every(v => v.background === 'linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.45)), url("/local/garten.jpg") center / cover no-repeat, rgb(15, 23, 42)')).toBe(true)
-    const odd = await generateDashboard({ type: 'custom:auto-dashboard', background_image: '/local/a"b.jpg' }, createHass(true))
-    expect(String(odd.views[0]!.background)).toContain('url("/local/a\\"b.jpg")')
+  it('hands a background image to HA in its own format, also instead of the glass light', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', glass: true, theme: 'dark', background_image: ' media-source://image_upload/abc ' }, createHass(true))
+    expect(views.every(v => JSON.stringify(v.background) === JSON.stringify({
+      image: 'media-source://image_upload/abc', opacity: 55, size: 'cover', alignment: 'center', repeat: 'no-repeat', attachment: 'fixed',
+    }))).toBe(true)
+    const auto = await generateDashboard({ type: 'custom:auto-dashboard', background_image: '/local/garten.jpg' }, createHass(true))
+    expect(auto.views[0]!.background).toMatchObject({ image: '/local/garten.jpg', opacity: 60 })
     const blank = await generateDashboard({ type: 'custom:auto-dashboard', background_image: '  ' }, createHass(true))
     expect(blank.views[0]!.background).toBeUndefined()
   })

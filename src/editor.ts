@@ -232,12 +232,14 @@ export class AdStrategyEditor extends LitElement {
       @change=${(e: Event) => onChange((e.target as HTMLTextAreaElement).value.split(/[\s,]+/).filter(Boolean))}></textarea>`
   }
 
-  /** HA's image picker (upload or URL) when it is loaded, else a path. */
+  /** HA's media picker with upload, like in its own view background editor, when it is loaded, else a path. */
   private imagePicker(value: string | undefined) {
     const set = (background_image?: string) => this.change({ background_image: background_image?.trim() || undefined })
     if (customElements.get('ha-selector')) {
-      return html`<ha-selector .hass=${this.hass} .value=${value} .selector=${{ image: { original: true } }}
-        @value-changed=${(e: CustomEvent) => set(e.detail.value as string | undefined)}></ha-selector>`
+      // The picker works with { media_content_id }; the config keeps just the id, a URL or media-source://…
+      return html`<ha-selector .hass=${this.hass} .value=${value ? { media_content_id: value } : undefined}
+        .selector=${{ media: { accept: ['image/*'], image_upload: true, hide_content_type: true } }}
+        @value-changed=${(e: CustomEvent) => set((e.detail.value as { media_content_id?: string } | undefined)?.media_content_id)}></ha-selector>`
     }
     return html`<input type="text" .value=${value ?? ''} placeholder="/local/garten.jpg"
       @change=${(e: Event) => set((e.target as HTMLInputElement).value)}>`

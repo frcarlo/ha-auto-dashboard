@@ -110,19 +110,19 @@ export function glassBackground(hex: string | undefined, theme: 'auto' | 'dark' 
 }
 
 /**
- * A picture of one's own as the page background, like a phone's wallpaper behind its widgets. A veil in the
- * page color keeps text readable over bright or busy pictures; glass cards blur what lies behind them.
+ * A picture of one's own as the page background, like a phone's wallpaper behind its widgets. In HA's own
+ * format, so HA resolves uploaded pictures (media-source://…) itself. The picture is drawn partly transparent
+ * over the page color, which keeps text readable on bright or busy pictures; glass cards blur what lies behind.
  */
-export function imageBackground(url: string, hex: string | undefined, theme: 'auto' | 'dark' | 'light' = 'auto') {
-  const rgb = (dark: boolean) => {
-    const own = hex ? paletteVars(hex, dark)?.['--ad-bg'] : undefined
-    return own ? own.slice(4, -1) : parseHex(dark ? DEFAULT_BG.dark : DEFAULT_BG.light)!.join(', ')
+export function imageBackground(image: string, theme: 'auto' | 'dark' | 'light' = 'auto') {
+  return {
+    image: image.trim(),
+    opacity: theme === 'dark' ? 55 : theme === 'light' ? 65 : 60,
+    size: 'cover',
+    alignment: 'center',
+    repeat: 'no-repeat',
+    attachment: 'fixed',
   }
-  const veil = byTheme(theme, `rgba(${rgb(true)}, 0.45)`, `rgba(${rgb(false)}, 0.35)`)
-  const base = byTheme(theme, `rgb(${rgb(true)})`, `rgb(${rgb(false)})`)
-  // Quotes, backslashes and line breaks would end the CSS string early
-  const src = url.trim().replace(/[\n\r]/g, '').replace(/["\\]/g, c => `\\${c}`)
-  return `linear-gradient(${veil}, ${veil}), url("${src}") center / cover no-repeat, ${base}`
 }
 
 /**

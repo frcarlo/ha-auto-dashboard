@@ -323,7 +323,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
 
   // With an own accent the page behind the cards follows it too; without, HA's theme stays in charge.
   // Glass needs something to blur, so it brings its own lit backdrop.
-  const background = config.background_image?.trim() ? imageBackground(config.background_image, look.primary_color, config.theme)
+  const background = config.background_image?.trim() ? imageBackground(config.background_image, config.theme)
     : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
   const views = [home, ...domainViews, ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]

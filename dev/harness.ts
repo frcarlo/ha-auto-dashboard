@@ -135,7 +135,12 @@ function render() {
   const main = document.getElementById('view')!
   main.innerHTML = ''
   // Like hui-view-background; color-scheme stands in for the one HA sets from its dark mode
-  main.style.background = view.background ?? ''
+  const bg = view.background
+  if (typeof bg === 'object' && bg) {
+    // HA's object form: the picture drawn at its opacity over the page color, approximated with a veil of that color
+    const veil = `color-mix(in srgb, ${dark ? '#0f172a' : '#f8fafc'} ${100 - (bg.opacity ?? 100)}%, transparent)`
+    main.style.background = `linear-gradient(${veil}, ${veil}), ${bg.alignment ?? 'center'} / ${bg.size ?? 'cover'} ${bg.repeat ?? 'no-repeat'} url('${bg.image}'), ${dark ? '#0f172a' : '#f8fafc'}`
+  } else main.style.background = bg ?? ''
   main.style.colorScheme = dark ? 'dark' : 'light'
   const width = main.clientWidth || window.innerWidth
   const cols = Math.max(1, Math.min(view.max_columns ?? 4, Math.floor((width - 32 + 8) / (320 + 8))))
