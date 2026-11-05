@@ -6,6 +6,7 @@ import { AdHeader } from './cards/header'
 import { AdNavBar } from './cards/nav-bar'
 import { AdGroupHeading } from './cards/group-heading'
 import { AdRoomHeader } from './cards/room-header'
+import { AdClimateRoom } from './cards/climate-room'
 import { AdScenes } from './cards/scenes'
 import { AdNowPlaying } from './cards/now-playing'
 import { AdHouseInfo } from './cards/house-info'
@@ -55,6 +56,7 @@ define('ad-header', AdHeader)
 define('ad-nav-bar', AdNavBar)
 define('ad-group-heading', AdGroupHeading)
 define('ad-room-header', AdRoomHeader)
+define('ad-climate-room', AdClimateRoom)
 define('ad-scenes', AdScenes)
 define('ad-now-playing', AdNowPlaying)
 define('ad-house-info', AdHouseInfo)

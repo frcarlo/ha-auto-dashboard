@@ -4,7 +4,7 @@ import { css, html, render } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { tokens } from '../styles/tokens'
 import type { NavPosition } from '../types'
-import { PALETTE_VARS, haThemeVars } from '../styles/palette'
+import { PALETTE_VARS, haGlassVars, haThemeVars } from '../styles/palette'
 
 export interface NavItem {
   path: string
@@ -200,8 +200,12 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
       else bar.style.removeProperty(name)
     }
     bar.setAttribute('pos', this.config.position ?? 'bottom')
+    const dark = this.hasAttribute('dark')
     const color = this.config.ha_colors === false ? undefined : this.config.primary_color
-    tintHa(color ? haThemeVars(color, this.hasAttribute('dark')) : undefined)
+    const tint = color ? haThemeVars(color, dark) : undefined
+    // HA's own cards between ours turn to glass as well, whether or not HA's colors follow the accent
+    const glass = this.config.glass ? haGlassVars(this.config.primary_color, dark) : undefined
+    tintHa(tint || glass ? { ...tint, ...glass } : undefined)
     bar.style.setProperty('--ad-offset', `${sidebarRight()}px`)
     this.padView()
     // A bare dashboard URL shows the first view

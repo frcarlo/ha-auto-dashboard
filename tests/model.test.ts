@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
 import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
-import { PALETTE_VARS, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
+import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
 const st = (entity_id: string, state: string, attributes: Record<string, unknown> = {}): HassEntity =>
   ({ entity_id, state, attributes: { friendly_name: entity_id, ...attributes } })
@@ -370,5 +370,10 @@ describe('HA theme from the accent', () => {
     expect(vars['--card-background-color']).toBe(cards['--ad-surface'])
     expect(vars['--primary-color']).toBe(`rgb(${cards['--ad-primary']})`)
     expect(haThemeVars('kaputt', true)).toBeUndefined()
+  })
+
+  it('turns the built-in HA cards to the same glass as ours', () => {
+    expect(haGlassVars('#14b8a6', true)['--ha-card-background']).toBe(paletteVars('#14b8a6', true)!['--ad-glass-bg'])
+    expect(haGlassVars(undefined, false)['--ha-card-backdrop-filter']).toMatch(/^blur\(/)
   })
 })

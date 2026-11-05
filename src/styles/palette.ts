@@ -167,3 +167,18 @@ export function haThemeVars(hex: string, dark: boolean): Record<string, string> 
     '--state-icon-active-color': primary,
   }
 }
+
+/**
+ * HA's own cards on the dashboard (history graph, todo list, camera) as frosted glass like ours.
+ * ha-card reads its background, blur, edge and corners from these variables.
+ */
+export function haGlassVars(hex: string | undefined, dark: boolean): Record<string, string> {
+  const own = hex ? paletteVars(hex, dark)?.['--ad-glass-bg'] : undefined
+  return {
+    '--ha-card-background': own ?? (dark ? 'rgba(30, 41, 59, 0.46)' : 'rgba(255, 255, 255, 0.56)'),
+    '--ha-card-backdrop-filter': 'blur(30px) saturate(180%)',
+    '--ha-card-border-color': dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.6)',
+    '--ha-card-box-shadow': `0 10px 36px rgba(0, 0, 0, 0.18), inset 0 1px 0 ${dark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.72)'}`,
+    '--ha-card-border-radius': '24px',
+  }
+}

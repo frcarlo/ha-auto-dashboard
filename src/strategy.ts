@@ -8,7 +8,7 @@ import {
 import { domainOf, entityName } from './presentation'
 import { glassBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
-import type { CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
+import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
 type Card = Record<string, unknown>
 type Section = { type: 'grid'; column_span?: number; cards: Card[] }
@@ -114,6 +114,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       pick: (e: HassEntity) => groupOf(e) === 'climate' ||
         (domainOf(e.entity_id) === 'sensor' && ['temperature', 'humidity'].includes(e.attributes.device_class)),
       counts: (e: HassEntity) => groupOf(e) === 'climate',
+      // One card per room: the thermostat in the middle, all readings of the room beneath
+      roomCard: (area: AreaRegistryEntry, entities: HassEntity[]): Card => ({
+        type: 'custom:ad-climate-room', area: area.area_id, path: areaPath(area.area_id), entities: entities.map(e => e.entity_id), ...look,
+      }),
     },
     {
       path: 'covers', icon: 'mdi:window-shutter', title: t(hass, 'covers'),
@@ -272,7 +276,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         column_span: 2,
         cards: rooms.length ? [
           heading(group.floor?.name ?? t(hass, 'other_rooms'), group.floor?.icon),
-          ...rooms.flatMap(({ area, entities }) => [
+          ...rooms.flatMap(({ area, entities }) => page.roomCard ? [page.roomCard(area, entities)] : [
             groupHeading(area.name, entities, { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }),
             ...entities.map(e => page.card ? page.card(e) : tile(e, area.name)),
           ]),

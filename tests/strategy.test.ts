@@ -21,6 +21,15 @@ describe('generateDashboard', () => {
     expect(new Set(rooms).size).toBe(rooms.length)
   })
 
+  it('shows the climate page as one card per room with its thermostat and readings', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const cards = (views.find(v => v.path === 'climate')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    const rooms = cards.filter(c => c.type === 'custom:ad-climate-room')
+    expect(new Set(rooms.map(c => c.area)).size).toBe(rooms.length)
+    expect(rooms.find(c => c.area === 'wohnzimmer')!.entities).toContain('climate.wohnzimmer')
+    expect(cards.some(c => c.type === 'custom:ad-tile' && String(c.entity).startsWith('climate.wohnzimmer'))).toBe(false)
+  })
+
   it('applies hide_areas, hide_domains and the look options', async () => {
     const { views } = await generateDashboard(
       { type: 'custom:auto-dashboard', hide_areas: ['garage'], hide_domains: ['cover'], theme: 'light', glass: true },
