@@ -1,7 +1,9 @@
 // One entity on a room or overview page. The tile shows the amount it controls as a material
-// (see styles/materials.ts): a light is a dimmer you drag, a cover shows its slats, a thermostat sits on a scale.
+// (see styles/materials.ts): a light is a dimmer you drag, a cover shows the thing itself (slats, fabric, window,
+// garage panels), a thermostat sits on a scale.
 // Switches and sensors are rows like a wall switch with a pilot light.
 import { css, html, nothing } from 'lit'
+import { keyed } from 'lit/directives/keyed.js'
 import { BaseCard, gestures, type BaseConfig } from './base'
 import { t } from '../i18n'
 import { isAwning } from '../model'
@@ -28,13 +30,26 @@ const PILOT: Record<string, string> = {
 const DRAG_START = 8
 /** Brightness step for the arrow keys. */
 const KEY_STEP = 10
+/** A cover's percentage counts to the new value as long as its material takes to move there. */
+const COUNT_MS = 600
+
+/** Binary sensors whose change gets a one-time cue on the pilot light: a ring for presence, a pop for opening. */
+const RING = ['motion', 'occupancy', 'presence']
+const POP = ['door', 'window', 'garage_door', 'opening']
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 export class AdTile extends BaseCard<TileConfig> {
-  static properties = { ...BaseCard.properties, dragLevel: { state: true } }
+  static properties = { ...BaseCard.properties, dragLevel: { state: true }, shown: { state: true } }
   /** Brightness while dragging, and until HA reports the new value */
   dragLevel?: number
+  /** Cover position on screen while it counts toward the one HA reports */
+  shown?: number
+  private counting?: number
+  private countTarget?: number
+  /** State the entity changed into while on screen, so the pilot and icon can mark the change once */
+  private fresh?: string
+  private lastState?: string
   private drag?: { x: number; y: number; start: number; width: number; active: boolean }
   private dragged = false
   private seen?: HassEntity
@@ -93,10 +108,29 @@ export class AdTile extends BaseCard<TileConfig> {
     /* Rows: like a wall switch, the whole row is the switch and the pilot light shows the state */
     .row { flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 16px 0 14px; }
     .row > ha-icon { --mdc-icon-size: 20px; opacity: 0.5; }
-    .row.on > ha-icon { opacity: 1; color: rgb(var(--pilot, var(--ad-primary))); }
+    /* The pilot carries the state's color; the icon only gets brighter */
+    .row.on > ha-icon { opacity: 0.85; }
     .row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .label { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sub { font-size: 12px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* A change while on screen is marked once: presence sends a ring out of the pilot, an opening pops it,
+       a lock's icon drops in or lifts. A lock still moving blinks until HA reports it done. */
+    @media (prefers-reduced-motion: no-preference) {
+      .pilot.ring::after {
+        content: ''; position: absolute; inset: 0; border-radius: 50%; background: rgb(var(--pilot, var(--ad-primary)));
+        animation: ad-ring 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+      .pilot.pop { animation: ad-pop 0.36s cubic-bezier(0.22, 1, 0.36, 1); }
+      .pilot.pending { animation: ad-blink 0.8s ease-in-out infinite alternate; }
+      .row > ha-icon.latch { animation: ad-latch 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+      .row > ha-icon.unlatch { animation: ad-unlatch 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+    }
+    @keyframes ad-ring { from { transform: scale(1); opacity: 0.5; } to { transform: scale(3.2); opacity: 0; } }
+    @keyframes ad-pop { from { transform: scale(0.4); } }
+    @keyframes ad-blink { to { opacity: 0.3; } }
+    @keyframes ad-latch { from { transform: translateY(-4px); } }
+    @keyframes ad-unlatch { from { transform: translateY(3px); } }
   `]
 
   private tap = gestures({
@@ -130,6 +164,37 @@ export class AdTile extends BaseCard<TileConfig> {
       if (this.seen && !this.drag) this.dragLevel = undefined
       this.seen = entity
     }
+    if (entity && this.lastState !== undefined && entity.state !== this.lastState) this.fresh = entity.state
+    this.lastState = entity?.state
+    if (entity && domainOf(entity.entity_id) === 'cover') this.countTo(this.position(entity))
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    if (this.counting) cancelAnimationFrame(this.counting)
+    this.counting = undefined
+    this.shown = this.countTarget
+  }
+
+  private position(entity: HassEntity) {
+    return (entity.attributes.current_position as number | undefined) ?? (isActive(entity) ? 100 : 0)
+  }
+
+  /** The percentage counts from the old to the new position instead of jumping, like the material moving there. */
+  private countTo(value: number) {
+    if (this.countTarget === value) return
+    const from = this.shown ?? value
+    this.countTarget = value
+    if (this.counting) cancelAnimationFrame(this.counting)
+    this.counting = undefined
+    if (from === value || matchMedia('(prefers-reduced-motion: reduce)').matches) return void (this.shown = value)
+    const start = performance.now()
+    const step = (now: number) => {
+      const p = Math.min(1, (now - start) / COUNT_MS)
+      this.shown = Math.round(from + (value - from) * (1 - Math.pow(1 - p, 3)))
+      this.counting = p < 1 ? requestAnimationFrame(step) : undefined
+    }
+    this.counting = requestAnimationFrame(step)
   }
 
   private get entity() {
@@ -300,21 +365,26 @@ export class AdTile extends BaseCard<TileConfig> {
   }
 
   private renderCover(entity: HassEntity, off: string) {
-    const open = isActive(entity)
-    const position = (entity.attributes.current_position as number | undefined) ?? (open ? 100 : 0)
+    const position = this.position(entity)
     const closed = 100 - position
+    const deviceClass = entity.attributes.device_class as string | undefined
+    // While the motor runs the material travels in its direction
+    const moving = entity.state === 'opening' ? 'moving up' : entity.state === 'closing' ? 'moving' : ''
     // An awning opens outwards: its fabric rolls out as far as it is open, the buttons extend and retract it
     const awning = isAwning(entity)
     const [up, down] = awning
       ? [{ icon: 'mdi:arrow-expand-horizontal', label: t(this.hass, 'extend') }, { icon: 'mdi:arrow-collapse-horizontal', label: t(this.hass, 'retract') }]
       : [{ icon: 'mdi:arrow-up', label: t(this.hass, 'all_open') }, { icon: 'mdi:arrow-down', label: t(this.hass, 'all_close') }]
+    // Each kind of cover shows the thing itself: fabric, a tilting window, garage panels, gate bars, or slats
+    const material = awning ? html`<div class="awning" style="--out:${position}%" data-out=${position}></div>`
+      : deviceClass === 'window' ? html`<div class="sash" style="--open:${position}"><span></span></div>`
+      : html`<div class="slats ${deviceClass === 'garage' || deviceClass === 'gate' ? deviceClass : ''} ${moving}"
+          style="--closed:${closed}%" data-closed=${closed}></div>`
     return this.wrap(`cover ${off}`, html`
-      ${awning
-        ? html`<div class="awning" style="--out:${position}%" data-out=${position}></div>`
-        : html`<div class="slats" style="--closed:${closed}%" data-closed=${closed}></div>`}
+      ${material}
       <div class="top"><span class="name">${this.label}</span></div>
       <div class="bottom">
-        <span class="big">${position}<small>%</small></span>
+        <span class="big">${this.shown ?? position}<small>%</small></span>
         ${this.controllable ? html`<div class="ctl" @click=${this.stop} @pointerdown=${this.stop}>
           <button class="btn" aria-label=${up.label} @click=${() => this.call('cover', 'open_cover', entity.entity_id)}><ha-icon icon=${up.icon}></ha-icon></button>
           <button class="btn" aria-label="Stop" @click=${() => this.call('cover', 'stop_cover', entity.entity_id)}><ha-icon icon="mdi:stop"></ha-icon></button>
@@ -370,8 +440,14 @@ export class AdTile extends BaseCard<TileConfig> {
     const color = lock ? (active ? 'success' : 'warning') : stateColor(entity, active)
     const lit = lock || active
     const runnable = domain === 'scene' || domain === 'script'
+    // Cues for a change seen on screen; keyed by state, so each change gets fresh elements and plays once
+    const fresh = this.fresh === entity.state
+    const deviceClass = (entity.attributes.device_class as string | undefined) ?? ''
+    const cue = domain === 'binary_sensor' && active && fresh ? (RING.includes(deviceClass) ? 'ring' : POP.includes(deviceClass) ? 'pop' : '') : ''
+    const pending = lock && ['locking', 'unlocking', 'opening'].includes(entity.state) ? 'pending' : ''
+    const latch = lock && fresh && !pending ? (active ? 'latch' : 'unlatch') : ''
     return this.wrap(`row ${lit ? 'on' : ''} ${off}`, html`
-      <ha-icon icon=${this.hass!.entities[entity.entity_id]?.icon ?? entityIcon(entity, active)}></ha-icon>
+      ${keyed(entity.state, html`<ha-icon class=${latch} icon=${this.hass!.entities[entity.entity_id]?.icon ?? entityIcon(entity, active)}></ha-icon>`)}
       <div class="row-text">
         <span class="label">${this.label}</span>
         ${runnable ? nothing : html`<span class="sub">${this.hass!.formatEntityState?.(entity) ?? entity.state}</span>`}
@@ -379,7 +455,7 @@ export class AdTile extends BaseCard<TileConfig> {
       ${lock && this.controllable ? html`<button class="btn" aria-label=${t(this.hass, active ? 'do_unlock' : 'do_lock')} title=${t(this.hass, active ? 'do_unlock' : 'do_lock')}
         @pointerdown=${this.stop} @click=${(e: Event) => { e.stopPropagation(); this.toggle(entity) }}>
         <ha-icon icon=${active ? 'mdi:lock-open-variant-outline' : 'mdi:lock'}></ha-icon></button>` : nothing}
-      ${runnable ? nothing : html`<span class="pilot ${lit ? 'on' : ''}" style="--pilot: ${PILOT[color] ?? 'var(--ad-primary)'}"></span>`}
+      ${runnable ? nothing : keyed(entity.state, html`<span class="pilot ${lit ? 'on' : ''} ${cue} ${pending}" style="--pilot: ${PILOT[color] ?? 'var(--ad-primary)'}"></span>`)}
     `, { style: `--pilot: ${PILOT[color] ?? 'var(--ad-primary)'}` })
   }
 }
