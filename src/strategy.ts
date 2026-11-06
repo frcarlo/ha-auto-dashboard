@@ -179,6 +179,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     sections: withNav([fullWidth([{ type: 'custom:ad-header', variant: 'page', title, ...look }]), ...sections]),
   })
 
+  // Two cards share one row where there is room; a single card stands on its own
+  const side = (cards: Card[], options: { widths?: number[]; align?: 'center' } = {}): Card[] =>
+    cards.length > 1 ? [{ type: 'custom:ad-row', cards, ...options, ...look }] : cards
+
   const favoritesSection = (entities: HassEntity[], areaName?: string): Section[] => entities.length ? [{
     type: 'grid',
     column_span: areaName ? 1 : MAX_COLUMNS,
@@ -220,7 +224,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     max_columns: MAX_COLUMNS,
     sections: withNav([
       fullWidth([
-        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...(weather ? { weather: false } : {}), ...hideOpts, ...look },
+        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...(weather ? { weather: false } : {}), ...look },
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
           links: {
@@ -228,20 +232,26 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
             battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
           },
         },
-        ...(weather ? [{
-          type: 'custom:ad-weather', entity: weather, ...(config.weather_warnings?.length ? { warnings: config.weather_warnings } : {}),
-          ...(weatherSensors(hass, config.weather_sensors) ? { sensors: weatherSensors(hass, config.weather_sensors) } : {}),
-          ...(config.forecast_days !== undefined ? { days: config.forecast_days } : {}), ...look,
-        }] : []),
-        ...(showClimate || hasEnergy ? [{
-          type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outsideTile.length ? { outdoor: outsideTile } : {}), ...hideOpts, ...look,
-          ...sourceOpts, links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
-        }] : []),
-        // Hides itself while nothing plays
-        { type: 'custom:ad-now-playing', ...scopeOpts },
+        // On wide screens two to a row, so the rooms come into view sooner: weather beside inside and power,
+        // now playing beside the scenes. Phones stack them.
+        ...side([
+          ...(weather ? [{
+            type: 'custom:ad-weather', entity: weather, ...(config.weather_warnings?.length ? { warnings: config.weather_warnings } : {}),
+            ...(weatherSensors(hass, config.weather_sensors) ? { sensors: weatherSensors(hass, config.weather_sensors) } : {}),
+            ...(config.forecast_days !== undefined ? { days: config.forecast_days } : {}), ...look,
+          }] : []),
+          ...(showClimate || hasEnergy ? [{
+            type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outsideTile.length ? { outdoor: outsideTile } : {}), ...hideOpts, ...look,
+            ...sourceOpts, links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
+          }] : []),
+        ], { widths: [2, 1] }),
+        // Now playing hides itself while nothing plays
+        ...side([
+          { type: 'custom:ad-now-playing', ...scopeOpts },
+          ...(scenes.length ? [{ type: 'custom:ad-scenes', entities: scenes.map(e => e.entity_id), ...look }] : []),
+        ], { align: 'center' }),
         // Each shows only while its appliance runs, waits to be emptied or needs someone
         ...appliances.map(a => applianceCard(a, true)),
-        ...(scenes.length ? [{ type: 'custom:ad-scenes', entities: scenes.map(e => e.entity_id), ...look }] : []),
       ]),
       ...(singleRoom ? [] : favoritesSection(favorites)),
       // One room: its content right on the home page instead of a single room card

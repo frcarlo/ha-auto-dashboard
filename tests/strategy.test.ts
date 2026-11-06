@@ -17,13 +17,13 @@ describe('generateDashboard', () => {
     const sections = views[0]!.sections as { cards: Record<string, any>[] }[]
     const floors = sections.slice(1, -1).map(s => s.cards[0]!.heading)
     expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume', 'Listen'])
-    const rooms = sections.flatMap(s => s.cards).filter(c => c.type === 'custom:ad-room-card').map(c => c.area)
+    const rooms = sections.flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c]).filter(c => c.type === 'custom:ad-room-card').map(c => c.area)
     expect(new Set(rooms).size).toBe(rooms.length)
   })
 
   it('shows the climate page as one card per room with its thermostat and readings', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
-    const cards = (views.find(v => v.path === 'climate')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    const cards = (views.find(v => v.path === 'climate')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
     const rooms = cards.filter(c => c.type === 'custom:ad-climate-room')
     expect(new Set(rooms.map(c => c.area)).size).toBe(rooms.length)
     expect(rooms.find(c => c.area === 'wohnzimmer')!.entities).toContain('climate.wohnzimmer')
@@ -32,7 +32,7 @@ describe('generateDashboard', () => {
 
   it('gives blinds and awnings of one room their own headings on the covers page', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
-    const cards = (views.find(v => v.path === 'covers')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    const cards = (views.find(v => v.path === 'covers')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
     const kinds = cards.filter(c => c.type === 'custom:ad-group-heading' && c.minor)
     expect(kinds.map(c => [c.title, c.entities])).toEqual([['Beschattung', ['cover.esszimmer']], ['Markisen', ['cover.esszimmer_markise']]])
     expect(cards.find(c => c.type === 'custom:ad-group-heading' && c.title === 'Esszimmer')!.control).toBeUndefined()
@@ -55,14 +55,14 @@ describe('generateDashboard', () => {
     const entities = (path: string) => JSON.stringify(views.find(v => v.path === path)!.sections)
     expect(entities('area-kuche')).not.toContain('switch.kuche_kaffee')
     expect(entities('area-kuche')).toContain('light.kuche')
-    const cards = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    const cards = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
     expect(cards.find(c => c.type === 'custom:ad-status-bar')).toMatchObject({ hide_labels: ['technik'] })
     expect(cards.filter(c => c.type === 'custom:ad-room-card').every(c => c.hide_labels?.[0] === 'technik')).toBe(true)
   })
 })
 
 describe('filters and nav position', () => {
-  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
   it('floors limits rooms, pages and the status bar to those floors', async () => {
     const { title, views } = await generateDashboard({ type: 'custom:auto-dashboard', floors: ['og'] }, createHass(true))
@@ -97,7 +97,7 @@ describe('filters and nav position', () => {
 })
 
 describe('per-user rules', () => {
-  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
   const asUser = (name: string, is_admin = false) => {
     const hass = createHass(true)
     hass.user = { id: `id-${name}`, name, is_admin }
@@ -126,7 +126,7 @@ describe('per-user rules', () => {
 })
 
 describe('room page, favorites and scenes', () => {
-  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
   it('room pages open with the room header and group headings with bulk controls', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
@@ -161,7 +161,7 @@ describe('room page, favorites and scenes', () => {
 })
 
 describe('groups by function and now playing', () => {
-  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
   it('the covers page only has shading; garage and window drives go to security', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
@@ -172,16 +172,29 @@ describe('groups by function and now playing', () => {
     expect(tiles('security')).toEqual(expect.arrayContaining(['cover.garage_tor', 'cover.wohnzimmer_dachfenster', 'binary_sensor.garage_rauch']))
   })
 
-  it('Home has the now playing bar and passes hide options to the header', async () => {
+  it('Home has the now playing bar and passes hide options to the status bar, which shows the people', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', hide_domains: ['person'] }, createHass(true))
     const home = cards(views[0]!)
     expect(home.find(c => c.type === 'custom:ad-now-playing')).toBeDefined()
-    expect(home.find(c => c.type === 'custom:ad-header')).toMatchObject({ hide_domains: ['person'] })
+    expect(home.find(c => c.type === 'custom:ad-status-bar')).toMatchObject({ hide_domains: ['person'] })
+  })
+
+  it('puts weather beside inside and power, and now playing beside the scenes', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const rows = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).filter(c => c.type === 'custom:ad-row')
+    expect(rows.map(r => [r.cards.map((c: Record<string, unknown>) => c.type), r.widths, r.align])).toEqual([
+      [['custom:ad-weather', 'custom:ad-house-info'], [2, 1], undefined],
+      [['custom:ad-now-playing', 'custom:ad-scenes'], undefined, 'center'],
+    ])
+    // Without scenes now playing stands alone
+    const none = await generateDashboard({ type: 'custom:auto-dashboard', hide_domains: ['scene'] }, createHass(true))
+    const top = (none.views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    expect(top.some(c => c.type === 'custom:ad-now-playing')).toBe(true)
   })
 })
 
 describe('energy, maintenance, cameras and lists', () => {
-  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
   it('adds energy and maintenance pages, linked from Home but not in the nav', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
@@ -239,7 +252,7 @@ describe('energy, maintenance, cameras and lists', () => {
 describe('primary color', () => {
   it('reaches every card, and an invalid value is ignored', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#0ea5e9' }, createHass(true))
-    const all = views.flatMap(v => (v.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)).filter(c => String(c.type).startsWith('custom:'))
+    const all = views.flatMap(v => (v.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])).filter(c => String(c.type).startsWith('custom:'))
     expect(all.every(c => c.primary_color === '#0ea5e9')).toBe(true)
     const bad = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: 'blau' }, createHass(true))
     expect(JSON.stringify(bad.views)).not.toContain('primary_color')
@@ -269,7 +282,7 @@ describe('primary color', () => {
 })
 
 describe('room settings, own cards and energy settings', () => {
-  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
   it('applies hidden groups, order and own cards on the room page', async () => {
     const config = {
@@ -333,7 +346,7 @@ describe('hand-written YAML', () => {
 describe('to-do lists', () => {
   const lists = async (config: Record<string, unknown>) => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', ...config }, createHass(true))
-    return (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).filter(c => c.type === 'todo-list')
+    return (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c]).filter(c => c.type === 'todo-list')
   }
 
   it('shows every list with its name as title', async () => {
@@ -347,7 +360,7 @@ describe('to-do lists', () => {
 })
 
 describe('appliances and TVs', () => {
-  const cardsOf = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+  const cardsOf = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
   it('gives each room its appliance cards and takes their read-outs out of the groups', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))

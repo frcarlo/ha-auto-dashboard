@@ -1,4 +1,5 @@
-// Weather on Home: now (measured by the house's own sensors where configured), the details, warnings, and the next days.
+// Weather on Home: now (measured by the house's own sensors where configured), the details in one line, warnings,
+// and the next days side by side, so the card stays low and the rooms come into view on a tablet.
 // HA keeps forecasts out of the state, so the card subscribes to them like HA's own weather card.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
@@ -6,7 +7,7 @@ import { t } from '../i18n'
 import { tokens } from '../styles/tokens'
 import type { HassEntity, WeatherSensorKey } from '../types'
 import {
-  activeWarnings, compass, conditionIcon, conditionTone, forecastDays, forecastType, temperatureColor, todayDate,
+  activeWarnings, compass, conditionIcon, conditionTone, forecastDays, forecastType, todayDate,
   type ForecastEntry, type Warning,
 } from '../weather'
 
@@ -33,7 +34,7 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     .card { padding: 16px; cursor: pointer; }
     .card:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: -2px; }
     .layout { display: grid; gap: 16px; }
-    .now { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .now { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
     .top { display: flex; align-items: center; gap: 12px; }
     .cond { --mdc-icon-size: 48px; flex: 0 0 auto; color: rgba(var(--ad-on-surface), 0.7); }
@@ -46,7 +47,7 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     .state { font-size: 16px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .sub { font-size: 13px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 
-    .details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+    .details { display: flex; flex-wrap: wrap; gap: 4px 16px; }
     .detail { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; min-width: 0; }
     button.detail { cursor: pointer; }
     button.detail:focus-visible, button.temp:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; border-radius: 4px; }
@@ -66,26 +67,21 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     .warn small { font-size: 12px; opacity: 0.6; }
     .warn:focus-visible { outline: 2px solid rgb(var(--tone)); }
 
-    .days { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
-    .day {
-      display: grid; grid-template-columns: 4em 20px 2.5em minmax(0, 1fr) 2.5em; align-items: center; gap: 8px;
-      font-size: 14px; font-variant-numeric: tabular-nums;
+    /* The next days side by side: weekday, sky, high and low */
+    .days {
+      display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px;
+      padding-top: 12px; border-top: 1px solid rgba(var(--ad-on-surface), 0.08);
     }
-    .weekday { opacity: 0.7; }
+    .day { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0; border-radius: 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .day.today { background: rgba(var(--ad-on-surface), 0.05); }
+    .weekday { font-size: 12px; opacity: 0.7; }
     .day.today .weekday { opacity: 1; font-weight: 500; }
-    .day ha-icon { --mdc-icon-size: 20px; color: rgba(var(--ad-on-surface), 0.6); }
+    .day ha-icon { --mdc-icon-size: 22px; color: rgba(var(--ad-on-surface), 0.6); }
     .day ha-icon.sun, .day ha-icon.storm { color: rgb(var(--ad-warning)); }
     .day ha-icon.wet { color: rgb(var(--ad-info)); }
-    .days.wet .day { grid-template-columns: 4em 20px 2.5em 2.5em minmax(0, 1fr) 2.5em; }
-    .rain { font-size: 12px; color: rgb(var(--ad-info)); }
-    .low { text-align: right; opacity: 0.6; }
-    .high { text-align: right; }
-    .track { position: relative; height: 6px; border-radius: 3px; background: rgba(var(--ad-on-surface), 0.08); }
-    .fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; min-width: 6px; }
-    .mark {
-      position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
-      background: rgb(var(--ad-on-surface)); box-shadow: 0 0 0 2px var(--ad-surface);
-    }
+    .temps { display: flex; gap: 6px; white-space: nowrap; }
+    .low { opacity: 0.55; }
+    .rain { font-size: 11px; line-height: 14px; min-height: 14px; color: rgb(var(--ad-info)); }
 
     @container (max-width: 400px) {
       .cond { --mdc-icon-size: 40px; }
@@ -93,7 +89,7 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     }
     /* Wide: now on the left, the days on the right */
     @container (min-width: 600px) {
-      .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+      .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 24px; align-items: center; }
       .days { border-top: 0; padding-top: 0; }
     }
   `]
@@ -250,34 +246,22 @@ export class AdWeather extends BaseCard<WeatherConfig> {
             : html`<span class="detail"><ha-icon icon=${d.icon}></ha-icon><span>${d.text}</span></span>`)}</div>` : nothing}
           ${this.renderWarnings()}
         </div>
-        ${days.length ? this.renderDays(days, now, unit, today) : nothing}
+        ${days.length ? this.renderDays(days, today) : nothing}
       </div>
     </div>`
   }
 
-  private renderDays(days: ReturnType<typeof forecastDays>, now: number | undefined, unit: string, today?: (typeof days)[number]) {
-    const temps = days.flatMap(d => [d.low, d.high]).filter((n): n is number => n !== undefined)
-    if (!temps.length) return nothing
-    const min = Math.min(...temps)
-    const max = Math.max(...temps)
-    const span = max - min || 1
-    const pos = (n: number) => `${((n - min) / span) * 100}%`
-    // A rain column only when some day is likely to be wet
+  private renderDays(days: ReturnType<typeof forecastDays>, today?: ReturnType<typeof forecastDays>[number]) {
+    // A rain line only when some day is likely to be wet
     const rain = days.some(d => (d.precipitation_probability ?? 0) >= 30)
-    return html`<div class="days ${rain ? 'wet' : ''}">${days.map(d => {
+    return html`<div class="days">${days.map(d => {
       const isToday = d === today
       const label = isToday ? t(this.hass, 'today') : new Date(`${d.date}T12:00:00`).toLocaleDateString(this.language, { weekday: 'short' }).replace(/\.$/, '')
-      const low = d.low ?? d.high
-      const high = d.high ?? d.low
       return html`<div class="day ${isToday ? 'today' : ''}">
         <span class="weekday">${label}</span>
         <ha-icon class=${conditionTone(d.condition)} icon=${conditionIcon(d.condition)}></ha-icon>
+        <span class="temps"><span class="high">${this.temp(d.high ?? d.low)}°</span><span class="low">${this.temp(d.low ?? d.high)}°</span></span>
         ${rain ? html`<span class="rain">${(d.precipitation_probability ?? 0) >= 30 ? `${Math.round(d.precipitation_probability!)} %` : ''}</span>` : nothing}
-        <span class="low">${this.temp(low)}°</span>
-        <span class="track">${low !== undefined && high !== undefined ? html`
-          <span class="fill" style="left:${pos(low)};width:${((high - low) / span) * 100}%;background:linear-gradient(90deg, ${temperatureColor(low, unit)}, ${temperatureColor(high, unit)})"></span>
-          ${isToday && now !== undefined && now >= min && now <= max ? html`<span class="mark" style="left:${pos(now)}"></span>` : nothing}` : nothing}</span>
-        <span class="high">${this.temp(high)}°</span>
       </div>`
     })}</div>`
   }

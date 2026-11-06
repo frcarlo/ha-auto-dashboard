@@ -52,7 +52,7 @@ describe('weather', () => {
   })
 
   it('puts the weather card on Home instead of the outside tile; inside stays', async () => {
-    const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
     const { views } = await generateDashboard({
       type: 'custom:auto-dashboard', outdoor_areas: ['garten'], weather_warnings: ['binary_sensor.warning_mulheim_1'], forecast_days: 5,
       weather_sensors: { temperature: 'sensor.aussen_temperatur', humidity: 'sensor.gibt_es_nicht' },

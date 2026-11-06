@@ -15,6 +15,7 @@ import { AdPower } from './cards/power'
 import { AdMaintenanceList } from './cards/maintenance-list'
 import { AdAppliance } from './cards/appliance'
 import { AdTv } from './cards/tv'
+import { AdRow } from './cards/row'
 import { AdStrategyEditor } from './editor'
 import { AdRoomSettings } from './editor-rooms'
 import type { HomeAssistant, StrategyConfig } from './types'
@@ -68,6 +69,7 @@ define('ad-power', AdPower)
 define('ad-maintenance-list', AdMaintenanceList)
 define('ad-appliance', AdAppliance)
 define('ad-tv', AdTv)
+define('ad-row', AdRow)
 define('ad-strategy-editor', AdStrategyEditor)
 define('ad-room-settings', AdRoomSettings)
 

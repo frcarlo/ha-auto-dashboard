@@ -1,8 +1,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { entityIndex } from '../model'
-import { domainOf, entityName, isActive } from '../presentation'
+import { domainOf, isActive } from '../presentation'
 import { tokens } from '../styles/tokens'
 
 interface HeaderAction {
@@ -20,26 +19,8 @@ interface HeaderConfig extends BaseConfig {
   entities?: string[]
   count_label?: 'n_on' | 'n_open'
   action?: HeaderAction
-  hide_domains?: string[]
-  hide_labels?: string[]
-  hide_entities?: string[]
   /** Weather next to the clock: an entity, or false while the weather card shows it */
   weather?: string | false
-}
-
-const ALARM_ICONS: Record<string, string> = {
-  disarmed: 'mdi:shield-off-outline',
-  triggered: 'mdi:bell-ring',
-  arming: 'mdi:shield-sync-outline',
-  pending: 'mdi:shield-sync-outline',
-}
-
-/** Triggered is red and pulses, armed blue, disarmed green, arming or pending grey. */
-function alarmColor(state: string) {
-  if (state === 'triggered') return 'error'
-  if (state.startsWith('armed')) return 'info'
-  if (state === 'disarmed') return 'success'
-  return ''
 }
 
 export class AdHeader extends BaseCard<HeaderConfig> {
@@ -62,30 +43,6 @@ export class AdHeader extends BaseCard<HeaderConfig> {
       border-radius: 999px; background: var(--ad-surface); box-shadow: var(--ad-shadow); font-size: 13px;
     }
     .action ha-icon { --mdc-icon-size: 17px; opacity: 0.7; }
-    .people { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-    .person {
-      all: unset; position: relative; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; flex: 0 0 auto;
-      display: grid; place-items: center; font-size: 12px; font-weight: 600;
-      background: center / cover var(--ad-surface-variant);
-    }
-    .person.away { filter: grayscale(1); opacity: 0.55; }
-    .person::after {
-      content: ''; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%;
-      background: rgb(var(--ad-success)); box-shadow: 0 0 0 2px var(--ad-bg);
-    }
-    .person.away::after { background: rgba(var(--ad-on-surface), 0.4); }
-    .person:focus-visible, .alarm:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
-    .alarm {
-      all: unset; display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px 5px 8px; margin-left: 4px; cursor: pointer;
-      border-radius: 999px; font-size: 12px; background: rgba(var(--ad-on-surface), 0.08);
-    }
-    .alarm ha-icon { --mdc-icon-size: 16px; }
-    .alarm.success ha-icon { color: rgb(var(--ad-success)); }
-    .alarm.info { background: rgba(var(--ad-info), 0.16); }
-    .alarm.info ha-icon { color: rgb(var(--ad-info)); }
-    .alarm.error { background: rgb(var(--ad-error)); color: #fff; animation: alarm 1s ease-in-out infinite; }
-    @keyframes alarm { 50% { opacity: 0.55; } }
-    @media (prefers-reduced-motion: reduce) { .alarm.error { animation: none; } }
     .action:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     @container (max-width: 480px) {
       h1 { font-size: 24px; }
@@ -119,43 +76,8 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     return w ? this.hass!.states[w] : Object.values(this.hass!.states).find(e => domainOf(e.entity_id) === 'weather')
   }
 
-  /** People and the alarm panel follow the dashboard's hide options; rooms don't matter for them. */
-  private visible(domain: string) {
-    if (this.config!.hide_domains?.includes(domain)) return []
-    return entityIndex(this.hass!, this.config!.hide_labels).all
-      .filter(id => domainOf(id) === domain && !this.config!.hide_entities?.includes(id))
-      .map(id => this.hass!.states[id]!)
-      .filter(Boolean)
-  }
-
   protected watched() {
-    const home = this.config!.variant !== 'page'
-    return [
-      ...(this.config!.entities ?? []),
-      ...(this.weather ? [this.weather.entity_id] : []),
-      ...(home ? [...this.visible('person'), ...this.visible('alarm_control_panel')].map(e => e.entity_id) : []),
-    ]
-  }
-
-  private renderPeople() {
-    const people = this.visible('person')
-    const alarm = this.visible('alarm_control_panel')[0]
-    if (!people.length && !alarm) return nothing
-    return html`<div class="people">
-      ${people.map(p => {
-        const home = p.state === 'home'
-        const picture = p.attributes.entity_picture as string | undefined
-        const name = entityName(p)
-        const where = home ? t(this.hass, 'home_state') : p.state === 'not_home' ? t(this.hass, 'away') : this.hass!.formatEntityState?.(p) ?? p.state
-        return html`<button class="person ${home ? '' : 'away'}" title="${name}: ${where}" aria-label="${name}: ${where}"
-          style=${picture ? `background-image:url('${picture}')` : ''} @click=${() => this.moreInfo(p.entity_id)}>
-          ${picture ? nothing : name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-        </button>`
-      })}
-      ${alarm ? html`<button class="alarm ${alarmColor(alarm.state)}" @click=${() => this.moreInfo(alarm.entity_id)}>
-        <ha-icon icon=${ALARM_ICONS[alarm.state] ?? 'mdi:shield-lock'}></ha-icon>${this.hass!.formatEntityState?.(alarm) ?? alarm.state}
-      </button>` : nothing}
-    </div>`
+    return [...(this.config!.entities ?? []), ...(this.weather ? [this.weather.entity_id] : [])]
   }
 
   private greeting(hour: number) {
@@ -178,7 +100,6 @@ export class AdHeader extends BaseCard<HeaderConfig> {
       <div class="text">
         <div class="eyebrow">${now.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}${this.config!.scope ? ` · ${this.config!.scope}` : ''}${this.config!.access === 'read_only' ? ` · ${t(this.hass, 'view_only')}` : ''}</div>
         <h1>${this.greeting(now.getHours())}${name ? `, ${name}` : ''}</h1>
-        ${this.renderPeople()}
       </div>
       <div class="right">
         <span class="clock">${now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}</span>

@@ -27,8 +27,12 @@ export function formatWatts(watts: number, lang: string) {
 
 export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
   static styles = [tokens, css`
-    :host { display: block; }
-    .row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
+    :host { display: block; height: 100%; }
+    /* Beside the weather (a row says so) the tiles stack and share its height */
+    .row {
+      display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; box-sizing: border-box;
+      flex-direction: var(--ad-beside, row); height: var(--ad-beside-height, auto);
+    }
     .row::-webkit-scrollbar { display: none; }
     .tile {
       all: unset; flex: 1 0 auto; min-width: 120px; display: flex; align-items: center; gap: 10px; box-sizing: border-box;
