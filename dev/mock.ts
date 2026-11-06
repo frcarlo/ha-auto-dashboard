@@ -72,7 +72,15 @@ const extras: HassEntity[] = [
   { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo' } },
   { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni' } },
   { entity_id: 'alarm_control_panel.haus', state: 'armed_home', attributes: { friendly_name: 'Alarmanlage' } },
-  { entity_id: 'weather.home', state: 'partlycloudy', attributes: { friendly_name: 'Zuhause', temperature: 11.2, temperature_unit: '°C' } },
+  {
+    entity_id: 'weather.home', state: 'partlycloudy', attributes: {
+      friendly_name: 'Zuhause', temperature: 11.2, temperature_unit: '°C', apparent_temperature: 8.6, humidity: 74, pressure: 1018, pressure_unit: 'hPa',
+      wind_speed: 14.4, wind_speed_unit: 'km/h', wind_bearing: 230, visibility: 10, visibility_unit: 'km', supported_features: 3,
+    },
+  },
+  // NINA keeps one binary sensor per warning slot; ?warn=on fills the first
+  { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1' } },
+  { entity_id: 'binary_sensor.warning_mulheim_2', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 2' } },
 ]
 
 export function createHass(dark: boolean): HomeAssistant {
@@ -126,6 +134,22 @@ export function createHass(dark: boolean): HomeAssistant {
       return map[e.state] ?? (unit ? `${e.state} ${unit}` : e.state)
     },
     callService: async () => undefined,
+    // Daily forecast like met.no: a mild day today, rain on day three
+    connection: {
+      subscribeMessage: async <T,>(callback: (msg: T) => void, msg: Record<string, unknown>) => {
+        if (msg.type !== 'weather/subscribe_forecast') throw new Error(`mock: ${msg.type}`)
+        const day = (n: number) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.toISOString() }
+        const forecast = [
+          { datetime: day(0), condition: 'partlycloudy', temperature: 13, templow: 6, precipitation_probability: 10 },
+          { datetime: day(1), condition: 'sunny', temperature: 15, templow: 4 },
+          { datetime: day(2), condition: 'rainy', temperature: 9, templow: 5, precipitation_probability: 80 },
+          { datetime: day(3), condition: 'cloudy', temperature: 8, templow: 1 },
+          { datetime: day(4), condition: 'snowy-rainy', temperature: 3, templow: -2, precipitation_probability: 60 },
+        ]
+        setTimeout(() => callback({ type: 'daily', forecast } as T), 0)
+        return () => undefined
+      },
+    },
     callWS: async <T,>(msg: Record<string, unknown>) => {
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [

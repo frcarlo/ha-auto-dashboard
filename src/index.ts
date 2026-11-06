@@ -10,6 +10,7 @@ import { AdClimateRoom } from './cards/climate-room'
 import { AdScenes } from './cards/scenes'
 import { AdNowPlaying } from './cards/now-playing'
 import { AdHouseInfo } from './cards/house-info'
+import { AdWeather } from './cards/weather'
 import { AdPower } from './cards/power'
 import { AdMaintenanceList } from './cards/maintenance-list'
 import { AdStrategyEditor } from './editor'
@@ -60,6 +61,7 @@ define('ad-climate-room', AdClimateRoom)
 define('ad-scenes', AdScenes)
 define('ad-now-playing', AdNowPlaying)
 define('ad-house-info', AdHouseInfo)
+define('ad-weather', AdWeather)
 define('ad-power', AdPower)
 define('ad-maintenance-list', AdMaintenanceList)
 define('ad-strategy-editor', AdStrategyEditor)

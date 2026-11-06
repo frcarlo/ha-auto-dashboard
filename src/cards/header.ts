@@ -23,6 +23,8 @@ interface HeaderConfig extends BaseConfig {
   hide_domains?: string[]
   hide_labels?: string[]
   hide_entities?: string[]
+  /** Weather next to the clock: an entity, or false while the weather card shows it */
+  weather?: string | false
 }
 
 const ALARM_ICONS: Record<string, string> = {
@@ -112,7 +114,9 @@ export class AdHeader extends BaseCard<HeaderConfig> {
   }
 
   private get weather() {
-    return Object.values(this.hass!.states).find(e => domainOf(e.entity_id) === 'weather')
+    const w = this.config!.weather
+    if (w === false) return undefined
+    return w ? this.hass!.states[w] : Object.values(this.hass!.states).find(e => domainOf(e.entity_id) === 'weather')
   }
 
   /** People and the alarm panel follow the dashboard's hide options; rooms don't matter for them. */

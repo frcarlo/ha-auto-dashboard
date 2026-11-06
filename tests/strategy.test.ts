@@ -207,7 +207,7 @@ describe('energy, maintenance, cameras and lists', () => {
   })
 
   it('outdoor areas leave the indoor average; updates are for admins only', async () => {
-    const admin = await generateDashboard({ type: 'custom:auto-dashboard', outdoor_areas: ['garten'] }, createHass(true))
+    const admin = await generateDashboard({ type: 'custom:auto-dashboard', outdoor_areas: ['garten'], hide_domains: ['weather'] }, createHass(true))
     const info = cards(admin.views[0]!).find(c => c.type === 'custom:ad-house-info')!
     expect(info.outdoor).toEqual(['garten'])
     expect(info.areas).not.toContain('garten')

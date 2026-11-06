@@ -1,7 +1,7 @@
 // Keeps the saved strategy config as small as hand-written YAML: no defaults, no empty lists.
 import type { RoomSettings, StrategyConfig, UserRule } from './types'
 
-const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', ha_colors: true }
+const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', ha_colors: true, forecast_days: 3 }
 const RULE_DEFAULTS: Partial<Record<string, unknown>> = { read_only: false, control_critical: true }
 
 const isEmpty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)
@@ -32,7 +32,7 @@ export function cleanConfig(config: StrategyConfig): StrategyConfig {
   return { type: config.type, ...out }
 }
 
-const LIST_KEYS = ['areas', 'floors', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities', 'favorites', 'scenes', 'todo_lists', 'outdoor_areas'] as const
+const LIST_KEYS = ['areas', 'floors', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities', 'favorites', 'scenes', 'todo_lists', 'outdoor_areas', 'weather_warnings'] as const
 const RULE_LIST_KEYS = ['areas', 'floors', 'hide_pages'] as const
 const ROOM_LIST_KEYS = ['hide_groups', 'group_order', 'order'] as const
 

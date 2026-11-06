@@ -6,6 +6,7 @@ import {
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
+import { weatherEntity } from './weather'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -109,6 +110,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const sourceOpts = sources ? { power_sources: sources } : {}
   const hasEnergy = pageAllowed('energy') && (all.some(isPower) || !!sources)
   const hasMaintenance = pageAllowed('maintenance')
+  // The weather card takes over outside (and the weather next to the clock); inside stays a tile next to power
+  const weather = weatherEntity(hass, config)
+  const outsideTile = weather ? [] : outdoor
+  const showClimate = averageClimate(hass, indoor, hide).temperature !== undefined || outsideTile.length > 0
 
   // Domain pages: which entities, and how the header counts and acts on them
   const domainPages = [
@@ -197,7 +202,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     max_columns: MAX_COLUMNS,
     sections: withNav([
       fullWidth([
-        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...hideOpts, ...look },
+        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...(weather ? { weather: false } : {}), ...hideOpts, ...look },
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
           links: {
@@ -205,8 +210,12 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
             battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
           },
         },
-        ...(averageClimate(hass, indoor, hide).temperature !== undefined || hasEnergy || outdoor.length ? [{
-          type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outdoor.length ? { outdoor } : {}), ...hideOpts, ...look,
+        ...(weather ? [{
+          type: 'custom:ad-weather', entity: weather, ...(config.weather_warnings?.length ? { warnings: config.weather_warnings } : {}),
+          ...(outdoor.length ? { outdoor } : {}), ...(config.forecast_days !== undefined ? { days: config.forecast_days } : {}), ...hideOpts, ...look,
+        }] : []),
+        ...(showClimate || hasEnergy ? [{
+          type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outsideTile.length ? { outdoor: outsideTile } : {}), ...hideOpts, ...look,
           ...sourceOpts, links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
         }] : []),
         // Hides itself while nothing plays

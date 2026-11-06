@@ -40,7 +40,7 @@ const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
-  'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor', 'camera', 'todo',
+  'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
 ] as const
 
 export class AdStrategyEditor extends LitElement {
@@ -232,6 +232,17 @@ export class AdStrategyEditor extends LitElement {
       @change=${(e: Event) => onChange((e.target as HTMLTextAreaElement).value.split(/[\s,]+/).filter(Boolean))}></textarea>`
   }
 
+  /** One entity, HA's picker when it is loaded, else its id. */
+  private singleEntityPicker(value: string | undefined, domain: string, onChange: (v: string | undefined) => void) {
+    if (customElements.get('ha-selector')) {
+      return html`<ha-selector .hass=${this.hass} .value=${value}
+        .selector=${{ entity: { filter: { domain } } }}
+        @value-changed=${(e: CustomEvent) => onChange((e.detail.value as string | undefined) || undefined)}></ha-selector>`
+    }
+    return html`<input type="text" .value=${value ?? ''} placeholder="${domain}.…"
+      @change=${(e: Event) => onChange((e.target as HTMLInputElement).value.trim() || undefined)}>`
+  }
+
   /** HA's media picker with upload, like in its own view background editor, when it is loaded, else a path. */
   private imagePicker(value: string | undefined) {
     const set = (background_image?: string) => this.change({ background_image: background_image?.trim() || undefined })
@@ -315,7 +326,12 @@ export class AdStrategyEditor extends LitElement {
     return html`
         ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
-        ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}`
+        ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
+        ${c.hide_domains?.includes('weather') ? nothing : html`
+          ${this.field(this.l('ed.weather'), this.singleEntityPicker(c.weather_entity, 'weather', weather_entity => this.change({ weather_entity })), this.l('ed.weather_hint'))}
+          ${this.field(this.l('ed.warnings'), this.entityPicker(c.weather_warnings, ['binary_sensor', 'sensor'], weather_warnings => this.change({ weather_warnings })), this.l('ed.warnings_hint'))}
+          ${this.field(this.l('ed.forecast_days'), html`<div class="seg" role="group">${[0, 3, 5, 7].map(n => html`
+            <button aria-pressed=${(c.forecast_days ?? 3) === n} @click=${() => this.change({ forecast_days: n })}>${n}</button>`)}</div>`)}`}`
   }
 
   private renderLook() {

@@ -43,11 +43,20 @@ const config: StrategyConfig = {
   // ?fav=light.flur,lock.eingangstur  ?scenes=script.gute_nacht,scene.wohnzimmer_kino
   favorites: list('fav'),
   scenes: list('scenes'),
+  // ?warnings=binary_sensor.warning_mulheim_1&warn=on   ?days=5
+  weather_warnings: list('warnings'),
+  forecast_days: params.has('days') ? Number(params.get('days')) : undefined,
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
   // ?as=leni&users={"leni":{"read_only":true}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,
 }
 let hass: HomeAssistant = createHass(dark)
+if (params.get('warn') === 'on') {
+  hass.states['binary_sensor.warning_mulheim_1'] = {
+    entity_id: 'binary_sensor.warning_mulheim_1', state: 'on',
+    attributes: { friendly_name: 'Warnung Mülheim 1', headline: 'Amtliche WARNUNG vor STURMBÖEN', severity: 'Moderate', expires: new Date(Date.now() + 6 * 3600_000).toISOString() },
+  }
+}
 if (params.has('as')) hass.user = { id: 'harness', name: params.get('as')!, is_admin: false }
 let views: any[] = []
 const cards: any[] = []

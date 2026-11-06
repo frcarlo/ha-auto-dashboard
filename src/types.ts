@@ -59,6 +59,8 @@ export interface HomeAssistant {
   user?: { id: string; name: string; is_admin?: boolean }
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>
   callWS?<T>(msg: Record<string, unknown>): Promise<T>
+  /** Subscriptions, e.g. weather forecasts, which HA no longer keeps in the state */
+  connection?: { subscribeMessage<T>(callback: (msg: T) => void, msg: Record<string, unknown>): Promise<() => void> }
   formatEntityState?(stateObj: HassEntity, state?: string): string
   formatEntityAttributeValue?(stateObj: HassEntity, attribute: string, value?: unknown): string
 }
@@ -139,4 +141,10 @@ export interface StrategyConfig extends CardLook {
   background_image?: string
   /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */
   outdoor_areas?: string[]
+  /** Weather on Home; unset = the first weather entity, hide_domains: [weather] hides it */
+  weather_entity?: string
+  /** Warning entities shown with the weather: NINA binary sensors, a DWD warnings sensor, or any on/off */
+  weather_warnings?: string[]
+  /** Days of forecast under the weather, 3 by default */
+  forecast_days?: number
 }
