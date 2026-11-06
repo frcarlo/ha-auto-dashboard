@@ -20,7 +20,7 @@ Ein ES-Modul (~140 KB, ~39 KB gzip), einzige Abhängigkeit ist Lit. Keine andere
 
 **Haushaltsgeräte:** Spülmaschine, Waschmaschine, Trockner und Ofen findet das Dashboard an ihrem Betriebszustand, einem Sensor wie `sensor.geschirrspuler_betriebszustand` (Home Connect) oder `sensor.washing_machine_state` (WashData). Was das Gerät sonst noch meldet, nimmt die Karte mit: Fortschritt, Endzeit oder Restzeit, das laufende Programm, Tür und Hinweise wie „Salz fast leer“. Während ein Programm läuft, füllt sich ein Ring mit der Restzeit in der Mitte, darunter stehen Start und Ende. „Fertig“ ist grün und bleibt stehen, bis das Gerät wieder „Bereit“ meldet, bei Home Connect also bis jemand die Tür öffnet. Jedes Gerät steht auf seiner Raumseite unter „Geräte“, seine einzelnen Sensoren erscheinen dort nicht noch einmal. Auf der Startseite erscheint es nur, solange es läuft, fertig ist oder etwas braucht. Geräte ohne eigenen Betriebszustand, etwa ein Trockner an einer smarten Steckdose, kommen über `appliances` dazu: Als Zustand reicht eine Leistung (ab 5 W läuft es), ein Schalter oder ein eigener Status-Sensor. `hide_domains: [appliance]` schaltet die Karten ab.
 
-**Fernseher:** Ein Mediaplayer mit der Klasse `tv` bekommt auf seiner Raumseite eine Karte wie eine Fernbedienung: Ein/Aus, die laufende App, ein rundes Steuerkreuz mit OK, Lauter, Leiser und Stumm, Zurück und Start. Das Steuerkreuz geht über die Remote-Entity desselben Geräts (Android TV Remote oder Android Debug Bridge). Bringen beide Integrationen denselben Fernseher mit, erscheint er nur einmal, mit der Android-TV-Remote-Fernbedienung.
+**Fernseher:** Ein Mediaplayer mit der Klasse `tv` bekommt auf seiner Raumseite eine Karte wie eine Fernbedienung: Ein/Aus, die laufende App, ein rundes Steuerkreuz mit OK, Lauter, Leiser und Stumm, Zurück und Start. Das Steuerkreuz geht über die Remote-Entity desselben Geräts (Android TV Remote oder Android Debug Bridge). Bringen beide Integrationen denselben Fernseher mit, erscheint er nur einmal, mit der Android-TV-Remote-Fernbedienung. Darunter starten Knöpfe eine App direkt, die laufende ist hervorgehoben. Welche, legt `tv_apps` fest (im Editor „Apps am Fernseher“): `netflix`, `prime`, `youtube`, `magenta`, `disney`, `spotify`, `plex`, `kodi`, ohne Angabe Netflix, YouTube und Prime Video. Statt Paketnamen wie `de.telekom.magentatv.tv` zeigt die Karte den App-Namen, beim Launcher „Startseite“.
 
 **Läuft gerade:** erscheint, sobald ein Player spielt, mit Cover, Titel, Raum, Play/Pause und Weiter. Bei mehreren Playern schaltet „+N“ weiter. Ein pausierter Player bleibt fünf Minuten stehen. Mit `hide_domains: [media_player]` verschwindet die Leiste.
 
@@ -103,6 +103,7 @@ strategy:
     rain: sensor.regen
     illuminance: sensor.aussen_helligkeit
   forecast_days: 3         # 0 = keine Vorhersage
+  tv_apps: [magenta, netflix, prime]   # App-Knöpfe auf der TV-Karte
   appliances:              # Geräte ohne eigenen Betriebszustand; die anderen findet das Dashboard selbst
     - status: sensor.trockner_leistung   # Zustand: Leistung, Schalter, Binärsensor oder Status-Sensor
       name: Trockner

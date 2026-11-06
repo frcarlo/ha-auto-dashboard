@@ -100,7 +100,7 @@ const deviceDefs: DeviceDef[] = [
   },
   {
     id: 'dev-tv', name: 'TV-Wohnzimmer', model: 'Philips UHD Android TV', area: 'wohnzimmer', platform: 'androidtv_remote', entities: [
-      ['media_player.tv_wohnzimmer', 'on', { friendly_name: 'TV-Wohnzimmer', device_class: 'tv', app_name: 'YouTube', volume_level: 0.3, is_volume_muted: false, supported_features: 153529 }],
+      ['media_player.tv_wohnzimmer', 'on', { friendly_name: 'TV-Wohnzimmer', device_class: 'tv', app_id: 'com.google.android.youtube.tv', app_name: 'YouTube', volume_level: 0.3, is_volume_muted: false, supported_features: 153529 }],
       ['remote.tv_wohnzimmer', 'on', { friendly_name: 'TV-Wohnzimmer Remote' }],
     ],
   },

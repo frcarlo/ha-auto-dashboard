@@ -79,3 +79,26 @@ describe('appliances', () => {
     }])
   })
 })
+
+describe('TV apps', () => {
+  it('offers the picked apps, else Netflix, YouTube and Prime Video', async () => {
+    const { tvApps } = await import('../src/tv-apps')
+    expect(tvApps(undefined).map(a => a.name)).toEqual(['Netflix', 'YouTube', 'Prime Video'])
+    expect(tvApps(['magenta', 'netflix', 'gibtsnicht']).map(a => a.package)).toEqual(['de.telekom.magentatv.tv', 'com.netflix.ninja'])
+  })
+
+  it('names what runs the way people call it', async () => {
+    const { appLabel } = await import('../src/tv-apps')
+    expect(appLabel('de.telekom.magentatv.tv', 'Startseite')).toBe('MagentaTV')
+    expect(appLabel('com.spocky.projengmenu', 'Startseite')).toBe('Startseite')
+    expect(appLabel('com.example.mediathek', 'Startseite')).toBe('Mediathek')
+    expect(appLabel('YouTube', 'Startseite')).toBe('YouTube')
+  })
+
+  it('hands the apps to the TV card', async () => {
+    const { generateDashboard } = await import('../src/strategy')
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', tv_apps: ['magenta', 'prime'] }, createHass(true))
+    const tv = (views.find(v => v.path === 'area-wohnzimmer')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).find(c => c.type === 'custom:ad-tv')!
+    expect(tv.apps.map((a: { name: string }) => a.name)).toEqual(['MagentaTV', 'Prime Video'])
+  })
+})

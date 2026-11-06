@@ -8,6 +8,7 @@ import {
 import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
+import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -199,7 +200,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
       ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e, area.name)] })),
-      ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, ...look }] })),
+      ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }] })),
       ...(appliances.some(a => a.area === area.area_id) ? [{
         type: 'grid' as const,
         cards: [

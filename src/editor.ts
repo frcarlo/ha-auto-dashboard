@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
 import { HIDE_LABEL, hideOf } from './model'
 import { findAppliances } from './appliances'
+import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
 import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
@@ -373,6 +374,8 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
         ${this.renderAppliances()}
+        ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
+          c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint'))}
         ${c.hide_domains?.includes('weather') ? nothing : html`
           ${this.field(this.l('ed.weather'), this.singleEntityPicker(c.weather_entity, 'weather', weather_entity => this.change({ weather_entity })), this.l('ed.weather_hint'))}
           ${this.field(this.l('ed.sensors'), html`<div class="sensors">${WEATHER_SENSORS.map(([key, classes]) => html`

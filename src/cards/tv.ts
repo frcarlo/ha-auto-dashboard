@@ -1,15 +1,18 @@
 // A TV like the remote on the sofa: on/off and what runs at the top, the round arrow pad with OK in the middle,
-// volume beside it, back and home beneath. The arrows go through the TV's remote entity; without one the card
-// keeps power and volume.
+// volume beside it, back and home beneath, and a row of apps to start with one tap. The arrows go through the
+// TV's remote entity; without one the card keeps power and volume.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
 import { isUnavailable } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { Tv } from '../appliances'
+import { appLabel, type TvApp } from '../tv-apps'
 
 interface TvCardConfig extends BaseConfig {
   tv: Tv
+  /** Apps to start from the card */
+  apps?: TvApp[]
 }
 
 type Key = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' | 'home'
@@ -73,10 +76,22 @@ export class AdTv extends BaseCard<TvCardConfig> {
     .nav { grid-column: 1 / -1; display: flex; justify-content: center; gap: 48px; }
     .nav .btn { display: inline-flex; gap: 6px; width: auto; padding: 0 16px; border-radius: 20px; font-size: 13px; }
     .nav .btn ha-icon { --mdc-icon-size: 18px; }
+    .apps { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; padding-top: 16px; border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
+    .app {
+      all: unset; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 20px; cursor: pointer; white-space: nowrap;
+      background: rgba(var(--ad-on-surface), 0.08); font-size: 13px; font-weight: 500;
+      transition: background 0.15s ease, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .app ha-icon { --mdc-icon-size: 18px; }
+    .app:hover { background: rgba(var(--ad-on-surface), 0.14); }
+    .app:active { transform: scale(0.96); }
+    .app:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    /* The app on screen right now */
+    .app[aria-pressed=true] { background: rgba(var(--ad-on-surface), 0.9); color: var(--ad-surface); }
     .unavailable { opacity: 0.45; }
 
     @media (prefers-reduced-motion: reduce) {
-      .arrow, .ok { transition: none; }
+      .arrow, .ok, .app { transition: none; }
     }
   `]
 
@@ -99,6 +114,13 @@ export class AdTv extends BaseCard<TvCardConfig> {
     this.call('remote', 'send_command', tv.remote, { command: KEYS[tv.keys][key] })
   }
 
+  /** Android TV Remote opens the app's deep link, or the app by package; ADB switches to it as a source. */
+  private launch(app: TvApp) {
+    const tv = this.config!.tv
+    if (tv.keys === 'androidtv') return this.call('media_player', 'select_source', tv.entity, { source: app.package })
+    return this.call('media_player', 'play_media', tv.entity, { media_content_type: app.link ? 'url' : 'app', media_content_id: app.link ?? app.package })
+  }
+
   private key(key: Key, icon: string, label: string) {
     return html`<button class="arrow ${key}" aria-label=${label} @click=${() => this.send(key)}><ha-icon icon=${icon}></ha-icon></button>`
   }
@@ -112,7 +134,9 @@ export class AdTv extends BaseCard<TvCardConfig> {
     const control = !off && this.canControl(tv.entity)
     const a = player?.attributes ?? {}
     const features = Number(a.supported_features ?? 0)
-    const now = on ? (a.app_name ?? a.source ?? a.media_title) as string | undefined : undefined
+    const running = (a.app_id ?? a.app_name) as string | undefined
+    const now = on ? appLabel(running, t(hass, 'tv_home_screen')) ?? (a.source ?? a.media_title) as string | undefined : undefined
+    const apps = on && control && tv.keys ? this.config!.apps ?? [] : []
     const sub = off ? t(hass, 'unavailable') : on ? now ?? t(hass, 'on') : t(hass, 'off')
     const pad = on && control && !!tv.remote && !!tv.keys
     const volume = on && control && !!(features & (VOLUME_STEP | VOLUME_SET))
@@ -126,7 +150,7 @@ export class AdTv extends BaseCard<TvCardConfig> {
         ${control ? html`<button class="btn power" aria-label=${t(hass, 'tv_power')} title=${t(hass, 'tv_power')}
           @click=${() => this.call('media_player', on ? 'turn_off' : 'turn_on', tv.entity)}><ha-icon icon="mdi:power"></ha-icon></button>` : nothing}
       </div>
-      ${pad || volume ? html`<div class="remote">
+      ${pad || volume || apps.length ? html`<div class="remote">
         ${pad ? html`<div class="pad">
           ${this.key('up', 'mdi:chevron-up', t(hass, 'tv_up'))}
           ${this.key('left', 'mdi:chevron-left', t(hass, 'tv_left'))}
@@ -146,6 +170,10 @@ export class AdTv extends BaseCard<TvCardConfig> {
           <button class="btn" @click=${() => this.send('back')}><ha-icon icon="mdi:arrow-u-left-top"></ha-icon>${t(hass, 'tv_back')}</button>
           <button class="btn" @click=${() => this.send('home')}><ha-icon icon="mdi:home-outline"></ha-icon>${t(hass, 'tv_home')}</button>
         </div>` : nothing}
+        ${apps.length ? html`<div class="apps">${apps.map(app => html`
+          <button class="app" aria-pressed=${running === app.package} @click=${() => this.launch(app)}>
+            ${app.icon ? html`<ha-icon icon=${app.icon}></ha-icon>` : nothing}${app.name}
+          </button>`)}</div>` : nothing}
       </div>` : nothing}
     </div>`
   }

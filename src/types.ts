@@ -178,4 +178,6 @@ export interface StrategyConfig extends CardLook {
   forecast_days?: number
   /** Appliances besides those found from their devices; one with a found appliance's status replaces it */
   appliances?: ApplianceConfig[]
+  /** Apps on the TV cards' buttons, by key: netflix, prime, youtube, magenta, disney, spotify, plex, kodi */
+  tv_apps?: string[]
 }
