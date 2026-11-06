@@ -32,6 +32,8 @@ const list = (key: string) => params.get(key)?.split(',').filter(Boolean)
 const config: StrategyConfig = {
   type: 'custom:auto-dashboard',
   glass: params.has('glass'),
+  // The dryer only has a smart plug, so it is set up by hand like in a real config
+  appliances: [{ status: 'sensor.trockner_leistung', name: 'Trockner' }],
   // ?bg=/dev/some.jpg
   background_image: params.get('bg') ?? undefined,
   areas: list('areas'),

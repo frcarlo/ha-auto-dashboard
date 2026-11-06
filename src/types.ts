@@ -17,12 +17,15 @@ export interface EntityRegistryEntry {
   hidden?: boolean
   entity_category?: string | null
   display_precision?: number
+  /** Integration that provides the entity, e.g. androidtv_remote */
+  platform?: string
 }
 
 export interface DeviceRegistryEntry {
   id: string
   name?: string | null
   name_by_user?: string | null
+  model?: string | null
   area_id?: string | null
   labels?: string[]
 }
@@ -115,6 +118,27 @@ export type NavPosition = 'bottom' | 'top' | 'left' | 'right'
 /** Measurements a sensor at the house can give the weather card instead of the forecast service */
 export type WeatherSensorKey = 'temperature' | 'humidity' | 'pressure' | 'wind_speed' | 'wind_bearing' | 'rain' | 'illuminance'
 
+export type ApplianceKind = 'dishwasher' | 'washer' | 'dryer' | 'oven' | 'appliance'
+
+/**
+ * An appliance set up by hand under `appliances:`, for one that brings no operation state of its own
+ * (a dryer on a smart plug). `status` is a state sensor, a binary sensor or a power sensor.
+ */
+export interface ApplianceConfig {
+  status: string
+  name?: string
+  kind?: ApplianceKind
+  area?: string
+  progress?: string
+  end?: string
+  remaining?: string
+  program?: string
+  phase?: string
+  door?: string
+  power?: string
+  notices?: string[]
+}
+
 export interface StrategyConfig extends CardLook {
   type: string
   title?: string
@@ -152,4 +176,6 @@ export interface StrategyConfig extends CardLook {
   weather_sensors?: Partial<Record<WeatherSensorKey, string>>
   /** Days of forecast under the weather, 3 by default */
   forecast_days?: number
+  /** Appliances besides those found from their devices; one with a found appliance's status replaces it */
+  appliances?: ApplianceConfig[]
 }

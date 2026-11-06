@@ -7,6 +7,7 @@ import {
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
+import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -101,6 +102,15 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       ...(areaName && name.trim().toLowerCase() === areaName.trim().toLowerCase() ? { show_name: false } : label !== name ? { name: label } : {}),
     }
   }
+  // Appliances and TVs get their own cards; what those cards show leaves the room page's groups
+  const appliances = findAppliances(hass, config.appliances, hide, areaIds)
+  const tvs = findTvs(hass, hide, areaIds)
+  const claimed = new Set([
+    ...appliances.flatMap(a => applianceEntities(hass, a)),
+    ...tvs.flatMap(tv => [tv.entity, ...(tv.remote ? [tv.remote] : []), ...tv.others]),
+  ])
+  const applianceCard = (appliance: (typeof appliances)[number], home = false): Card =>
+    ({ type: 'custom:ad-appliance', appliance, ...(home ? { only_active: true } : {}), ...look })
   const outdoor = config.outdoor_areas ?? []
   const indoor = areas.filter(a => !outdoor.includes(a.area_id))
   const pageAllowed = (path: PagePath) => !rule?.hide_pages?.includes(path)
@@ -185,7 +195,15 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
       ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e, area.name)] })),
-      ...arrangeRoom(groupEntities(areaEntities(hass, area.area_id, hide)), room).map(([key, entities]): Section => ({
+      ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, ...look }] })),
+      ...(appliances.some(a => a.area === area.area_id) ? [{
+        type: 'grid' as const,
+        cards: [
+          { type: 'custom:ad-group-heading', title: t(hass, 'appliances'), entities: [], ...look },
+          ...appliances.filter(a => a.area === area.area_id).map(a => applianceCard(a)),
+        ],
+      }] : []),
+      ...arrangeRoom(groupEntities(areaEntities(hass, area.area_id, hide).filter(e => !claimed.has(e.entity_id))), room).map(([key, entities]): Section => ({
         type: 'grid',
         cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name)), ...own(key)],
       })),
@@ -221,6 +239,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         }] : []),
         // Hides itself while nothing plays
         { type: 'custom:ad-now-playing', ...scopeOpts },
+        // Each shows only while its appliance runs, waits to be emptied or needs someone
+        ...appliances.map(a => applianceCard(a, true)),
         ...(scenes.length ? [{ type: 'custom:ad-scenes', entities: scenes.map(e => e.entity_id), ...look }] : []),
       ]),
       ...(singleRoom ? [] : favoritesSection(favorites)),

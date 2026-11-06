@@ -2,13 +2,14 @@
 // Only admins can edit dashboards, so only admins reach it. Uses HA's theme variables to fit the dialog.
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
-import { HIDE_LABEL } from './model'
+import { HIDE_LABEL, hideOf } from './model'
+import { findAppliances } from './appliances'
 import { isHexColor } from './styles/palette'
 import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
-import type { AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
+import type { ApplianceConfig, AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
 interface HaUser {
   id: string
@@ -137,6 +138,8 @@ export class AdStrategyEditor extends LitElement {
     .tab[aria-selected=true] { color: var(--ad-accent); border-bottom-color: var(--ad-accent); }
     .tab:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: -2px; }
     .tool-hint { min-height: 2.8em; }
+    .appliance { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 12px; font-size: 13px; padding: 12px 0; border-bottom: 1px solid var(--ad-line); }
+    .appliance .link { grid-column: 2; justify-self: end; }
     .sensors { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 12px; font-size: 13px; }
   `]
 
@@ -172,8 +175,8 @@ export class AdStrategyEditor extends LitElement {
     }
   }
 
-  private l(key: Key) {
-    return t(this.hass, key)
+  private l(key: Key, vars: Record<string, string | number> = {}) {
+    return t(this.hass, key, vars)
   }
 
   private change(patch: Partial<StrategyConfig>) {
@@ -235,15 +238,54 @@ export class AdStrategyEditor extends LitElement {
   }
 
   /** One entity, HA's picker when it is loaded, else its id. */
-  private singleEntityPicker(value: string | undefined, domain: string, onChange: (v: string | undefined) => void, deviceClasses?: string[]) {
+  private singleEntityPicker(value: string | undefined, domain: string | string[], onChange: (v: string | undefined) => void, deviceClasses?: string[]) {
     if (customElements.get('ha-selector')) {
       const filter = deviceClasses ? deviceClasses.map(device_class => ({ domain, device_class })) : { domain }
       return html`<ha-selector .hass=${this.hass} .value=${value}
         .selector=${{ entity: { filter } }}
         @value-changed=${(e: CustomEvent) => onChange((e.detail.value as string | undefined) || undefined)}></ha-selector>`
     }
-    return html`<input type="text" .value=${value ?? ''} placeholder="${domain}.…"
+    return html`<input type="text" .value=${value ?? ''} placeholder="${[domain].flat()[0]}.…"
       @change=${(e: Event) => onChange((e.target as HTMLInputElement).value.trim() || undefined)}>`
+  }
+
+  /** One area, HA's picker when it is loaded, else its id. */
+  private areaPicker(value: string | undefined, onChange: (v: string | undefined) => void) {
+    if (customElements.get('ha-selector')) {
+      return html`<ha-selector .hass=${this.hass} .value=${value} .selector=${{ area: {} }}
+        @value-changed=${(e: CustomEvent) => onChange((e.detail.value as string | undefined) || undefined)}></ha-selector>`
+    }
+    return html`<input type="text" .value=${value ?? ''} placeholder="area_id"
+      @change=${(e: Event) => onChange((e.target as HTMLInputElement).value.trim() || undefined)}>`
+  }
+
+  /**
+   * Appliances found from their devices are listed by name; ones without an operation state of their own
+   * (a dryer on a smart plug) are added here with a state, power or on/off entity and, if there is one, its progress.
+   */
+  private renderAppliances() {
+    const c = this.config
+    const found = findAppliances(this.hass!, [], hideOf(c)).filter(a => !c.appliances?.some(own => own.status === a.status)).map(a => a.name)
+    const list = c.appliances ?? []
+    const set = (next: ApplianceConfig[]) => this.change({ appliances: next.length ? next : undefined })
+    const update = (i: number, patch: Partial<ApplianceConfig>) => set(list.map((a, j) => j !== i ? a
+      : Object.fromEntries(Object.entries({ ...a, ...patch }).filter(([, v]) => v !== undefined && v !== '')) as unknown as ApplianceConfig))
+    return this.field(this.l('appliances'), html`
+      ${list.map((a, i) => html`<div class="appliance">
+        <span>${this.l('ed.appliance_name')}</span>
+        <input type="text" .value=${a.name ?? ''} @change=${(e: Event) => update(i, { name: (e.target as HTMLInputElement).value.trim() || undefined })}>
+        <span>${this.l('ed.appliance_status')}</span>
+        ${this.singleEntityPicker(a.status || undefined, ['sensor', 'binary_sensor', 'switch'], status => update(i, { status: status ?? '' }))}
+        <span>${this.l('ed.appliance_area')}</span>
+        ${this.areaPicker(a.area, area => update(i, { area }))}
+        <span>${this.l('ed.appliance_progress')}</span>
+        ${this.singleEntityPicker(a.progress, 'sensor', progress => update(i, { progress }))}
+        <span>${this.l('ed.appliance_remaining')}</span>
+        ${this.singleEntityPicker(a.remaining, 'sensor', remaining => update(i, { remaining }))}
+        <button class="link" @click=${() => set(list.filter((_, j) => j !== i))}>${this.l('ed.remove')}</button>
+      </div>`)}
+      <button class="link" @click=${() => set([...list, { status: '' }])}>${this.l('ed.appliance_add')}</button>`,
+    found.length ? this.l('ed.appliances_found', { names: found.join(', ') }) : this.l('ed.appliances_none'))
   }
 
   /** HA's media picker with upload, like in its own view background editor, when it is loaded, else a path. */
@@ -330,6 +372,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
+        ${this.renderAppliances()}
         ${c.hide_domains?.includes('weather') ? nothing : html`
           ${this.field(this.l('ed.weather'), this.singleEntityPicker(c.weather_entity, 'weather', weather_entity => this.change({ weather_entity })), this.l('ed.weather_hint'))}
           ${this.field(this.l('ed.sensors'), html`<div class="sensors">${WEATHER_SENSORS.map(([key, classes]) => html`

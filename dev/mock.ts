@@ -62,6 +62,57 @@ const defs: Def[] = [
   ['binary_sensor.garage_rauch', 'off', { friendly_name: 'Garage Rauchmelder', device_class: 'smoke' }, 'garage'],
 ]
 
+type DeviceDef = { id: string; name: string; model?: string; area: string; platform?: string; entities: [entityId: string, state: string, attributes: Record<string, unknown>, platform?: string][] }
+
+const PROGRAMS = ['dishcare_dishwasher_program_eco_50', 'dishcare_dishwasher_program_auto_2', 'dishcare_dishwasher_program_quick_45']
+const ENUM = (options: string[]) => ({ device_class: 'enum', options })
+
+// Appliances and a TV as their integrations bring them: one device with many entities each
+const deviceDefs: DeviceDef[] = [
+  {
+    id: 'dev-geschirrspuler', name: 'Geschirrspüler', model: 'SN53ES14VE', area: 'kuche', platform: 'home_connect', entities: [
+      ['sensor.geschirrspuler_betriebszustand', 'run', { friendly_name: 'Geschirrspüler Betriebszustand', ...ENUM(['inactive', 'ready', 'delayedstart', 'run', 'pause', 'actionrequired', 'finished', 'error', 'aborting']) }],
+      ['sensor.geschirrspuler_programm_fortschritt', '62', { friendly_name: 'Geschirrspüler Programm-Fortschritt', unit_of_measurement: '%' }],
+      ['sensor.geschirrspuler_programm_endzeit', new Date(Date.now() + 48 * 60_000).toISOString(), { friendly_name: 'Geschirrspüler Programm-Endzeit', device_class: 'timestamp' }],
+      ['select.geschirrspuler_aktives_programm', PROGRAMS[0]!, { friendly_name: 'Geschirrspüler Aktives Programm', options: PROGRAMS }],
+      ['select.geschirrspuler_ausgewahltes_programm', PROGRAMS[0]!, { friendly_name: 'Geschirrspüler Ausgewähltes Programm', options: PROGRAMS }],
+      ['sensor.geschirrspuler_tur', 'closed', { friendly_name: 'Geschirrspüler Tür', ...ENUM(['closed', 'locked', 'open']) }],
+      ['sensor.geschirrspuler_salz_fast_leer', 'present', { friendly_name: 'Geschirrspüler Salz fast leer', ...ENUM(['confirmed', 'off', 'present']) }],
+      ['sensor.geschirrspuler_klarspuler_fast_leer', 'off', { friendly_name: 'Geschirrspüler Klarspüler fast leer', ...ENUM(['confirmed', 'off', 'present']) }],
+      ['switch.geschirrspuler_intensivzone', 'off', { friendly_name: 'Geschirrspüler Intensivzone' }],
+    ],
+  },
+  {
+    id: 'dev-waschmaschine', name: 'Waschmaschine', area: 'waschkeller', platform: 'washdata', entities: [
+      ['sensor.waschmaschine_zustand', 'finished', { friendly_name: 'Waschmaschine Zustand', ...ENUM(['off', 'idle', 'starting', 'running', 'paused', 'ending', 'finished', 'anti_wrinkle']) }],
+      ['sensor.waschmaschine_fortschritt', '100', { friendly_name: 'Waschmaschine Fortschritt', unit_of_measurement: '%' }],
+      ['sensor.waschmaschine_verbleibende_zeit', '0', { friendly_name: 'Waschmaschine Verbleibende Zeit', device_class: 'duration', unit_of_measurement: 'min' }],
+      ['sensor.waschmaschine_programm', 'Baumwolle Long', { friendly_name: 'Waschmaschine Programm', ...ENUM(['Baumwolle Long', 'Feinwäsche', 'off']) }],
+      ['sensor.waschmaschine_leistung', '0.4', { friendly_name: 'Waschmaschine Leistung', device_class: 'power', unit_of_measurement: 'W' }],
+    ],
+  },
+  // Only a smart plug: the dashboard gets it from `appliances:` in the harness config
+  {
+    id: 'dev-trockner', name: 'Trockner', area: 'waschkeller', platform: 'mqtt', entities: [
+      ['switch.trockner', 'on', { friendly_name: 'Trockner', device_class: 'outlet' }],
+      ['sensor.trockner_leistung', '820', { friendly_name: 'Trockner Leistung', device_class: 'power', unit_of_measurement: 'W' }],
+    ],
+  },
+  {
+    id: 'dev-tv', name: 'TV-Wohnzimmer', model: 'Philips UHD Android TV', area: 'wohnzimmer', platform: 'androidtv_remote', entities: [
+      ['media_player.tv_wohnzimmer', 'on', { friendly_name: 'TV-Wohnzimmer', device_class: 'tv', app_name: 'YouTube', volume_level: 0.3, is_volume_muted: false, supported_features: 153529 }],
+      ['remote.tv_wohnzimmer', 'on', { friendly_name: 'TV-Wohnzimmer Remote' }],
+    ],
+  },
+  // The same TV over ADB, which the dashboard leaves out
+  {
+    id: 'dev-tv-adb', name: 'TV-Wohnzimmer (ADB)', area: 'wohnzimmer', platform: 'androidtv', entities: [
+      ['media_player.tv_wohnzimmer_adb', 'off', { friendly_name: 'TV-Wohnzimmer (ADB)', device_class: 'tv', supported_features: 23997 }],
+      ['remote.tv_wohnzimmer_adb', 'unknown', { friendly_name: 'TV-Wohnzimmer (ADB)' }],
+    ],
+  },
+]
+
 const extras: HassEntity[] = [
   { entity_id: 'sensor.flur_batterie', state: '9', attributes: { friendly_name: 'Flur Bewegungsmelder Batterie', device_class: 'battery', unit_of_measurement: '%' } },
   { entity_id: 'script.gute_nacht', state: 'off', attributes: { friendly_name: 'Gute Nacht', icon: 'mdi:weather-night', last_triggered: new Date(Date.now() - 15 * 3600_000).toISOString() } },
@@ -99,6 +150,14 @@ export function createHass(dark: boolean): HomeAssistant {
   // ?labels=technik hides these
   entities['switch.kuche_kaffee']!.labels = ['technik']
   entities['sensor.buro_keller_leistung']!.labels = ['technik']
+  const devices: HomeAssistant['devices'] = {}
+  for (const d of deviceDefs) {
+    devices[d.id] = { id: d.id, name: d.name, model: d.model ?? null, area_id: d.area }
+    for (const [entity_id, state, attributes, platform] of d.entities) {
+      states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - 20 * 60_000).toISOString() }
+      entities[entity_id] = { entity_id, device_id: d.id, platform: platform ?? d.platform, labels: [] }
+    }
+  }
   for (const e of extras) {
     states[e.entity_id] = e
     entities[e.entity_id] = { entity_id: e.entity_id, entity_category: e.entity_id.startsWith('sensor.') ? 'diagnostic' : null }
@@ -107,7 +166,7 @@ export function createHass(dark: boolean): HomeAssistant {
   const hass: HomeAssistant = {
     states,
     entities,
-    devices: {},
+    devices,
     areas: {
       wohnzimmer: { area_id: 'wohnzimmer', name: 'Wohnzimmer', icon: 'mdi:sofa', floor_id: 'eg', temperature_entity_id: 'sensor.wohnzimmer_temperatur', humidity_entity_id: 'sensor.wohnzimmer_luftfeuchte' },
       // Stand-in for an uploaded area picture
@@ -120,6 +179,7 @@ export function createHass(dark: boolean): HomeAssistant {
       flur: { area_id: 'flur', name: 'Flur', icon: null },
       garage: { area_id: 'garage', name: 'Garage', icon: 'mdi:garage' },
       garten: { area_id: 'garten', name: 'Garten', icon: 'mdi:flower' },
+      waschkeller: { area_id: 'waschkeller', name: 'Waschkeller', icon: 'mdi:washing-machine', floor_id: 'keller' },
     },
     floors: {
       keller: { floor_id: 'keller', name: 'Keller', level: -1, icon: 'mdi:home-floor-b' },

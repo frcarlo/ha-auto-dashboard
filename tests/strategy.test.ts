@@ -345,3 +345,30 @@ describe('to-do lists', () => {
     expect(await lists({ hide_domains: ['todo'], todo_lists: ['todo.werkstatt'] })).toEqual([])
   })
 })
+
+describe('appliances and TVs', () => {
+  const cardsOf = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+
+  it('gives each room its appliance cards and takes their read-outs out of the groups', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const kitchen = cardsOf(views.find(v => v.path === 'area-kuche')!)
+    expect(kitchen.filter(c => c.type === 'custom:ad-appliance').map(c => c.appliance.name)).toEqual(['Geschirrspüler'])
+    const tiles = kitchen.filter(c => c.type === 'custom:ad-tile').map(c => c.entity)
+    expect(tiles.some(id => id.startsWith('sensor.geschirrspuler') || id.startsWith('select.geschirrspuler'))).toBe(false)
+    // Its switches stay
+    expect(tiles).toContain('switch.geschirrspuler_intensivzone')
+  })
+
+  it('lists every appliance on Home, each showing only while it is busy', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', appliances: [{ status: 'sensor.trockner_leistung', name: 'Trockner' }] }, createHass(true))
+    const home = cardsOf(views[0]!).filter(c => c.type === 'custom:ad-appliance')
+    expect(home.map(c => [c.appliance.name, c.only_active])).toEqual([['Geschirrspüler', true], ['Trockner', true], ['Waschmaschine', true]])
+  })
+
+  it('shows one TV card per set and leaves both players off the room page', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const living = cardsOf(views.find(v => v.path === 'area-wohnzimmer')!)
+    expect(living.filter(c => c.type === 'custom:ad-tv').map(c => c.tv.entity)).toEqual(['media_player.tv_wohnzimmer'])
+    expect(living.filter(c => c.type === 'custom:ad-tile').map(c => c.entity).filter(id => id.includes('tv_wohnzimmer'))).toEqual([])
+  })
+})
