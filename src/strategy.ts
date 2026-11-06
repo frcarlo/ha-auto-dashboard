@@ -69,10 +69,6 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   }
   const areaIds = scoped ? areas.map(a => a.area_id) : undefined
   const all = allEntities(hass, hide, areaIds)
-  const scopeLabel = !scoped ? undefined
-    : config.floors?.length && !config.areas?.length
-      ? floors.map(f => f.floor?.name).filter(Boolean).join(', ')
-      : areas.map(a => a.name).join(', ')
   const position = config.nav_position ?? 'bottom'
 
   const tile = (entity: HassEntity, areaName?: string): Card =>
@@ -230,7 +226,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     max_columns: MAX_COLUMNS,
     sections: withNav([
       fullWidth([
-        { type: 'custom:ad-header', variant: 'home', ...(scopeLabel ? { scope: scopeLabel } : {}), ...(weather ? { weather: false } : {}), ...look },
+        { type: 'custom:ad-header', variant: 'home', ...(weather ? { weather: false } : {}), ...look },
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
           links: {
@@ -386,7 +382,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
   const views = [home, ...domainViews, ...(calendars.length ? [calendarView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {
-    title: config.title ?? scopeLabel ?? t(hass, 'home'),
+    title: config.title ?? t(hass, 'home'),
     views: background ? views.map((view): View => ({ ...view, background })) : views,
   }
 }
