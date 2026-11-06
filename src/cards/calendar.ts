@@ -1,4 +1,4 @@
-// The calendar page: month, week or day, switchable, with every calendar as a chip to show or hide.
+// The calendar page: month, week or day, switchable. Which calendars it shows is set in the dashboard's config only.
 // The month shows each day's first events, a tap on a day opens it; week and day lay the hours out like a planner.
 // On a phone the week becomes a list of the days with their events. A tap on an event shows its details.
 import { css, html, nothing, type PropertyValues } from 'lit'
@@ -38,16 +38,15 @@ const store = {
 export class AdCalendar extends BaseCard<CalendarConfig> {
   static properties = {
     ...BaseCard.properties,
-    view: { state: true }, anchor: { state: true }, hiddenCals: { state: true }, events: { state: true },
+    view: { state: true }, anchor: { state: true }, events: { state: true },
     selected: { state: true }, narrow: { state: true }, fit: { state: true },
   }
   view: CalendarView = 'month'
   anchor = new Date()
-  hiddenCals = new Set<string>()
   events: CalEvent[] = []
   selected?: CalEvent
   narrow = false
-  /** Height left on screen below the bar and chips, 0 until measured */
+  /** Height left on screen below the bar, 0 until measured */
   fit = 0
   private loaded = new Map<string, number>()
   private all = new Map<string, CalEvent[]>()
@@ -63,18 +62,11 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .nav { display: flex; align-items: center; gap: 4px; }
     .nav .btn { width: 36px; height: 36px; }
     .today-btn { all: unset; cursor: pointer; height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13px; font-weight: 500; background: rgba(var(--ad-on-surface), 0.08); }
-    .today-btn:focus-visible, .seg button:focus-visible, .chip:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    .today-btn:focus-visible, .seg button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .seg { display: inline-flex; padding: 2px; border-radius: 12px; background: rgba(var(--ad-on-surface), 0.08); }
     .seg button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 10px; font-size: 13px; opacity: 0.7; }
     .seg button[aria-pressed=true] { background: var(--ad-surface); opacity: 1; font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
 
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    :host([narrow]) .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-    .chips::-webkit-scrollbar { display: none; }
-    .chip { all: unset; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; border-radius: 14px; cursor: pointer; font-size: 12px; background: rgba(var(--ad-on-surface), 0.06); }
-    .chip i { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--c)); }
-    .chip[aria-pressed=false] { opacity: 0.45; }
-    .chip[aria-pressed=false] i { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(var(--c)); }
 
     /* Month: six weeks of days, each with its first events */
     .month { display: grid; grid-auto-rows: auto; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
@@ -166,7 +158,6 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     super.setConfig(config)
     const saved = store.get('ad-calendar-view') as CalendarView | null
     this.view = saved && ['month', 'week', 'day'].includes(saved) ? saved : config.view ?? 'month'
-    this.hiddenCals = new Set(JSON.parse(store.get('ad-calendar-hidden') ?? '[]') as string[])
   }
 
   connectedCallback() {
@@ -186,7 +177,7 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     window.removeEventListener('resize', this.onResize)
   }
 
-  /** How much of the screen is left below the bar and chips, so month and hours fit without scrolling. */
+  /** How much of the screen is left below the bar, so month and hours fit without scrolling. */
   private measure() {
     const body = this.renderRoot.querySelector<HTMLElement>('.fit')
     const rect = body?.getBoundingClientRect()
@@ -231,7 +222,7 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     return viewDays(this.view, this.anchor, this.firstDay)
   }
 
-  /** Loads the shown range from every calendar, unless it is fresh; hidden ones too, so showing them is instant. */
+  /** Loads the shown range from every configured calendar, unless it is fresh. */
   private async load() {
     const days = this.days
     const from = days[0]!
@@ -250,12 +241,12 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   }
 
   private collect(key: string) {
-    this.events = (this.all.get(key) ?? []).filter(e => !this.hiddenCals.has(e.calendar))
+    this.events = this.all.get(key) ?? []
   }
 
   protected updated(changed: PropertyValues<this>) {
     // A new range or a change in a calendar (an event starts or ends) loads again, unless what is there is fresh
-    if ((['view', 'anchor', 'config', 'hiddenCals', 'hass'] as const).some(k => changed.has(k))) void this.load()
+    if ((['view', 'anchor', 'config', 'hass'] as const).some(k => changed.has(k))) void this.load()
     // All-day events push the hours down, so measure again when they change
     if (changed.has('view') || changed.has('narrow') || changed.has('events')) this.measure()
   }
@@ -268,14 +259,6 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   private openDay(day: Date) {
     this.anchor = day
     this.setView('day')
-  }
-
-  private toggleCal(id: string) {
-    const next = new Set(this.hiddenCals)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    this.hiddenCals = next
-    store.set('ad-calendar-hidden', JSON.stringify([...next]))
   }
 
   private time(d: Date) {
@@ -398,11 +381,6 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
         <h2>${this.heading()}</h2>
         <div class="seg" role="group">${views.map(([v, label]) => html`<button aria-pressed=${this.view === v} @click=${() => this.setView(v)}>${label}</button>`)}</div>
       </div>
-      ${this.config!.entities.length > 1 ? html`<div class="chips">${this.config!.entities.map(id => {
-        const e = this.hass!.states[id]
-        return html`<button class="chip" style="--c:${this.color(id)}" aria-pressed=${!this.hiddenCals.has(id)} @click=${() => this.toggleCal(id)}>
-          <i></i>${e ? entityName(e) : id}</button>`
-      })}</div>` : nothing}
       ${body}
       ${this.selected ? this.renderDetail(this.selected) : nothing}
     </div>`
