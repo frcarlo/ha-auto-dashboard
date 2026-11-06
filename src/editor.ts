@@ -40,7 +40,7 @@ const TABS: [Tab, Key][] = [['look', 'ed.look'], ['home', 'ed.home'], ['house', 
 type Tool = 'hide' | 'outdoor' | 'only'
 const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide: 'hide_areas', outdoor: 'outdoor_areas', only: 'areas' }
 
-const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'energy', 'maintenance']
+const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'calendar', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
   'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
@@ -373,6 +373,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
+        ${this.field(this.l('ed.calendars'), this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
         ${this.renderAppliances()}
         ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
           c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint'))}

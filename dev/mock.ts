@@ -134,6 +134,9 @@ const extras: HassEntity[] = [
   { entity_id: 'sensor.aussen_luftfeuchte', state: '81', attributes: { friendly_name: 'Außen Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' } },
   { entity_id: 'sensor.aussen_helligkeit', state: '2920', attributes: { friendly_name: 'Außen Helligkeit', device_class: 'illuminance', unit_of_measurement: 'lx' } },
   { entity_id: 'sensor.aussen_regen', state: '0.4', attributes: { friendly_name: 'Außen Regen', device_class: 'precipitation_intensity', unit_of_measurement: 'mm/h' } },
+  { entity_id: 'calendar.familie', state: 'off', attributes: { friendly_name: 'Familie' } },
+  { entity_id: 'calendar.abfall', state: 'off', attributes: { friendly_name: 'Abfall' } },
+  { entity_id: 'calendar.feiertage', state: 'off', attributes: { friendly_name: 'Feiertage' } },
   // NINA keeps one binary sensor per warning slot; ?warn=on fills the first
   { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1' } },
   { entity_id: 'binary_sensor.warning_mulheim_2', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 2' } },
@@ -214,6 +217,39 @@ export function createHass(dark: boolean): HomeAssistant {
         setTimeout(() => callback({ type: 'daily', forecast } as T), 0)
         return () => undefined
       },
+    },
+    // Events around today, like HA's calendar API returns them
+    callApi: async <T,>(_method: string, path: string) => {
+      const [, id, query] = /^calendars\/([^?]+)\?(.*)$/.exec(path) ?? []
+      const params = new URLSearchParams(query)
+      const from = new Date(params.get('start') ?? 0)
+      const to = new Date(params.get('end') ?? 0)
+      const day = (offset: number, h?: number, m = 0) => {
+        const d = new Date(); d.setHours(h ?? 0, m, 0, 0); d.setDate(d.getDate() + offset); return d
+      }
+      const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const timed = (summary: string, offset: number, h: number, m: number, minutes: number, extra = {}) =>
+        ({ summary, start: { dateTime: day(offset, h, m).toISOString() }, end: { dateTime: new Date(day(offset, h, m).getTime() + minutes * 60_000).toISOString() }, ...extra })
+      const allDay = (summary: string, offset: number, days = 1) => ({ summary, start: { date: local(day(offset)) }, end: { date: local(day(offset + days)) } })
+      const all: Record<string, unknown[]> = {
+        'calendar.familie': [
+          timed('Zahnarzt Leni', 0, 9, 30, 60, { location: 'Praxis Dr. Berg, Schloßstraße 4' }),
+          timed('Elternabend', 0, 19, 0, 90),
+          timed('Fußball Training', 0, 17, 30, 90),
+          timed('Einkaufen', 1, 10, 0, 60),
+          timed('Geburtstag Oma', 2, 15, 0, 180, { description: 'Kuchen mitbringen' }),
+          timed('Frühstück mit Tom', 2, 9, 0, 90),
+          timed('Physiotherapie', 3, 8, 0, 45),
+          timed('Fußball Training', 4, 17, 30, 90),
+          timed('Kino', 5, 20, 15, 150),
+          allDay('Urlaub Sylt', 12, 5),
+          timed('Kita Fest', -3, 14, 0, 120),
+        ],
+        'calendar.abfall': [allDay('Restmüll', 1), allDay('Papier', 8), allDay('Gelbe Tonne', 4), allDay('Bio', 11), allDay('Restmüll', 15)],
+        'calendar.feiertage': [allDay('Martinstag', 5)],
+      }
+      return ((all[id ?? ''] ?? []) as { start: { date?: string; dateTime?: string }; end: { date?: string; dateTime?: string } }[])
+        .filter(e => new Date(e.start.dateTime ?? `${e.start.date}T00:00`) < to && new Date(e.end.dateTime ?? `${e.end.date}T00:00`) > from) as T
     },
     callWS: async <T,>(msg: Record<string, unknown>) => {
       if (msg.type === 'energy/get_prefs') return {

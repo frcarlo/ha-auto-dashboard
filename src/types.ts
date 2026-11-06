@@ -62,6 +62,8 @@ export interface HomeAssistant {
   user?: { id: string; name: string; is_admin?: boolean }
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>
   callWS?<T>(msg: Record<string, unknown>): Promise<T>
+  /** HA's REST API, e.g. calendar events */
+  callApi?<T>(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<T>
   /** Subscriptions, e.g. weather forecasts, which HA no longer keeps in the state */
   connection?: { subscribeMessage<T>(callback: (msg: T) => void, msg: Record<string, unknown>): Promise<() => void> }
   formatEntityState?(stateObj: HassEntity, state?: string): string
@@ -100,7 +102,7 @@ export interface CardLook {
   access?: Access
 }
 
-export type PagePath = 'lights' | 'climate' | 'covers' | 'security' | 'cameras' | 'energy' | 'maintenance'
+export type PagePath = 'lights' | 'climate' | 'covers' | 'security' | 'cameras' | 'calendar' | 'energy' | 'maintenance'
 
 /** Per-user rule under `users:`, keyed by user name, first name, user id or `default`. */
 export interface UserRule {
@@ -180,4 +182,6 @@ export interface StrategyConfig extends CardLook {
   appliances?: ApplianceConfig[]
   /** Apps on the TV cards' buttons, by key: netflix, prime, youtube, magenta, disney, spotify, plex, kodi */
   tv_apps?: string[]
+  /** Calendars on the calendar page; unset = every visible calendar, hide_domains: [calendar] drops the page */
+  calendars?: string[]
 }

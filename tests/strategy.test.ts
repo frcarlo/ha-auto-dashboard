@@ -385,3 +385,24 @@ describe('appliances and TVs', () => {
     expect(living.filter(c => c.type === 'custom:ad-tile').map(c => c.entity).filter(id => id.includes('tv_wohnzimmer'))).toEqual([])
   })
 })
+
+describe('calendar page', () => {
+  const cardsOf = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+
+  it('collects every calendar on its own page in the nav', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const page = views.find(v => v.path === 'calendar')!
+    expect(cardsOf(page).find(c => c.type === 'custom:ad-calendar')!.entities).toEqual(['calendar.familie', 'calendar.abfall', 'calendar.feiertage'])
+    expect(cardsOf(views[0]!).find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: { path: string }) => i.path)).toContain('calendar')
+  })
+
+  it('takes the picked calendars, and drops the page with hide_domains or a user rule', async () => {
+    const picked = await generateDashboard({ type: 'custom:auto-dashboard', calendars: ['calendar.abfall'] }, createHass(true))
+    expect(cardsOf(picked.views.find(v => v.path === 'calendar')!).find(c => c.type === 'custom:ad-calendar')!.entities).toEqual(['calendar.abfall'])
+    const hidden = await generateDashboard({ type: 'custom:auto-dashboard', hide_domains: ['calendar'] }, createHass(true))
+    expect(hidden.views.map(v => v.path)).not.toContain('calendar')
+    const hass = createHass(true)
+    const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['calendar'] } } }, hass)
+    expect(ruled.views.map(v => v.path)).not.toContain('calendar')
+  })
+})

@@ -166,9 +166,14 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     .map(page => ({ ...page, entities: all.filter(page.pick) }))
     .filter(page => page.entities.length)
 
+  // Calendars rarely belong to a room, so the page takes them from the whole house
+  const calendars = config.hide_domains?.includes('calendar') || !pageAllowed('calendar') ? []
+    : config.calendars?.length ? favoriteEntities(hass, config.calendars).filter(ofDomain('calendar'))
+    : allEntities(hass, hide).filter(ofDomain('calendar'))
   const navItems: NavItem[] = [
     { path: 'home', icon: 'mdi:home-outline', label: t(hass, 'home') },
     ...domainPages.map(p => ({ path: p.path, icon: p.icon, label: p.title })),
+    ...(calendars.length ? [{ path: 'calendar', icon: 'mdi:calendar-month-outline', label: t(hass, 'calendar') }] : []),
   ]
   const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...look }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
@@ -280,6 +285,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(hass.user?.is_admin ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'updates'), 'mdi:package-up'), { type: 'custom:ad-maintenance-list', source: 'updates', ...scopeOpts }] }] : []),
   ])
 
+  const calendarView = subview('calendar', t(hass, 'calendar'), 'mdi:calendar-month-outline', [
+    fullWidth([{ type: 'custom:ad-calendar', entities: calendars.map(e => e.entity_id), ...look }]),
+  ])
+
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
   const powerOpts = { ...hideOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
@@ -375,7 +384,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const background = config.background_image?.trim() ? imageBackground(config.background_image, config.theme)
     : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
-  const views = [home, ...domainViews, ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
+  const views = [home, ...domainViews, ...(calendars.length ? [calendarView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {
     title: config.title ?? scopeLabel ?? t(hass, 'home'),
     views: background ? views.map((view): View => ({ ...view, background })) : views,
