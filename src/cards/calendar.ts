@@ -17,8 +17,13 @@ interface CalendarConfig extends BaseConfig {
   view?: CalendarView
 }
 
-/** Pixels per hour in week and day */
+/** Pixels per hour in week and day until the card knows its room, and the bounds when it does */
 const HOUR = 48
+const HOUR_MIN = 28
+const HOUR_MAX = 64
+/** The hours week and day always show; earlier or later events widen them */
+const DAY_FROM = 7
+const DAY_TO = 21
 /** Events load again after this long */
 const STALE_MS = 10 * 60_000
 /** Below this width the week becomes a list */
@@ -34,7 +39,7 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   static properties = {
     ...BaseCard.properties,
     view: { state: true }, anchor: { state: true }, hiddenCals: { state: true }, events: { state: true },
-    selected: { state: true }, narrow: { state: true },
+    selected: { state: true }, narrow: { state: true }, fit: { state: true },
   }
   view: CalendarView = 'month'
   anchor = new Date()
@@ -42,10 +47,12 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   events: CalEvent[] = []
   selected?: CalEvent
   narrow = false
+  /** Height left on screen below the bar and chips, 0 until measured */
+  fit = 0
   private loaded = new Map<string, number>()
   private all = new Map<string, CalEvent[]>()
   private resize?: ResizeObserver
-  private scrolled?: string
+  private onResize = () => this.measure()
 
   static styles = [tokens, css`
     :host { display: block; }
@@ -61,7 +68,8 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .seg button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 10px; font-size: 13px; opacity: 0.7; }
     .seg button[aria-pressed=true] { background: var(--ad-surface); opacity: 1; font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
 
-    .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    :host([narrow]) .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
     .chips::-webkit-scrollbar { display: none; }
     .chip { all: unset; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; border-radius: 14px; cursor: pointer; font-size: 12px; background: rgba(var(--ad-on-surface), 0.06); }
     .chip i { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--c)); }
@@ -69,10 +77,10 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .chip[aria-pressed=false] i { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(var(--c)); }
 
     /* Month: six weeks of days, each with its first events */
-    .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
+    .month { display: grid; grid-auto-rows: auto; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
     .wd { padding: 8px 4px; font-size: 12px; opacity: 0.55; text-align: center; }
     .cell {
-      all: unset; box-sizing: border-box; min-height: 96px; padding: 4px; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-width: 0;
+      all: unset; box-sizing: border-box; min-height: var(--cell, 96px); padding: 4px; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-width: 0;
       border-top: 1px solid rgba(var(--ad-on-surface), 0.08);
     }
     .cell:not(:nth-child(7n + 1)) { border-left: 1px solid rgba(var(--ad-on-surface), 0.05); }
@@ -91,22 +99,22 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .ev .h { opacity: 0.6; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
     .ev.all { background: rgba(var(--c), 0.22); }
     .ev:not(.all)::before { content: ''; flex: 0 0 6px; height: 6px; border-radius: 50%; background: rgb(var(--c)); }
-    .more { font-size: 11px; opacity: 0.6; padding: 0 4px; }
+    .day-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+    .more { font-size: 11px; opacity: 0.6; padding: 0 4px; white-space: nowrap; }
 
     /* Week and day: the hours like a planner */
-    .grid { display: grid; grid-template-columns: 48px repeat(var(--days), minmax(0, 1fr)); }
+    .grid { display: grid; grid-template-columns: 56px repeat(var(--days), minmax(0, 1fr)); }
     .head { padding: 4px; text-align: center; font-size: 12px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
     .head button { all: unset; cursor: pointer; display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
     .head .wdn { opacity: 0.55; }
     .head .num { align-self: center; font-size: 16px; min-width: 30px; height: 30px; border-radius: 15px; }
     .head.today .num { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .alld { padding: 4px 2px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); min-width: 0; }
-    .alld-label { font-size: 11px; opacity: 0.5; padding: 6px 4px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
-    .scroll { max-height: min(640px, 65vh); overflow-y: auto; scrollbar-width: thin; }
-    .hours { position: relative; height: calc(24 * ${HOUR}px); }
+    .alld-label { font-size: 11px; opacity: 0.5; padding: 6px 8px 6px 0; text-align: right; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
+    .hours { position: relative; height: calc(var(--hours) * var(--hour)); }
     .gutter span { position: absolute; right: 8px; font-size: 11px; opacity: 0.5; transform: translateY(-50%); font-variant-numeric: tabular-nums; }
     .col { position: relative; border-left: 1px solid rgba(var(--ad-on-surface), 0.06);
-      background: repeating-linear-gradient(to bottom, rgba(var(--ad-on-surface), 0.06) 0 1px, transparent 1px ${HOUR}px); }
+      background: repeating-linear-gradient(to bottom, rgba(var(--ad-on-surface), 0.06) 0 1px, transparent 1px var(--hour)); }
     .slot {
       all: unset; box-sizing: border-box; position: absolute; padding: 2px 6px; border-radius: 6px; overflow: hidden; cursor: pointer;
       background: rgba(var(--c), 0.22); box-shadow: inset 3px 0 0 rgb(var(--c)); font-size: 12px; line-height: 16px;
@@ -166,13 +174,39 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     this.resize = new ResizeObserver(([entry]) => {
       const narrow = (entry?.contentRect.width ?? 1000) < NARROW
       if (narrow !== this.narrow) { this.narrow = narrow; this.toggleAttribute('narrow', narrow) }
+      this.measure()
     })
     this.resize.observe(this)
+    window.addEventListener('resize', this.onResize)
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
     this.resize?.disconnect()
+    window.removeEventListener('resize', this.onResize)
+  }
+
+  /** How much of the screen is left below the bar and chips, so month and hours fit without scrolling. */
+  private measure() {
+    const body = this.renderRoot.querySelector<HTMLElement>('.fit')
+    const rect = body?.getBoundingClientRect()
+    // Not on screen yet, like a page that is not open
+    if (!rect || !rect.width) return
+    const fit = Math.floor(window.innerHeight - rect.top - 24)
+    if (Math.abs(fit - this.fit) > 4) this.fit = fit
+  }
+
+  /** The hours week and day show: the working day, widened to the events and to now. */
+  private hourRange(days: Date[]): [number, number] {
+    let from = DAY_FROM
+    let to = DAY_TO
+    for (const d of days) for (const p of layoutDay(this.events, d)) {
+      from = Math.min(from, Math.floor(p.top / 60))
+      to = Math.max(to, Math.ceil((p.top + p.height) / 60))
+    }
+    const now = new Date()
+    if (days.some(d => sameDay(d, now))) { from = Math.min(from, now.getHours()); to = Math.max(to, now.getHours() + 1) }
+    return [Math.max(0, from), Math.min(24, to)]
   }
 
   protected watched() {
@@ -222,14 +256,8 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   protected updated(changed: PropertyValues<this>) {
     // A new range or a change in a calendar (an event starts or ends) loads again, unless what is there is fresh
     if ((['view', 'anchor', 'config', 'hiddenCals', 'hass'] as const).some(k => changed.has(k))) void this.load()
-    // Week and day open at the morning, or just before now when today is shown
-    const key = `${this.view}|${dayKey(this.anchor)}`
-    const scroll = this.renderRoot.querySelector<HTMLElement>('.scroll')
-    if (scroll && this.scrolled !== key) {
-      this.scrolled = key
-      const now = new Date()
-      scroll.scrollTop = (this.days.some(d => sameDay(d, now)) ? Math.max(0, now.getHours() - 1) : 7) * HOUR
-    }
+    // All-day events push the hours down, so measure again when they change
+    if (changed.has('view') || changed.has('narrow') || changed.has('events')) this.measure()
   }
 
   private setView(view: CalendarView) {
@@ -276,17 +304,20 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     const today = new Date()
     const days = this.days
     const month = this.anchor.getMonth()
-    const lines = this.narrow ? 4 : MONTH_LINES
-    return html`<div class="month">
+    // The weeks share the height left on screen; a taller cell shows more events
+    const cell = this.fit && !this.narrow ? Math.min(160, Math.max(72, Math.floor((this.fit - 32) / (days.length / 7)))) : undefined
+    // Padding and day number take 34px, each event line 20px
+    const lines = this.narrow ? 4 : cell ? Math.max(1, Math.floor((cell - 34) / 20)) : MONTH_LINES
+    return html`<div class="month fit" style=${cell ? `--cell:${cell}px` : ''}>
       ${days.slice(0, 7).map(d => html`<span class="wd">${d.toLocaleDateString(this.locale, { weekday: this.narrow ? 'narrow' : 'short' })}</span>`)}
       ${days.map(d => {
         const list = eventsOn(this.events, d)
         return html`<div class="cell ${d.getMonth() !== month ? 'other' : ''} ${sameDay(d, today) ? 'today' : ''}" role="button" tabindex="0"
           aria-label=${d.toLocaleDateString(this.locale, { weekday: 'long', day: 'numeric', month: 'long' })}
           @click=${() => this.openDay(d)} @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.openDay(d)}>
-          <span class="num">${d.getDate()}</span>
+          <div class="day-top"><span class="num">${d.getDate()}</span>
+            ${list.length > lines ? html`<span class="more">${t(this.hass, 'cal.more', { n: list.length - lines })}</span>` : nothing}</div>
           <div class="events">${list.slice(0, lines).map(e => this.evButton(e, d))}</div>
-          ${list.length > lines ? html`<span class="more">${t(this.hass, 'cal.more', { n: list.length - lines })}</span>` : nothing}
         </div>`
       })}
     </div>`
@@ -295,7 +326,12 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   private renderHours() {
     const today = new Date()
     const days = this.days
-    const now = (today.getHours() * 60 + today.getMinutes()) / 60 * HOUR
+    const [from, to] = this.hourRange(days)
+    const hours = to - from
+    // The hours share the height left on screen; below the smallest step the page grows instead of a box that scrolls
+    const px = this.fit ? Math.min(HOUR_MAX, Math.max(HOUR_MIN, Math.floor(this.fit / hours))) : HOUR
+    const y = (minutes: number) => (minutes / 60 - from) * px
+    const nowMin = today.getHours() * 60 + today.getMinutes()
     return html`
       <div class="grid" style="--days:${days.length}">
         <span></span>
@@ -305,15 +341,15 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
         <span class="alld-label">${t(this.hass, 'cal.all_day')}</span>
         ${days.map(d => html`<div class="alld">${eventsOn(this.events, d).filter(e => e.allDay).map(e => this.evButton(e, d))}</div>`)}
       </div>
-      <div class="scroll">
-        <div class="grid hours" style="--days:${days.length}">
-          <div class="gutter" style="position:relative">${Array.from({ length: 23 }, (_, i) => html`<span style="top:${(i + 1) * HOUR}px">${String(i + 1).padStart(2, '0')}:00</span>`)}</div>
+      <div class="fit">
+        <div class="grid hours" style="--days:${days.length};--hours:${hours};--hour:${px}px">
+          <div class="gutter" style="position:relative">${Array.from({ length: hours - 1 }, (_, i) => html`<span style="top:${(i + 1) * px}px">${String(from + i + 1).padStart(2, '0')}:00</span>`)}</div>
           ${days.map(d => html`<div class="col">
-            ${layoutDay(this.events, d).map(p => html`<button class="slot" style="--c:${this.color(p.event.calendar)};top:${p.top / 60 * HOUR}px;height:${Math.max(p.height / 60 * HOUR - 2, 16)}px;left:calc(${(p.column / p.columns) * 100}% + 2px);width:calc(${100 / p.columns}% - 4px)"
+            ${layoutDay(this.events, d).map(p => html`<button class="slot" style="--c:${this.color(p.event.calendar)};top:${y(p.top)}px;height:${Math.max(p.height / 60 * px - 2, 16)}px;left:calc(${(p.column / p.columns) * 100}% + 2px);width:calc(${100 / p.columns}% - 4px)"
               @click=${() => (this.selected = p.event)}>
-              <b>${p.event.title}</b>${p.height >= 45 ? html`<span>${this.time(p.event.start)} – ${this.time(p.event.end)}</span>` : nothing}
+              <b>${p.event.title}</b>${p.height / 60 * px >= 34 ? html`<span>${this.time(p.event.start)} – ${this.time(p.event.end)}</span>` : nothing}
             </button>`)}
-            ${sameDay(d, today) ? html`<span class="now" style="top:${now}px"></span>` : nothing}
+            ${sameDay(d, today) ? html`<span class="now" style="top:${y(nowMin)}px"></span>` : nothing}
           </div>`)}
         </div>
       </div>`
