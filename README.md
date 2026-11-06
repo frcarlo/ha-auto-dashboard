@@ -20,7 +20,7 @@ Ein ES-Modul (~140 KB, ~39 KB gzip), einzige Abhängigkeit ist Lit. Keine andere
 
 **Läuft gerade:** erscheint, sobald ein Player spielt, mit Cover, Titel, Raum, Play/Pause und Weiter. Bei mehreren Playern schaltet „+N“ weiter. Ein pausierter Player bleibt fünf Minuten stehen. Mit `hide_domains: [media_player]` verschwindet die Leiste.
 
-**Wetter:** Auf der Startseite steht eine Wetterkarte mit Temperatur, Zustand, Luftfeuchte, Wind, Luftdruck und Sicht, darunter die nächsten Tage mit Temperaturbalken. Haben die Bereiche in `outdoor_areas` (Garten, Terrasse) Temperatur- oder Feuchtesensoren, zeigt die Karte deren Messwert statt des Werts vom Wetterdienst. Mit `weather_warnings` erscheinen Unwetterwarnungen: NINA legt pro Region mehrere `binary_sensor.warning_…` an, die Karte zeigt jede aktive mit Überschrift und Ende, sonst „Keine Warnungen“. Der DWD-Warnsensor geht ebenso. Die Wetterkarte ersetzt die Kachel „Außen“; „Innen“ und „Strom“ stehen darunter. Gibt es keine Wetter-Entity oder ist `weather` unter `hide_domains`, erscheint „Außen“ wieder als Kachel.
+**Wetter:** Auf der Startseite steht eine Wetterkarte mit Temperatur, Zustand, Luftfeuchte, Wind, Luftdruck und Sicht, darunter die nächsten Tage mit Temperaturbalken. Mit `weather_sensors` ersetzen Sensoren am Haus die Werte vom Wetterdienst: Temperatur, Luftfeuchte, Luftdruck, Wind, Windrichtung, Regen und Helligkeit. Neben einer gemessenen Temperatur steht zum Vergleich die des Wetterdienstes, so fällt ein Sensor in der Sonne oder im Haus auf. Ein Tipp auf einen gemessenen Wert öffnet seinen Verlauf. Mit `weather_warnings` erscheinen Unwetterwarnungen: NINA legt pro Region mehrere `binary_sensor.warning_…` an, die Karte zeigt jede aktive mit Überschrift und Ende, sonst „Keine Warnungen“. Der DWD-Warnsensor geht ebenso. Die Wetterkarte ersetzt die Kachel „Außen“; „Innen“ und „Strom“ stehen darunter. Gibt es keine Wetter-Entity oder ist `weather` unter `hide_domains`, erscheint „Außen“ wieder als Kachel.
 
 **Innen, Außen, Strom:** „Innen“ ist der Durchschnitt aller Räume, „Außen“ der Durchschnitt der Bereiche in `outdoor_areas`. Außenbereiche zählen innen nicht mit. „Strom“ kommt aus HAs Energieeinstellungen, wenn sie eindeutig sind: ein Hausverbrauch-Sensor, sonst genau eine Netzquelle mit Leistungssensor (plus Solar und Akku). Mehrere Netzquellen mit Leistungssensor sind meist einzelne Steckdosen und werden ignoriert. Die Energieseite zeigt die drei dann einzeln. Ohne diese Angaben (oder für Nutzer ohne Zugriff darauf) ist „Strom“ die Summe aller Leistungssensoren (`device_class: power`) in den Räumen; ein Gesamtzähler in einem Raum zählt dann doppelt und lässt sich per Label ausblenden.
 
@@ -87,9 +87,17 @@ strategy:
   favorites: [light.flur, lock.haustuer]       # Startseite und oben im jeweiligen Raum
   scenes: [scene.kino, script.gute_nacht]      # Zeile auf der Startseite
   todo_lists: [todo.einkaufsliste]             # Listen auf der Startseite, sonst alle
-  outdoor_areas: [garten]  # ihre Sensoren geben die Außentemperatur in der Wetterkarte
+  outdoor_areas: [garten]  # zählen nicht zum Innenklima; ohne Wetterkarte ihr Durchschnitt als „Außen“
   weather_entity: weather.forecast_home        # sonst die erste Wetter-Entity mit Tagesvorhersage
   weather_warnings: [binary_sensor.warning_muelheim_1]   # NINA-Sensoren oder der DWD-Warnsensor
+  weather_sensors:         # eigene Messwerte statt Wetterdienst, alle optional
+    temperature: sensor.aussen_temperatur
+    humidity: sensor.aussen_luftfeuchte
+    pressure: sensor.aussen_luftdruck
+    wind_speed: sensor.wind
+    wind_bearing: sensor.windrichtung
+    rain: sensor.regen
+    illuminance: sensor.aussen_helligkeit
   forecast_days: 3         # 0 = keine Vorhersage
   hide_entities: [light.deko]   # einzelne Geräte überall ausblenden
   rooms:                   # Einstellungen pro Raumseite, siehe unten

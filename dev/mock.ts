@@ -78,6 +78,11 @@ const extras: HassEntity[] = [
       wind_speed: 14.4, wind_speed_unit: 'km/h', wind_bearing: 230, visibility: 10, visibility_unit: 'km', supported_features: 3,
     },
   },
+  // A weather station at the house, ?sensors uses it in the weather card
+  { entity_id: 'sensor.aussen_temperatur', state: '9.4', attributes: { friendly_name: 'Außen Temperatur', device_class: 'temperature', unit_of_measurement: '°C' } },
+  { entity_id: 'sensor.aussen_luftfeuchte', state: '81', attributes: { friendly_name: 'Außen Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' } },
+  { entity_id: 'sensor.aussen_helligkeit', state: '2920', attributes: { friendly_name: 'Außen Helligkeit', device_class: 'illuminance', unit_of_measurement: 'lx' } },
+  { entity_id: 'sensor.aussen_regen', state: '0.4', attributes: { friendly_name: 'Außen Regen', device_class: 'precipitation_intensity', unit_of_measurement: 'mm/h' } },
   // NINA keeps one binary sensor per warning slot; ?warn=on fills the first
   { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1' } },
   { entity_id: 'binary_sensor.warning_mulheim_2', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 2' } },

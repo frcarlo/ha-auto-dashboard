@@ -1,11 +1,10 @@
-// Weather on Home: now (measured outside when outdoor areas have sensors), the details, warnings, and the next days.
+// Weather on Home: now (measured by the house's own sensors where configured), the details, warnings, and the next days.
 // HA keeps forecasts out of the state, so the card subscribes to them like HA's own weather card.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { averageClimate, entityIndex, hideOf } from '../model'
 import { tokens } from '../styles/tokens'
-import type { AreaRegistryEntry } from '../types'
+import type { HassEntity, WeatherSensorKey } from '../types'
 import {
   activeWarnings, compass, conditionIcon, conditionTone, forecastDays, forecastType, temperatureColor, todayDate,
   type ForecastEntry, type Warning,
@@ -15,13 +14,17 @@ interface WeatherConfig extends BaseConfig {
   entity: string
   /** Warning entities (NINA, DWD); without them there is no warning line */
   warnings?: string[]
-  /** Outdoor areas: their sensors give the temperature and humidity now */
-  outdoor?: string[]
+  /** Sensors at the house; each replaces the forecast service's value */
+  sensors?: Partial<Record<WeatherSensorKey, string>>
   /** Days of forecast, 3 by default, 0 for none */
   days?: number
-  hide_domains?: string[]
-  hide_labels?: string[]
-  hide_entities?: string[]
+}
+
+interface Detail {
+  icon: string
+  text: string
+  /** Measured by this sensor: a tap shows its history */
+  sensor?: string
 }
 
 export class AdWeather extends BaseCard<WeatherConfig> {
@@ -36,7 +39,7 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     .cond { --mdc-icon-size: 48px; flex: 0 0 auto; color: rgba(var(--ad-on-surface), 0.7); }
     .cond.sun, .cond.storm { color: rgb(var(--ad-warning)); }
     .cond.wet { color: rgb(var(--ad-info)); }
-    .temp { font-size: 48px; font-weight: 200; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .temp { all: unset; font-size: 48px; font-weight: 200; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
     .temp small { font-size: 20px; font-weight: 300; opacity: 0.5; margin-left: 2px; vertical-align: top; letter-spacing: 0; }
     .desc { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; margin-left: 4px; }
     /* Long conditions ("Teilweise bewölkt") wrap rather than lose their end */
@@ -44,7 +47,9 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     .sub { font-size: 13px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 
     .details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
-    .detail { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; min-width: 0; }
+    .detail { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; min-width: 0; }
+    button.detail { cursor: pointer; }
+    button.detail:focus-visible, button.temp:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; border-radius: 4px; }
     .detail ha-icon { --mdc-icon-size: 16px; opacity: 0.5; }
     .detail span { overflow: hidden; text-overflow: ellipsis; }
 
@@ -140,20 +145,16 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     }, { type: 'weather/subscribe_forecast', forecast_type: type, entity_id: entity.entity_id }).catch(() => undefined)
   }
 
-  private get outdoorAreas(): AreaRegistryEntry[] {
-    return (this.config!.outdoor ?? []).map(id => this.hass!.areas[id]).filter((a): a is AreaRegistryEntry => !!a)
+  protected watched() {
+    return [this.config!.entity, ...(this.config!.warnings ?? []), ...Object.values(this.config!.sensors ?? {})]
   }
 
-  protected watched() {
-    const index = entityIndex(this.hass!, this.config!.hide_labels).byArea
-    return [
-      this.config!.entity,
-      ...(this.config!.warnings ?? []),
-      ...this.outdoorAreas.flatMap(area => [
-        ...(index.get(area.area_id) ?? []),
-        ...[area.temperature_entity_id, area.humidity_entity_id].filter((id): id is string => !!id),
-      ]),
-    ]
+  /** A configured sensor's number, or nothing while it is missing or unavailable. */
+  private reading(key: WeatherSensorKey): { entity: HassEntity; n: number; text: string } | undefined {
+    const entity = this.state(this.config!.sensors?.[key])
+    if (!entity || entity.state === '' || !Number.isFinite(Number(entity.state))) return undefined
+    const { value, unit } = this.value(entity)
+    return { entity, n: Number(entity.state), text: unit ? `${value} ${unit}` : value }
   }
 
   private get language() {
@@ -195,27 +196,41 @@ export class AdWeather extends BaseCard<WeatherConfig> {
     const weather = this.state(c.entity)
     if (!weather) return nothing
     const a = weather.attributes
-    const unit = String(a.temperature_unit ?? '°C')
-    // Sensors at the house know the temperature outside better than a forecast service
-    const measured = averageClimate(this.hass!, this.outdoorAreas, hideOf(c))
-    const now = measured.temperature ?? a.temperature
-    const humidity = measured.humidity ?? a.humidity
+    // Sensors at the house know what it is like here better than a forecast service
+    const temperature = this.reading('temperature')
+    const now: number | undefined = temperature?.n ?? a.temperature
+    const unit = String(temperature?.entity.attributes.unit_of_measurement ?? a.temperature_unit ?? '°C')
     const days = forecastDays(this.forecast ?? a.forecast).slice(0, c.days ?? 3)
     const today = days[0]?.date === todayDate() ? days[0] : undefined
-    const dir = compass(a.wind_bearing, t(this.hass, 'compass').split(','))
+    const points = t(this.hass, 'compass').split(',')
 
-    const details = [
-      humidity !== undefined ? ['mdi:water-percent', `${this.number(humidity, 0)} %`] : undefined,
-      a.wind_speed !== undefined ? ['mdi:weather-windy', `${this.temp(a.wind_speed)} ${a.wind_speed_unit ?? ''}${dir ? ` ${dir}` : ''}`] : undefined,
-      a.pressure !== undefined ? ['mdi:gauge', `${this.number(a.pressure, 0)} ${a.pressure_unit ?? ''}`] : undefined,
-      a.visibility !== undefined ? ['mdi:eye-outline', `${this.temp(a.visibility)} ${a.visibility_unit ?? ''}`] : undefined,
-      a.uv_index !== undefined ? ['mdi:white-balance-sunny', `UV ${this.number(a.uv_index, 0)}`] : undefined,
-    ].filter((d): d is [string, string] => !!d).slice(0, 4)
+    const humidity = this.reading('humidity')
+    const wind = this.reading('wind_speed')
+    const bearing = this.reading('wind_bearing')
+    const dir = compass(bearing?.n ?? a.wind_bearing, points)
+    const pressure = this.reading('pressure')
+    const rain = this.reading('rain')
+    const light = this.reading('illuminance')
+    const details: Detail[] = [
+      humidity ? { icon: 'mdi:water-percent', text: humidity.text, sensor: humidity.entity.entity_id }
+        : a.humidity !== undefined ? { icon: 'mdi:water-percent', text: `${this.number(a.humidity, 0)} %` } : undefined,
+      wind ? { icon: 'mdi:weather-windy', text: `${wind.text}${dir ? ` ${dir}` : ''}`, sensor: wind.entity.entity_id }
+        : a.wind_speed !== undefined ? { icon: 'mdi:weather-windy', text: `${this.temp(a.wind_speed)} ${a.wind_speed_unit ?? ''}${dir ? ` ${dir}` : ''}` } : undefined,
+      pressure ? { icon: 'mdi:gauge', text: pressure.text, sensor: pressure.entity.entity_id }
+        : a.pressure !== undefined ? { icon: 'mdi:gauge', text: `${this.number(a.pressure, 0)} ${a.pressure_unit ?? ''}` } : undefined,
+      rain ? { icon: 'mdi:weather-pouring', text: rain.text, sensor: rain.entity.entity_id } : undefined,
+      light ? { icon: 'mdi:brightness-5', text: light.text, sensor: light.entity.entity_id } : undefined,
+      a.visibility !== undefined ? { icon: 'mdi:eye-outline', text: `${this.temp(a.visibility)} ${a.visibility_unit ?? ''}` } : undefined,
+      a.uv_index !== undefined ? { icon: 'mdi:white-balance-sunny', text: `UV ${this.number(a.uv_index, 0)}` } : undefined,
+    ].filter((d): d is Detail => !!d).slice(0, 6)
 
     const sub = [
       today?.high !== undefined && today.low !== undefined ? `↑ ${this.temp(today.high)}°  ↓ ${this.temp(today.low)}°` : undefined,
-      a.apparent_temperature !== undefined && Math.round(a.apparent_temperature) !== Math.round(now) ? t(this.hass, 'feels_like', { t: `${this.temp(a.apparent_temperature)}°` }) : undefined,
-    ].filter(Boolean).join(' · ')
+      // Measured here: what the service says next to it, so a sensor in the sun or indoors shows up
+      temperature && a.temperature !== undefined ? t(this.hass, 'service_value', { t: `${this.temp(a.temperature)}°` })
+        : a.apparent_temperature !== undefined && Math.round(a.apparent_temperature) !== Math.round(Number(now)) ? t(this.hass, 'feels_like', { t: `${this.temp(a.apparent_temperature)}°` }) : undefined,
+    ].filter((x): x is string => !!x)
+    const open = (id: string) => (e: Event) => { e.stopPropagation(); this.moreInfo(id) }
 
     return html`<div class="card" role="button" tabindex="0" aria-label=${t(this.hass, 'weather')}
       @click=${() => this.moreInfo(weather.entity_id)} @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.moreInfo(weather.entity_id)}>
@@ -223,14 +238,16 @@ export class AdWeather extends BaseCard<WeatherConfig> {
         <div class="now">
           <div class="top">
             <ha-icon class="cond ${conditionTone(weather.state)}" icon=${conditionIcon(weather.state)}></ha-icon>
-            <span class="temp">${this.temp(now)}<small>${unit}</small></span>
+            ${temperature ? html`<button class="temp" @click=${open(temperature.entity.entity_id)}>${this.temp(now)}<small>${unit}</small></button>`
+              : html`<span class="temp">${this.temp(now)}<small>${unit}</small></span>`}
             <span class="desc">
               <span class="state">${this.hass!.formatEntityState?.(weather) ?? weather.state}</span>
-              ${sub ? html`<span class="sub">${sub}</span>` : nothing}
+              ${sub.map(line => html`<span class="sub">${line}</span>`)}
             </span>
           </div>
-          ${details.length ? html`<div class="details">${details.map(([icon, text]) => html`
-            <span class="detail"><ha-icon icon=${icon}></ha-icon><span>${text}</span></span>`)}</div>` : nothing}
+          ${details.length ? html`<div class="details">${details.map(d => d.sensor
+            ? html`<button class="detail" @click=${open(d.sensor)}><ha-icon icon=${d.icon}></ha-icon><span>${d.text}</span></button>`
+            : html`<span class="detail"><ha-icon icon=${d.icon}></ha-icon><span>${d.text}</span></span>`)}</div>` : nothing}
           ${this.renderWarnings()}
         </div>
         ${days.length ? this.renderDays(days, now, unit, today) : nothing}

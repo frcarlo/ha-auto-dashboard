@@ -6,7 +6,7 @@ import {
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
-import { weatherEntity } from './weather'
+import { weatherEntity, weatherSensors } from './weather'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
@@ -212,7 +212,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         },
         ...(weather ? [{
           type: 'custom:ad-weather', entity: weather, ...(config.weather_warnings?.length ? { warnings: config.weather_warnings } : {}),
-          ...(outdoor.length ? { outdoor } : {}), ...(config.forecast_days !== undefined ? { days: config.forecast_days } : {}), ...hideOpts, ...look,
+          ...(weatherSensors(hass, config.weather_sensors) ? { sensors: weatherSensors(hass, config.weather_sensors) } : {}),
+          ...(config.forecast_days !== undefined ? { days: config.forecast_days } : {}), ...look,
         }] : []),
         ...(showClimate || hasEnergy ? [{
           type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outsideTile.length ? { outdoor: outsideTile } : {}), ...hideOpts, ...look,

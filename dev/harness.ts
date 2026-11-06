@@ -46,6 +46,9 @@ const config: StrategyConfig = {
   // ?warnings=binary_sensor.warning_mulheim_1&warn=on   ?days=5
   weather_warnings: list('warnings'),
   forecast_days: params.has('days') ? Number(params.get('days')) : undefined,
+  weather_sensors: params.has('sensors') ? {
+    temperature: 'sensor.aussen_temperatur', humidity: 'sensor.aussen_luftfeuchte', illuminance: 'sensor.aussen_helligkeit', rain: 'sensor.aussen_regen',
+  } : undefined,
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
   // ?as=leni&users={"leni":{"read_only":true}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,

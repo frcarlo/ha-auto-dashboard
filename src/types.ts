@@ -112,6 +112,9 @@ export interface UserRule {
 
 export type NavPosition = 'bottom' | 'top' | 'left' | 'right'
 
+/** Measurements a sensor at the house can give the weather card instead of the forecast service */
+export type WeatherSensorKey = 'temperature' | 'humidity' | 'pressure' | 'wind_speed' | 'wind_bearing' | 'rain' | 'illuminance'
+
 export interface StrategyConfig extends CardLook {
   type: string
   title?: string
@@ -145,6 +148,8 @@ export interface StrategyConfig extends CardLook {
   weather_entity?: string
   /** Warning entities shown with the weather: NINA binary sensors, a DWD warnings sensor, or any on/off */
   weather_warnings?: string[]
+  /** Own sensors for the weather card, e.g. temperature: sensor.aussen_temperatur */
+  weather_sensors?: Partial<Record<WeatherSensorKey, string>>
   /** Days of forecast under the weather, 3 by default */
   forecast_days?: number
 }

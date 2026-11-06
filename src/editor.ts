@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
 import { HIDE_LABEL } from './model'
 import { isHexColor } from './styles/palette'
+import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
@@ -136,6 +137,7 @@ export class AdStrategyEditor extends LitElement {
     .tab[aria-selected=true] { color: var(--ad-accent); border-bottom-color: var(--ad-accent); }
     .tab:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: -2px; }
     .tool-hint { min-height: 2.8em; }
+    .sensors { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 12px; font-size: 13px; }
   `]
 
   setConfig(config: StrategyConfig) {
@@ -233,10 +235,11 @@ export class AdStrategyEditor extends LitElement {
   }
 
   /** One entity, HA's picker when it is loaded, else its id. */
-  private singleEntityPicker(value: string | undefined, domain: string, onChange: (v: string | undefined) => void) {
+  private singleEntityPicker(value: string | undefined, domain: string, onChange: (v: string | undefined) => void, deviceClasses?: string[]) {
     if (customElements.get('ha-selector')) {
+      const filter = deviceClasses ? deviceClasses.map(device_class => ({ domain, device_class })) : { domain }
       return html`<ha-selector .hass=${this.hass} .value=${value}
-        .selector=${{ entity: { filter: { domain } } }}
+        .selector=${{ entity: { filter } }}
         @value-changed=${(e: CustomEvent) => onChange((e.detail.value as string | undefined) || undefined)}></ha-selector>`
     }
     return html`<input type="text" .value=${value ?? ''} placeholder="${domain}.…"
@@ -329,6 +332,13 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
         ${c.hide_domains?.includes('weather') ? nothing : html`
           ${this.field(this.l('ed.weather'), this.singleEntityPicker(c.weather_entity, 'weather', weather_entity => this.change({ weather_entity })), this.l('ed.weather_hint'))}
+          ${this.field(this.l('ed.sensors'), html`<div class="sensors">${WEATHER_SENSORS.map(([key, classes]) => html`
+            <span>${this.l(`ws.${key}` as Key)}</span>
+            ${this.singleEntityPicker(c.weather_sensors?.[key], 'sensor', id => {
+              const next = { ...(c.weather_sensors ?? {}), [key]: id }
+              if (!id) delete next[key]
+              this.change({ weather_sensors: Object.keys(next).length ? next : undefined })
+            }, classes)}`)}</div>`, this.l('ed.sensors_hint'))}
           ${this.field(this.l('ed.warnings'), this.entityPicker(c.weather_warnings, ['binary_sensor', 'sensor'], weather_warnings => this.change({ weather_warnings })), this.l('ed.warnings_hint'))}
           ${this.field(this.l('ed.forecast_days'), html`<div class="seg" role="group">${[0, 3, 5, 7].map(n => html`
             <button aria-pressed=${(c.forecast_days ?? 3) === n} @click=${() => this.change({ forecast_days: n })}>${n}</button>`)}</div>`)}`}`

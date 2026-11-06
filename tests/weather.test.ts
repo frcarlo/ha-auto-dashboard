@@ -55,11 +55,14 @@ describe('weather', () => {
     const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
     const { views } = await generateDashboard({
       type: 'custom:auto-dashboard', outdoor_areas: ['garten'], weather_warnings: ['binary_sensor.warning_mulheim_1'], forecast_days: 5,
+      weather_sensors: { temperature: 'sensor.aussen_temperatur', humidity: 'sensor.gibt_es_nicht' },
     }, createHass(true))
     const home = cards(views[0]!)
-    expect(home.find(c => c.type === 'custom:ad-weather')).toMatchObject({
-      entity: 'weather.home', warnings: ['binary_sensor.warning_mulheim_1'], outdoor: ['garten'], days: 5,
-    })
+    const card = home.find(c => c.type === 'custom:ad-weather')!
+    expect(card).toMatchObject({ entity: 'weather.home', warnings: ['binary_sensor.warning_mulheim_1'], days: 5 })
+    // Only sensors that exist; outdoor areas no longer guess the temperature
+    expect(card.sensors).toEqual({ temperature: 'sensor.aussen_temperatur' })
+    expect(card.outdoor).toBeUndefined()
     const info = home.find(c => c.type === 'custom:ad-house-info')!
     expect(info.outdoor).toBeUndefined()
     expect(info.areas).toContain('wohnzimmer')

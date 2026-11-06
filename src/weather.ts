@@ -1,6 +1,23 @@
 // Weather without the card: which entity, the forecast per day, warnings from NINA or DWD, colors for temperatures.
 import { domainOf } from './presentation'
-import type { HassEntity, HomeAssistant, StrategyConfig } from './types'
+import type { HassEntity, HomeAssistant, StrategyConfig, WeatherSensorKey } from './types'
+
+/** Each measurement with the device classes a fitting sensor has, in the order the editor lists them */
+export const WEATHER_SENSORS: [WeatherSensorKey, string[]][] = [
+  ['temperature', ['temperature']],
+  ['humidity', ['humidity']],
+  ['pressure', ['atmospheric_pressure', 'pressure']],
+  ['wind_speed', ['wind_speed']],
+  ['wind_bearing', ['wind_direction']],
+  ['rain', ['precipitation_intensity', 'precipitation']],
+  ['illuminance', ['illuminance']],
+]
+
+/** The configured sensors that exist, without empty entries. */
+export function weatherSensors(hass: HomeAssistant, sensors: StrategyConfig['weather_sensors']) {
+  const out = Object.fromEntries(Object.entries(sensors ?? {}).filter(([, id]) => typeof id === 'string' && !!hass.states[id]))
+  return Object.keys(out).length ? out as Partial<Record<WeatherSensorKey, string>> : undefined
+}
 
 /** HA's WeatherEntityFeature flags */
 const DAILY = 1
