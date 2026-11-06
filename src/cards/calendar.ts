@@ -1,21 +1,27 @@
 // The calendar page: month, week or day, switchable. Which calendars it shows is set in the dashboard's config only.
 // The month shows each day's first events, a tap on a day opens it; week and day lay the hours out like a planner.
 // On a phone the week becomes a list of the days with their events. A tap on an event shows its details.
+// Where a calendar allows it, events can be added (the + in the bar, or a tap on a free hour), changed and deleted.
 import { css, html, nothing, type PropertyValues } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
 import { entityName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import {
-  CALENDAR_COLORS, addDays, dayKey, eventsOn, layoutDay, sameDay, startOfDay, step, toEvent, viewDays,
-  type ApiEvent, type CalEvent, type CalendarView,
+  CALENDAR_COLORS, CAL_CREATE, CAL_DELETE, CAL_UPDATE, addDays, dayKey, draftOf, draftPayload, eventsOn, layoutDay, moveStart, newDraft,
+  sameDay, startOfDay, step, toEvent, viewDays,
+  type ApiEvent, type CalEvent, type CalendarView, type EventDraft,
 } from '../calendar'
 
 interface CalendarConfig extends BaseConfig {
   entities: string[]
   /** View on first open; afterwards each device keeps its own */
   view?: CalendarView
+  /** false: only look, no adding, changing or deleting */
+  edit?: boolean
 }
+
+type Scope = 'one' | 'following'
 
 /** Pixels per hour in week and day until the card knows its room, and the bounds when it does */
 const HOUR = 48
@@ -40,6 +46,7 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     ...BaseCard.properties,
     view: { state: true }, anchor: { state: true }, events: { state: true },
     selected: { state: true }, narrow: { state: true }, fit: { state: true },
+    draft: { state: true }, scope: { state: true }, confirming: { state: true }, busy: { state: true }, error: { state: true },
   }
   view: CalendarView = 'month'
   anchor = new Date()
@@ -48,6 +55,15 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   narrow = false
   /** Height left on screen below the bar, 0 until measured */
   fit = 0
+  /** The event in the form, new or being changed */
+  draft?: EventDraft
+  /** The event the form changes; none for a new one */
+  private editing?: CalEvent
+  /** For a series: change or delete just this one, or this and the following */
+  scope: Scope = 'one'
+  confirming = false
+  busy = false
+  error?: string
   private loaded = new Map<string, number>()
   private all = new Map<string, CalEvent[]>()
   private resize?: ResizeObserver
@@ -137,6 +153,44 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .detail .line ha-icon { --mdc-icon-size: 16px; opacity: 0.6; }
     .detail p { margin: 0; font-size: 13px; opacity: 0.75; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 
+    .detail .actions, .form .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .detail .confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+    .act {
+      all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 18px;
+      font-size: 13px; font-weight: 500; background: rgba(var(--ad-on-surface), 0.08);
+    }
+    .act ha-icon { --mdc-icon-size: 18px; }
+    .act:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    .act.primary { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
+    .act.danger { background: rgba(var(--ad-error), 0.16); color: rgb(var(--ad-error)); }
+    .act[disabled] { opacity: 0.5; pointer-events: none; }
+    .error { margin: 0; font-size: 13px; color: rgb(var(--ad-error)); }
+    .add ha-icon { --mdc-icon-size: 20px; }
+    :host([editable]) .col, :host([editable]) .alld { cursor: cell; }
+
+    /* The form for a new or changed event, over the whole page */
+    :host([dark]) { color-scheme: dark; }
+    dialog.form {
+      border: none; padding: 0; border-radius: 20px; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box;
+      background: var(--ad-surface); color: rgb(var(--ad-on-surface)); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    }
+    dialog.form::backdrop { background: rgba(0, 0, 0, 0.45); }
+    .form form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+    .form h3 { margin: 0 0 4px; font-size: 17px; font-weight: 500; }
+    .form input:not([type=checkbox]), .form select, .form textarea {
+      box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: none; border-radius: 10px; font: inherit; font-size: 14px; line-height: 20px;
+      color: inherit; background: rgba(var(--ad-on-surface), 0.06);
+    }
+    .form input:focus-visible, .form select:focus-visible, .form textarea:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 0; }
+    .form .name { font-size: 17px; }
+    .form textarea { resize: vertical; }
+    .form .row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 112px; align-items: center; gap: 8px; font-size: 13px; }
+    .form .row.dates { grid-template-columns: 64px minmax(0, 1fr); }
+    .form .row > span { opacity: 0.6; }
+    .form .switch { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+    .form .switch input { width: 18px; height: 18px; margin: 0; accent-color: rgb(var(--ad-primary)); }
+    .form .seg { align-self: flex-start; }
+
     /* Narrow month: dots instead of titles */
     :host([narrow]) .cell { min-height: 52px; align-items: center; }
     :host([narrow]) .cell .ev { padding: 0; }
@@ -204,6 +258,16 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     return this.config!.entities
   }
 
+  /** What HA lets this calendar do, if the dashboard allows changes at all */
+  private can(id: string, feature: number) {
+    if (this.config!.edit === false || !this.hass?.callWS || !this.canControl(id)) return false
+    return (Number(this.hass.states[id]?.attributes.supported_features ?? 0) & feature) !== 0
+  }
+
+  private get creatable() {
+    return this.config!.entities.filter(id => this.can(id, CAL_CREATE))
+  }
+
   private get locale() {
     return this.hass!.locale?.language ?? this.hass!.language
   }
@@ -245,6 +309,9 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   }
 
   protected updated(changed: PropertyValues<this>) {
+    this.toggleAttribute('editable', this.creatable.length > 0)
+    const dialog = this.renderRoot.querySelector<HTMLDialogElement>('dialog.form')
+    if (dialog && !dialog.open) dialog.showModal()
     // A new range or a change in a calendar (an event starts or ends) loads again, unless what is there is fresh
     if ((['view', 'anchor', 'config', 'hass'] as const).some(k => changed.has(k))) void this.load()
     // All-day events push the hours down, so measure again when they change
@@ -259,6 +326,108 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   private openDay(day: Date) {
     this.anchor = day
     this.setView('day')
+  }
+
+  private show(e: CalEvent) {
+    this.selected = e
+    this.confirming = false
+    this.error = undefined
+  }
+
+  /** The form for a new event: the calendar used last, an hour from the start */
+  private startNew(start: Date, allDay = false) {
+    const creatable = this.creatable
+    if (!creatable.length) return
+    const last = store.get('ad-calendar-last')
+    this.selected = undefined
+    this.editing = undefined
+    this.error = undefined
+    this.draft = newDraft(last && creatable.includes(last) ? last : creatable[0]!, start, allDay)
+  }
+
+  /** New from the bar: the next full hour when today is shown, else nine on the day shown */
+  private startNewFromBar() {
+    const now = new Date()
+    const start = this.days.some(d => sameDay(d, now)) ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1) : new Date(startOfDay(this.anchor).getTime() + 9 * 3_600_000)
+    this.startNew(start)
+  }
+
+  private startEdit(e: CalEvent) {
+    this.editing = e
+    this.scope = 'one'
+    this.error = undefined
+    this.draft = draftOf(e)
+  }
+
+  private closeForm() {
+    this.draft = undefined
+    this.editing = undefined
+    this.error = undefined
+  }
+
+  /** Which occurrence of a series a change or delete means */
+  private occurrence(e: CalEvent, scope: Scope) {
+    return e.recurrenceId ? { recurrence_id: e.recurrenceId, ...(scope === 'following' ? { recurrence_range: 'THISANDFUTURE' } : {}) } : {}
+  }
+
+  private failed(err: unknown) {
+    const msg = (err as { message?: string } | undefined)?.message ?? String(err)
+    this.error = t(this.hass, 'cal.failed', { msg })
+  }
+
+  private async save() {
+    const d = this.draft
+    if (!d || this.busy) return
+    const result = draftPayload(d)
+    if ('error' in result) {
+      this.error = t(this.hass, result.error === 'title' ? 'cal.need_title' : 'cal.end_before')
+      return
+    }
+    this.busy = true
+    try {
+      const e = this.editing
+      if (e) await this.hass!.callWS!({ type: 'calendar/event/update', entity_id: e.calendar, uid: e.uid, ...this.occurrence(e, this.scope), event: result.event })
+      else {
+        await this.hass!.callWS!({ type: 'calendar/event/create', entity_id: d.calendar, event: result.event })
+        store.set('ad-calendar-last', d.calendar)
+      }
+      this.selected = undefined
+      this.closeForm()
+      this.refresh()
+    } catch (err) {
+      this.failed(err)
+    } finally {
+      this.busy = false
+    }
+  }
+
+  private async deleteEvent(e: CalEvent, scope: Scope) {
+    if (this.busy) return
+    this.busy = true
+    try {
+      await this.hass!.callWS!({ type: 'calendar/event/delete', entity_id: e.calendar, uid: e.uid, ...this.occurrence(e, scope) })
+      this.selected = undefined
+      this.confirming = false
+      this.refresh()
+    } catch (err) {
+      this.failed(err)
+    } finally {
+      this.busy = false
+    }
+  }
+
+  /** After a change everything loads again, other ranges too */
+  private refresh() {
+    this.loaded.clear()
+    this.all.clear()
+    void this.load()
+  }
+
+  /** A tap on a free spot of a day: a new event at that half hour */
+  private tapHours(ev: MouseEvent, day: Date, from: number, px: number) {
+    if (ev.target !== ev.currentTarget) return
+    const minutes = Math.floor((ev.offsetY / px + from) * 2) * 30
+    this.startNew(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, minutes))
   }
 
   private time(d: Date) {
@@ -278,7 +447,7 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
   private evButton(e: CalEvent, day: Date, withTime = true) {
     const starts = !e.allDay && sameDay(e.start, day)
     return html`<button class="ev ${e.allDay ? 'all' : ''}" style="--c:${this.color(e.calendar)}" title=${e.title}
-      @click=${(ev: Event) => { ev.stopPropagation(); this.selected = e }}>
+      @click=${(ev: Event) => { ev.stopPropagation(); this.show(e) }}>
       ${withTime && starts ? html`<span class="h">${this.time(e.start)}</span>` : nothing}<span class="t">${e.title}</span>
     </button>`
   }
@@ -322,14 +491,14 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
           <button @click=${() => this.openDay(d)}><span class="wdn">${d.toLocaleDateString(this.locale, { weekday: 'short' })}</span><span class="num">${d.getDate()}</span></button>
         </div>`)}
         <span class="alld-label">${t(this.hass, 'cal.all_day')}</span>
-        ${days.map(d => html`<div class="alld">${eventsOn(this.events, d).filter(e => e.allDay).map(e => this.evButton(e, d))}</div>`)}
+        ${days.map(d => html`<div class="alld" @click=${(ev: Event) => ev.target === ev.currentTarget && this.startNew(d, true)}>${eventsOn(this.events, d).filter(e => e.allDay).map(e => this.evButton(e, d))}</div>`)}
       </div>
       <div class="fit">
         <div class="grid hours" style="--days:${days.length};--hours:${hours};--hour:${px}px">
           <div class="gutter" style="position:relative">${Array.from({ length: hours - 1 }, (_, i) => html`<span style="top:${(i + 1) * px}px">${String(from + i + 1).padStart(2, '0')}:00</span>`)}</div>
-          ${days.map(d => html`<div class="col">
+          ${days.map(d => html`<div class="col" @click=${(ev: MouseEvent) => this.tapHours(ev, d, from, px)}>
             ${layoutDay(this.events, d).map(p => html`<button class="slot" style="--c:${this.color(p.event.calendar)};top:${y(p.top)}px;height:${Math.max(p.height / 60 * px - 2, 16)}px;left:calc(${(p.column / p.columns) * 100}% + 2px);width:calc(${100 / p.columns}% - 4px)"
-              @click=${() => (this.selected = p.event)}>
+              @click=${() => this.show(p.event)}>
               <b>${p.event.title}</b>${p.height / 60 * px >= 34 ? html`<span>${this.time(p.event.start)} – ${this.time(p.event.end)}</span>` : nothing}
             </button>`)}
             ${sameDay(d, today) ? html`<span class="now" style="top:${y(nowMin)}px"></span>` : nothing}
@@ -365,7 +534,75 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
       <span class="line"><i></i>${cal ? entityName(cal) : e.calendar}</span>
       ${e.location ? html`<span class="line"><ha-icon icon="mdi:map-marker-outline"></ha-icon>${e.location}</span>` : nothing}
       ${e.description ? html`<p>${e.description}</p>` : nothing}
+      ${this.renderActions(e)}
     </div>`
+  }
+
+  /** Change and delete under the details, where the calendar allows them; delete asks first */
+  private renderActions(e: CalEvent) {
+    const update = !!e.uid && this.can(e.calendar, CAL_UPDATE)
+    const remove = !!e.uid && this.can(e.calendar, CAL_DELETE)
+    if (!update && !remove) return nothing
+    const error = this.error ? html`<p class="error">${this.error}</p>` : nothing
+    if (this.confirming) {
+      const series = !!e.recurrenceId
+      return html`${error}<div class="confirm">
+        <span>${t(this.hass, series ? 'cal.confirm_delete_series' : 'cal.confirm_delete')}</span>
+        <div class="actions">
+          <button class="act" @click=${() => (this.confirming = false)}>${t(this.hass, 'cal.cancel')}</button>
+          ${series ? html`<button class="act danger" ?disabled=${this.busy} @click=${() => this.deleteEvent(e, 'following')}>${t(this.hass, 'cal.this_and_following')}</button>` : nothing}
+          <button class="act danger" ?disabled=${this.busy} @click=${() => this.deleteEvent(e, 'one')}>${t(this.hass, series ? 'cal.only_this' : 'cal.delete')}</button>
+        </div>
+      </div>`
+    }
+    return html`${error}<div class="actions">
+      ${remove ? html`<button class="act" @click=${() => (this.confirming = true)}><ha-icon icon="mdi:delete-outline"></ha-icon>${t(this.hass, 'cal.delete')}</button>` : nothing}
+      ${update ? html`<button class="act" @click=${() => this.startEdit(e)}><ha-icon icon="mdi:pencil-outline"></ha-icon>${t(this.hass, 'cal.edit')}</button>` : nothing}
+    </div>`
+  }
+
+  private renderForm(d: EventDraft) {
+    const hass = this.hass!
+    const e = this.editing
+    const set = (patch: Partial<EventDraft>) => (this.draft = { ...this.draft!, ...patch })
+    const value = (ev: Event) => (ev.target as HTMLInputElement).value
+    const calendars = e ? [e.calendar] : this.creatable
+    const name = (id: string) => { const s = hass.states[id]; return s ? entityName(s) : id }
+    return html`<dialog class="form" aria-label=${t(hass, e ? 'cal.edit_title' : 'cal.new')}
+      @cancel=${(ev: Event) => { ev.preventDefault(); this.closeForm() }}
+      @click=${(ev: Event) => ev.target === ev.currentTarget && this.closeForm()}>
+      <form @submit=${(ev: Event) => { ev.preventDefault(); void this.save() }}>
+        <h3>${t(hass, e ? 'cal.edit_title' : 'cal.new')}</h3>
+        <input class="name" placeholder=${t(hass, 'cal.title')} aria-label=${t(hass, 'cal.title')} .value=${d.title} autofocus @input=${(ev: Event) => set({ title: value(ev) })}>
+        <label class="row dates"><span>${t(hass, 'calendar')}</span>
+          <select ?disabled=${!!e} @change=${(ev: Event) => set({ calendar: value(ev) })}>
+            ${calendars.map(id => html`<option value=${id} ?selected=${id === d.calendar}>${name(id)}</option>`)}
+          </select>
+        </label>
+        <label class="switch"><input type="checkbox" .checked=${d.allDay} @change=${(ev: Event) => {
+          const allDay = (ev.target as HTMLInputElement).checked
+          set({ allDay, ...(d.endDate < d.startDate ? { endDate: d.startDate } : {}) })
+        }}>${t(hass, 'cal.all_day')}</label>
+        <div class="row ${d.allDay ? 'dates' : ''}"><span>${t(hass, 'cal.start')}</span>
+          <input type="date" aria-label=${t(hass, 'cal.start')} .value=${d.startDate} required @change=${(ev: Event) => value(ev) && (this.draft = moveStart(d, value(ev), d.startTime))}>
+          ${d.allDay ? nothing : html`<input type="time" aria-label=${t(hass, 'cal.start')} .value=${d.startTime} required @change=${(ev: Event) => value(ev) && (this.draft = moveStart(d, d.startDate, value(ev)))}>`}
+        </div>
+        <div class="row ${d.allDay ? 'dates' : ''}"><span>${t(hass, 'cal.end')}</span>
+          <input type="date" aria-label=${t(hass, 'cal.end')} .value=${d.endDate} required @change=${(ev: Event) => value(ev) && set({ endDate: value(ev) })}>
+          ${d.allDay ? nothing : html`<input type="time" aria-label=${t(hass, 'cal.end')} .value=${d.endTime} required @change=${(ev: Event) => value(ev) && set({ endTime: value(ev) })}>`}
+        </div>
+        <input placeholder=${t(hass, 'cal.location')} aria-label=${t(hass, 'cal.location')} .value=${d.location} @input=${(ev: Event) => set({ location: value(ev) })}>
+        <textarea rows="3" placeholder=${t(hass, 'cal.description')} aria-label=${t(hass, 'cal.description')} .value=${d.description} @input=${(ev: Event) => set({ description: value(ev) })}></textarea>
+        ${e?.recurrenceId ? html`<div class="seg" role="group">
+          ${(['one', 'following'] as const).map(s => html`<button type="button" aria-pressed=${this.scope === s} @click=${() => (this.scope = s)}>${t(hass, s === 'one' ? 'cal.only_this' : 'cal.this_and_following')}</button>`)}
+        </div>` : nothing}
+        ${this.error ? html`<p class="error" role="alert">${this.error}</p>` : nothing}
+        <div class="actions">
+          <button type="button" class="act" @click=${() => this.closeForm()}>${t(hass, 'cal.cancel')}</button>
+          <button type="submit" class="act primary" ?disabled=${this.busy}>${t(hass, 'cal.save')}</button>
+        </div>
+      </form>
+    </dialog>`
   }
 
   protected render() {
@@ -379,10 +616,12 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
           <button class="btn" aria-label=${t(this.hass, 'cal.next')} @click=${() => (this.anchor = step(this.view, this.anchor, 1))}><ha-icon icon="mdi:chevron-right"></ha-icon></button>
         </div>
         <h2>${this.heading()}</h2>
+        ${this.creatable.length ? html`<button class="btn add" aria-label=${t(this.hass, 'cal.new')} title=${t(this.hass, 'cal.new')} @click=${() => this.startNewFromBar()}><ha-icon icon="mdi:plus"></ha-icon></button>` : nothing}
         <div class="seg" role="group">${views.map(([v, label]) => html`<button aria-pressed=${this.view === v} @click=${() => this.setView(v)}>${label}</button>`)}</div>
       </div>
       ${body}
       ${this.selected ? this.renderDetail(this.selected) : nothing}
+      ${this.draft ? this.renderForm(this.draft) : nothing}
     </div>`
   }
 }

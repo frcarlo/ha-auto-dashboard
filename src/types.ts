@@ -184,4 +184,6 @@ export interface StrategyConfig extends CardLook {
   tv_apps?: string[]
   /** Calendars on the calendar page; unset = every visible calendar, hide_domains: [calendar] drops the page */
   calendars?: string[]
+  /** false: the calendar page only shows events, no adding, changing or deleting */
+  calendar_edit?: boolean
 }

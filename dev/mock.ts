@@ -134,8 +134,8 @@ const extras: HassEntity[] = [
   { entity_id: 'sensor.aussen_luftfeuchte', state: '81', attributes: { friendly_name: 'Außen Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' } },
   { entity_id: 'sensor.aussen_helligkeit', state: '2920', attributes: { friendly_name: 'Außen Helligkeit', device_class: 'illuminance', unit_of_measurement: 'lx' } },
   { entity_id: 'sensor.aussen_regen', state: '0.4', attributes: { friendly_name: 'Außen Regen', device_class: 'precipitation_intensity', unit_of_measurement: 'mm/h' } },
-  { entity_id: 'calendar.familie', state: 'off', attributes: { friendly_name: 'Familie' } },
-  { entity_id: 'calendar.abfall', state: 'off', attributes: { friendly_name: 'Abfall' } },
+  { entity_id: 'calendar.familie', state: 'off', attributes: { friendly_name: 'Familie', supported_features: 7 } },
+  { entity_id: 'calendar.abfall', state: 'off', attributes: { friendly_name: 'Abfall', supported_features: 3 } },
   { entity_id: 'calendar.feiertage', state: 'off', attributes: { friendly_name: 'Feiertage' } },
   // NINA keeps one binary sensor per warning slot; ?warn=on fills the first
   { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1' } },
@@ -224,34 +224,11 @@ export function createHass(dark: boolean): HomeAssistant {
       const params = new URLSearchParams(query)
       const from = new Date(params.get('start') ?? 0)
       const to = new Date(params.get('end') ?? 0)
-      const day = (offset: number, h?: number, m = 0) => {
-        const d = new Date(); d.setHours(h ?? 0, m, 0, 0); d.setDate(d.getDate() + offset); return d
-      }
-      const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const timed = (summary: string, offset: number, h: number, m: number, minutes: number, extra = {}) =>
-        ({ summary, start: { dateTime: day(offset, h, m).toISOString() }, end: { dateTime: new Date(day(offset, h, m).getTime() + minutes * 60_000).toISOString() }, ...extra })
-      const allDay = (summary: string, offset: number, days = 1) => ({ summary, start: { date: local(day(offset)) }, end: { date: local(day(offset + days)) } })
-      const all: Record<string, unknown[]> = {
-        'calendar.familie': [
-          timed('Zahnarzt Leni', 0, 9, 30, 60, { location: 'Praxis Dr. Berg, Schloßstraße 4' }),
-          timed('Elternabend', 0, 19, 0, 90),
-          timed('Fußball Training', 0, 17, 30, 90),
-          timed('Einkaufen', 1, 10, 0, 60),
-          timed('Geburtstag Oma', 2, 15, 0, 180, { description: 'Kuchen mitbringen' }),
-          timed('Frühstück mit Tom', 2, 9, 0, 90),
-          timed('Physiotherapie', 3, 8, 0, 45),
-          timed('Fußball Training', 4, 17, 30, 90),
-          timed('Kino', 5, 20, 15, 150),
-          allDay('Urlaub Sylt', 12, 5),
-          timed('Kita Fest', -3, 14, 0, 120),
-        ],
-        'calendar.abfall': [allDay('Restmüll', 1), allDay('Papier', 8), allDay('Gelbe Tonne', 4), allDay('Bio', 11), allDay('Restmüll', 15)],
-        'calendar.feiertage': [allDay('Martinstag', 5)],
-      }
-      return ((all[id ?? ''] ?? []) as { start: { date?: string; dateTime?: string }; end: { date?: string; dateTime?: string } }[])
+      return (calendarStore()[id ?? ''] ?? [])
         .filter(e => new Date(e.start.dateTime ?? `${e.start.date}T00:00`) < to && new Date(e.end.dateTime ?? `${e.end.date}T00:00`) > from) as T
     },
     callWS: async <T,>(msg: Record<string, unknown>) => {
+      if (String(msg.type).startsWith('calendar/event/')) return calendarCommand(msg) as T
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [
           { type: 'grid', stat_rate: 'sensor.netz_leistung' },
@@ -301,4 +278,53 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
     states[id] = { ...e, state, attributes }
   }
   return { ...hass, states }
+}
+
+interface MockEvent { summary: string; start: { date?: string; dateTime?: string }; end: { date?: string; dateTime?: string }; uid: string; recurrence_id?: string; rrule?: string; location?: string; description?: string }
+let calendars: Record<string, MockEvent[]> | undefined
+
+/** The harness calendars, kept while the page lives so adding, changing and deleting show up */
+function calendarStore() {
+  if (calendars) return calendars
+  const day = (offset: number, h = 0, m = 0) => { const d = new Date(); d.setHours(h, m, 0, 0); d.setDate(d.getDate() + offset); return d }
+  const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  let n = 0
+  const timed = (summary: string, offset: number, h: number, m: number, minutes: number, extra = {}): MockEvent =>
+    ({ summary, uid: `mock-${++n}`, start: { dateTime: day(offset, h, m).toISOString() }, end: { dateTime: new Date(day(offset, h, m).getTime() + minutes * 60_000).toISOString() }, ...extra })
+  const allDay = (summary: string, offset: number, days = 1): MockEvent => ({ summary, uid: `mock-${++n}`, start: { date: local(day(offset)) }, end: { date: local(day(offset + days)) } })
+  // A weekly series: each week's event is one occurrence with its own recurrence_id
+  const weekly = Array.from({ length: 8 }, (_, w) => timed('Fußball Training', w * 7 - 7, 17, 30, 90, { uid: 'mock-training', rrule: 'FREQ=WEEKLY', recurrence_id: local(day(w * 7 - 7)).replaceAll('-', '') }))
+  calendars = {
+    'calendar.familie': [
+      timed('Zahnarzt Leni', 0, 9, 30, 60, { location: 'Praxis Dr. Berg, Schloßstraße 4' }),
+      timed('Elternabend', 0, 19, 0, 90),
+      timed('Einkaufen', 1, 10, 0, 60),
+      timed('Geburtstag Oma', 2, 15, 0, 180, { description: 'Kuchen mitbringen' }),
+      timed('Frühstück mit Tom', 2, 9, 0, 90),
+      timed('Physiotherapie', 3, 8, 0, 45),
+      timed('Kino', 5, 20, 15, 150),
+      allDay('Urlaub Sylt', 12, 5),
+      timed('Kita Fest', -3, 14, 0, 120),
+      ...weekly,
+    ],
+    'calendar.abfall': [allDay('Restmüll', 1), allDay('Papier', 8), allDay('Gelbe Tonne', 4), allDay('Bio', 11), allDay('Restmüll', 15)],
+    'calendar.feiertage': [allDay('Martinstag', 5)],
+  }
+  return calendars
+}
+
+/** HA's calendar/event/create, update and delete, on the harness calendars */
+function calendarCommand(msg: Record<string, unknown>) {
+  const list = calendarStore()[msg.entity_id as string] ?? []
+  const when = (v: string) => (v.includes('T') ? { dateTime: new Date(v).toISOString() } : { date: v })
+  const fields = (e: Record<string, string>) => ({ summary: e.summary!, start: when(e.dtstart!), end: when(e.dtend!), ...(e.location ? { location: e.location } : {}), ...(e.description ? { description: e.description } : {}) })
+  const hits = (e: MockEvent) => e.uid === msg.uid && (!msg.recurrence_id || (msg.recurrence_range ? e.recurrence_id! >= (msg.recurrence_id as string) : e.recurrence_id === msg.recurrence_id))
+  if (msg.type === 'calendar/event/create') list.push({ uid: `mock-${Date.now()}`, ...fields(msg.event as Record<string, string>) })
+  if (msg.type === 'calendar/event/delete') for (let i = list.length - 1; i >= 0; i--) if (hits(list[i]!)) list.splice(i, 1)
+  if (msg.type === 'calendar/event/update') {
+    const target = list.find(hits)
+    if (!target) throw new Error('Termin nicht gefunden')
+    Object.assign(target, { location: undefined, description: undefined }, fields(msg.event as Record<string, string>))
+  }
+  return null
 }

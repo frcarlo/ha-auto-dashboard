@@ -286,7 +286,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   ])
 
   const calendarView = subview('calendar', t(hass, 'calendar'), 'mdi:calendar-month-outline', [
-    fullWidth([{ type: 'custom:ad-calendar', entities: calendars.map(e => e.entity_id), ...look }]),
+    fullWidth([{ type: 'custom:ad-calendar', entities: calendars.map(e => e.entity_id), ...(config.calendar_edit === false ? { edit: false } : {}), ...look }]),
   ])
 
   // Energy: the house, then per floor each room's sensors next to a graph of the last day

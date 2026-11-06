@@ -405,4 +405,10 @@ describe('calendar page', () => {
     const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['calendar'] } } }, hass)
     expect(ruled.views.map(v => v.path)).not.toContain('calendar')
   })
+
+  it('lets the calendar card change events unless calendar_edit is false', async () => {
+    const card = async (extra = {}) => cardsOf((await generateDashboard({ type: 'custom:auto-dashboard', ...extra }, createHass(true))).views.find(v => v.path === 'calendar')!).find(c => c.type === 'custom:ad-calendar')!
+    expect((await card()).edit).toBeUndefined()
+    expect((await card({ calendar_edit: false })).edit).toBe(false)
+  })
 })

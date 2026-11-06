@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayKey, eventsOn, layoutDay, step, toEvent, viewDays, weekStart } from '../src/calendar'
+import { dayKey, draftOf, draftPayload, eventsOn, layoutDay, localIso, moveStart, newDraft, step, toEvent, viewDays, weekStart } from '../src/calendar'
 
 const at = (s: string) => new Date(s)
 
@@ -46,5 +46,41 @@ describe('calendar', () => {
       // Five minutes still get a quarter hour of height
       ['D', 0, 1, 720, 15],
     ])
+  })
+
+  it('keeps what HA needs to change an event, and knows a series', () => {
+    const one = toEvent('c', { summary: 'A', uid: 'u1', start: { dateTime: '2026-11-06T08:00:00' }, end: { dateTime: '2026-11-06T09:00:00' } }, 0)!
+    expect([one.uid, one.recurrenceId, one.recurring]).toEqual(['u1', undefined, false])
+    const series = toEvent('c', { summary: 'B', uid: 'u2', recurrence_id: '20261106', rrule: 'FREQ=WEEKLY', start: { date: '2026-11-06' }, end: { date: '2026-11-07' } }, 0)!
+    expect([series.recurrenceId, series.recurring]).toEqual(['20261106', true])
+  })
+})
+
+describe('event form', () => {
+  it('starts a new event with an hour, and an all-day one on its day', () => {
+    expect(newDraft('calendar.familie', at('2026-11-06T23:30'))).toMatchObject({ startDate: '2026-11-06', startTime: '23:30', endDate: '2026-11-07', endTime: '00:30', allDay: false })
+    expect(newDraft('c', at('2026-11-06T00:00'), true)).toMatchObject({ startDate: '2026-11-06', endDate: '2026-11-06', allDay: true })
+  })
+
+  it('opens an event with its inclusive last day', () => {
+    const e = toEvent('c', { summary: 'Urlaub', start: { date: '2026-11-05' }, end: { date: '2026-11-08' } }, 0)!
+    expect(draftOf(e)).toMatchObject({ title: 'Urlaub', startDate: '2026-11-05', endDate: '2026-11-07', allDay: true })
+  })
+
+  it('moves the end along with the start', () => {
+    const d = { ...newDraft('c', at('2026-11-06T10:00')), endTime: '12:30' }
+    expect(moveStart(d, '2026-11-07', '22:00')).toMatchObject({ startDate: '2026-11-07', startTime: '22:00', endDate: '2026-11-08', endTime: '00:30' })
+    const all = { ...newDraft('c', at('2026-11-06T00:00'), true), endDate: '2026-11-08' }
+    expect(moveStart(all, '2026-11-10', '')).toMatchObject({ startDate: '2026-11-10', endDate: '2026-11-12' })
+  })
+
+  it('builds what HA saves: dates with the end a day later, or local times with their offset', () => {
+    const all = { ...newDraft('c', at('2026-11-06T00:00'), true), title: ' Urlaub ', endDate: '2026-11-07' }
+    expect(draftPayload(all)).toEqual({ event: { summary: 'Urlaub', dtstart: '2026-11-06', dtend: '2026-11-08' } })
+    const timed = { ...newDraft('c', at('2026-11-06T10:00')), title: 'Zahnarzt', location: 'Praxis' }
+    expect(draftPayload(timed)).toEqual({ event: { summary: 'Zahnarzt', dtstart: localIso(at('2026-11-06T10:00')), dtend: localIso(at('2026-11-06T11:00')), location: 'Praxis' } })
+    expect(localIso(at('2026-11-06T10:00'))).toMatch(/^2026-11-06T10:00:00[+-]\d\d:\d\d$/)
+    expect(draftPayload({ ...timed, title: '  ' })).toEqual({ error: 'title' })
+    expect(draftPayload({ ...timed, endTime: '09:00' })).toEqual({ error: 'end' })
   })
 })

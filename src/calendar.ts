@@ -12,6 +12,7 @@ export interface ApiEvent {
   location?: string | null
   uid?: string | null
   recurrence_id?: string | null
+  rrule?: string | null
 }
 
 export interface CalEvent {
@@ -24,6 +25,11 @@ export interface CalEvent {
   allDay: boolean
   location?: string
   description?: string
+  /** What HA needs to change or delete the event */
+  uid?: string
+  recurrenceId?: string
+  /** Part of a series: changing or deleting asks for this one or this and the following */
+  recurring: boolean
 }
 
 const DAY_MS = 86_400_000
@@ -57,6 +63,9 @@ export function toEvent(calendar: string, e: ApiEvent, i: number): CalEvent | un
     allDay,
     ...(e.location ? { location: e.location } : {}),
     ...(e.description ? { description: e.description } : {}),
+    ...(e.uid ? { uid: e.uid } : {}),
+    ...(e.recurrence_id ? { recurrenceId: e.recurrence_id } : {}),
+    recurring: !!(e.rrule || e.recurrence_id),
   }
 }
 
@@ -131,3 +140,75 @@ export function layoutDay(events: CalEvent[], day: Date): Placed[] {
 
 /** Calendar colors: distinct hues that read on dark and light, as r, g, b */
 export const CALENDAR_COLORS = ['59, 130, 246', '34, 197, 94', '245, 158, 11', '236, 72, 153', '20, 184, 166', '168, 85, 247', '239, 68, 68', '132, 204, 22']
+
+/** calendar entity supported_features bits */
+export const CAL_CREATE = 1
+export const CAL_DELETE = 2
+export const CAL_UPDATE = 4
+
+/** An event as the form holds it: dates and times as the inputs give them, the end day inclusive */
+export interface EventDraft {
+  calendar: string
+  title: string
+  allDay: boolean
+  startDate: string
+  startTime: string
+  endDate: string
+  endTime: string
+  location: string
+  description: string
+}
+
+const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+const localDate = (date: string) => { const [y, m, d] = date.split('-').map(Number); return new Date(y!, m! - 1, d!) }
+const localTime = (date: string, time: string) => { const d = localDate(date); const [h, m] = time.split(':').map(Number); d.setHours(h ?? 0, m ?? 0); return d }
+
+/** A new event of an hour from the given start */
+export function newDraft(calendar: string, start: Date, allDay = false): EventDraft {
+  const end = new Date(start.getTime() + 3_600_000)
+  return { calendar, title: '', allDay, startDate: dayKey(start), startTime: hhmm(start), endDate: dayKey(allDay ? start : end), endTime: hhmm(end), location: '', description: '' }
+}
+
+export function draftOf(e: CalEvent): EventDraft {
+  const last = e.allDay ? addDays(e.end, -1) : e.end
+  return {
+    calendar: e.calendar, title: e.title === '–' ? '' : e.title, allDay: e.allDay,
+    startDate: dayKey(e.start), startTime: hhmm(e.start), endDate: dayKey(last), endTime: hhmm(e.end),
+    location: e.location ?? '', description: e.description ?? '',
+  }
+}
+
+/** A new start moves the end along, so the event keeps its length */
+export function moveStart(d: EventDraft, startDate: string, startTime: string): EventDraft {
+  if (d.allDay) {
+    const days = Math.round((localDate(d.endDate).getTime() - localDate(d.startDate).getTime()) / DAY_MS)
+    return { ...d, startDate, endDate: dayKey(addDays(localDate(startDate), Math.max(0, days))) }
+  }
+  const length = Math.max(0, localTime(d.endDate, d.endTime).getTime() - localTime(d.startDate, d.startTime).getTime())
+  const end = new Date(localTime(startDate, startTime).getTime() + length)
+  return { ...d, startDate, startTime, endDate: dayKey(end), endTime: hhmm(end) }
+}
+
+/** Local date-time with its offset, so HA reads it in the time the person meant */
+export function localIso(d: Date) {
+  const off = -d.getTimezoneOffset()
+  const sign = off >= 0 ? '+' : '-'
+  const abs = Math.abs(off)
+  return `${dayKey(d)}T${hhmm(d)}:00${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`
+}
+
+/** The event for HA's calendar/event/create and update, or why it cannot be saved */
+export function draftPayload(d: EventDraft): { event: Record<string, string> } | { error: 'title' | 'end' } {
+  const summary = d.title.trim()
+  if (!summary) return { error: 'title' }
+  const extra = { ...(d.location.trim() ? { location: d.location.trim() } : {}), ...(d.description.trim() ? { description: d.description.trim() } : {}) }
+  if (d.allDay) {
+    if (d.endDate < d.startDate) return { error: 'end' }
+    // HA's end of an all-day event is the day after
+    return { event: { summary, dtstart: d.startDate, dtend: dayKey(addDays(localDate(d.endDate), 1)), ...extra } }
+  }
+  const start = localTime(d.startDate, d.startTime)
+  const end = localTime(d.endDate, d.endTime)
+  if (end <= start) return { error: 'end' }
+  return { event: { summary, dtstart: localIso(start), dtend: localIso(end), ...extra } }
+}
