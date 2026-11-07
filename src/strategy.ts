@@ -185,6 +185,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(weatherSensors(hass, config.weather_sensors)?.temperature ? { temperature: weatherSensors(hass, config.weather_sensors)!.temperature } : {}),
     ...(calendars.length ? { calendars: calendars.map(e => e.entity_id) } : {}),
     ...(config.background_image?.trim() ? { image: config.background_image.trim() } : {}),
+    // Washer, dryer, dishwasher: the face shows them while they run or wait to be emptied
+    ...(appliances.length ? { appliances } : {}),
   } : undefined
   const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...(face ? { face } : {}), ...look }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits

@@ -465,4 +465,10 @@ describe('face', () => {
     expect(await navFace({ face: { style: 'calendar' }, users: { [id]: { face: { after: 60 } } } }, hass)).toMatchObject({ style: 'calendar', after: 60 })
     expect(await navFace({ face: { style: 'calendar' }, users: { [id]: { face: false } } }, hass)).toBeUndefined()
   })
+
+  it('knows the appliances, so it can show what runs', async () => {
+    const face = await navFace({ face: {} })
+    expect(face.appliances.map((a: { kind: string }) => a.kind)).toContain('dishwasher')
+    expect(await navFace({ face: {}, hide_domains: ['appliance'] })).not.toHaveProperty('appliances')
+  })
 })

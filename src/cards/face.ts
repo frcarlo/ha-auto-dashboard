@@ -3,10 +3,11 @@
 // One tap brings back the page underneath, exactly as it was. The nav bar puts it into document.body.
 import { LitElement, css, html, nothing, svg } from 'lit'
 import { tokens } from '../styles/tokens'
-import { t } from '../i18n'
+import { t, type Key } from '../i18n'
 import { CALENDAR_COLORS, addDays, sameDay, startOfDay, toEvent, type ApiEvent, type CalEvent } from '../calendar'
 import { conditionIcon } from '../weather'
 import { entityName } from '../presentation'
+import { ACTIVE_PHASES, applianceIcon, appliancePhase, applianceProgress, applianceTimes, type Appliance, type AppliancePhase } from '../appliances'
 import type { FaceStyle, HomeAssistant } from '../types'
 
 export interface FaceSettings {
@@ -19,11 +20,17 @@ export interface FaceSettings {
   calendars?: string[]
   /** The dashboard's background picture, for the photo face */
   image?: string
+  /** Washer, dryer, dishwasher: shown while they run, wait or need someone */
+  appliances?: Appliance[]
 }
+
+const PHASE_COLOR: Partial<Record<AppliancePhase, string>> = { running: 'warning', delayed: 'warning', paused: 'warning', finished: 'success', action: 'error', error: 'error' }
 
 const ACTIVITY = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const
 const EVENTS_EVERY = 15 * 60_000
 const SHIFT_EVERY = 60_000
+/** After a tap or a touch the face waits at least this long, even when it is set to show right away */
+const GRACE = 60
 
 export class AdFace extends LitElement {
   static properties = {
@@ -51,13 +58,13 @@ export class AdFace extends LitElement {
   private pictureFor?: string
 
   private onActivity = () => {
-    if (!this.shown) this.arm()
+    if (!this.shown) this.arm(false)
   }
 
   connectedCallback() {
     super.connectedCallback()
     for (const type of ACTIVITY) window.addEventListener(type, this.onActivity, { capture: true, passive: true })
-    this.arm()
+    this.arm(true)
   }
 
   disconnectedCallback() {
@@ -67,14 +74,20 @@ export class AdFace extends LitElement {
     window.clearInterval(this.tick)
   }
 
-  /** Starts the wait for the face again */
-  arm() {
+  /**
+   * Starts the wait for the face. "Right away" only holds when the page opens; once someone has touched
+   * the screen, the face waits a minute, or nobody could ever use the page underneath.
+   */
+  arm(opening: boolean) {
     window.clearTimeout(this.idle)
     if (!this.settings) return
-    this.idle = window.setTimeout(() => this.show(), Math.max(0, this.settings.after) * 1000)
+    const after = Math.max(0, this.settings.after)
+    this.idle = window.setTimeout(() => this.show(), (opening ? after : Math.max(after, GRACE)) * 1000)
   }
 
   private show() {
+    // Never over HA's edit mode, where the face would hide the editor that changes it
+    if (new URLSearchParams(location.search).has('edit')) return this.arm(false)
     this.shown = true
     this.now = new Date()
     window.clearInterval(this.tick)
@@ -97,13 +110,13 @@ export class AdFace extends LitElement {
     ev.stopPropagation()
     this.shown = false
     window.clearInterval(this.tick)
-    this.arm()
+    this.arm(false)
   }
 
   protected updated(changed: Map<string, unknown>) {
     // A new wait when the settings change, e.g. a shorter time in the config
     const before = changed.get('settings') as FaceSettings | undefined
-    if (changed.has('settings') && !this.shown && before?.after !== this.settings?.after) this.arm()
+    if (changed.has('settings') && !this.shown && before?.after !== this.settings?.after) this.arm(!before)
   }
 
   private async loadEvents() {
@@ -195,14 +208,31 @@ export class AdFace extends LitElement {
     return next ? html`<ul class="next">${this.eventRow(next)}</ul>` : nothing
   }
 
-  /** What is going on right now, small at the bottom: music that plays */
+  /** One appliance at work: "Geschirrspüler · fertig um 23:38", with its progress along the chip */
+  private applianceChip(a: Appliance) {
+    const hass = this.hass!
+    const phase = appliancePhase(hass, a)
+    if (!ACTIVE_PHASES.includes(phase)) return undefined
+    const progress = applianceProgress(hass, a, phase)
+    const { end } = applianceTimes(hass, a, this.now.getTime(), progress)
+    const state = (phase === 'running' || phase === 'delayed') && end !== undefined
+      ? t(hass, 'done_at', { time: new Date(end).toLocaleTimeString(this.loc, { hour: '2-digit', minute: '2-digit' }) })
+      : t(hass, `appliance.${phase}` as Key)
+    return html`<span class="chip ${PHASE_COLOR[phase] ?? ''}">
+      <ha-icon icon=${applianceIcon(a.kind)}></ha-icon><span class="text">${a.name} · ${state}</span>
+      ${progress !== undefined && phase !== 'finished' ? html`<span class="bar" style="width: ${progress}%"></span>` : nothing}
+    </span>`
+  }
+
+  /** What is going on right now, small at the bottom: appliances at work and music that plays */
   private live() {
     const hass = this.hass!
+    const appliances = (this.settings?.appliances ?? []).map(a => this.applianceChip(a)).filter(Boolean).slice(0, 3)
     const playing = Object.values(hass.states).filter(s => s.entity_id.startsWith('media_player.') && s.state === 'playing').slice(0, 2)
-    if (!playing.length) return nothing
-    return html`<div class="live">${playing.map(p => {
+    if (!appliances.length && !playing.length) return nothing
+    return html`<div class="live">${appliances}${playing.map(p => {
       const title = [p.attributes.media_title, p.attributes.media_artist].filter(Boolean).join(' – ')
-      return html`<span class="chip"><ha-icon icon="mdi:music"></ha-icon>${title || entityName(p)}</span>`
+      return html`<span class="chip"><ha-icon icon="mdi:music"></ha-icon><span class="text">${title || entityName(p)}</span></span>`
     })}</div>`
   }
 
@@ -291,12 +321,21 @@ export class AdFace extends LitElement {
       .agenda { grid-template-columns: 1fr; align-content: center; gap: 32px; }
     }
 
-    .live { position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; max-width: calc(100vw - 48px); }
-    .chip {
-      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 18px; min-width: 0;
-      background: rgba(var(--ad-on-surface), 0.1); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .live {
+      position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 48px);
     }
-    .chip ha-icon { --mdc-icon-size: 18px; }
+    .chip {
+      position: relative; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 18px; min-width: 0; max-width: 100%;
+      box-sizing: border-box; background: rgba(var(--ad-on-surface), 0.1); font-size: 14px; white-space: nowrap; overflow: hidden;
+    }
+    .chip .text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .chip ha-icon { flex: none; --mdc-icon-size: 18px; }
+    .chip.warning ha-icon { color: rgb(var(--ad-warning)); }
+    .chip.success ha-icon { color: rgb(var(--ad-success)); }
+    .chip.error ha-icon { color: rgb(var(--ad-error)); }
+    /* How far the run is, as a thin line along the bottom of the chip */
+    .chip .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: rgb(var(--ad-warning)); opacity: 0.8; }
     .on-photo .chip { background: rgba(0, 0, 0, 0.35); color: #fff; }
 
     @media (prefers-reduced-motion: reduce) {
