@@ -10,7 +10,7 @@ import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
-import type { ApplianceConfig, AreaRegistryEntry, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
+import type { ApplianceConfig, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
 interface HaUser {
   id: string
@@ -197,6 +197,22 @@ export class AdStrategyEditor extends LitElement {
   private seg<T extends string>(options: [T, Key][], value: T, onPick: (v: T) => void) {
     return html`<div class="seg" role="group">${options.map(([v, label]) => html`
       <button aria-pressed=${value === v} @click=${() => onPick(v)}>${this.l(label)}</button>`)}</div>`
+  }
+
+  /** Face style and wait: off or a style, then how long without a touch */
+  private faceFields(face: FaceConfig | false | undefined, onChange: (face: FaceConfig | false | undefined) => void, inherit: boolean) {
+    const styles: [FaceStyle, Key][] = [['clock', 'face.clock'], ['analog', 'face.analog'], ['photo', 'face.photo'], ['calendar', 'face.calendar']]
+    const value = face === false ? 'off' : face ? face.style ?? 'clock' : inherit ? 'inherit' : 'off'
+    const options: [string, Key][] = [...(inherit ? [['inherit', 'ed.face_inherit'] as [string, Key]] : []), ['off', 'ed.face_off'], ...styles]
+    const minutes = new Intl.NumberFormat(this.hass?.language, { style: 'unit', unit: 'minute', unitDisplay: 'short' })
+    const seconds = new Intl.NumberFormat(this.hass?.language, { style: 'unit', unit: 'second', unitDisplay: 'short' })
+    const waits = [0, 30, 60, 120, 300, 600]
+    const after = face ? face.after ?? 120 : 120
+    return html`${this.seg(options, value, v => onChange(
+      v === 'inherit' ? undefined : v === 'off' ? (inherit ? false : undefined) : { ...(face || {}), style: v as FaceStyle }))}
+      ${face ? html`<div class="seg" role="group" aria-label=${this.l('ed.face_after')}>${waits.map(w => html`
+        <button aria-pressed=${after === w} @click=${() => onChange({ ...face, after: w === 120 ? undefined : w })}>
+          ${w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)}</button>`)}</div>` : nothing}`
   }
 
   private toggle(label: string, checked: boolean, onToggle: (v: boolean) => void) {
@@ -406,7 +422,8 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.background'), this.imagePicker(c.background_image), this.l('ed.background_hint'))}
         ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
-          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}`
+          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}
+        ${this.field(this.l('ed.face'), this.faceFields(c.face, face => this.change({ face: face || undefined }), false), this.l('ed.face_hint'))}`
   }
 
   private renderHouse() {
@@ -481,6 +498,7 @@ export class AdStrategyEditor extends LitElement {
       ${this.field(this.l('ed.hide_pages'), this.chips(
         PAGES.map(p => ({ id: p, label: this.l(p) })),
         rule.hide_pages, hide_pages => this.changeRule(key, { hide_pages: hide_pages as PagePath[] })))}
+      ${this.field(this.l('ed.face'), this.faceFields(rule.face, face => this.changeRule(key, { face }), true))}
       ${this.field(this.l('ed.rule_rooms'), house({
         hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel,
         marks: id => rule.areas?.includes(id) ? ['only'] : [],

@@ -16,6 +16,7 @@ Ein ES-Modul (~140 KB, ~39 KB gzip), einzige Abhängigkeit ist Lit. Keine andere
 - **Listen** (`lists`, mit Eintrag in der Navigationsleiste): die To-do-Listen, etwa die Einkaufsliste, mit HAs eigener Karte; Einträge lassen sich abhaken, hinzufügen und umbenennen. Mehrere Listen stehen auf Tablet und Desktop nebeneinander. Ein Tipp auf den Namen klappt eine Liste zu, oben bleibt dann nur, wie viel noch offen ist; das merkt sich jedes Gerät. Admins legen mit „Neue Liste“ eine Liste an (über HAs Integration „Lokale To-do-Liste“) und löschen solche Listen mit dem Papierkorb, nach einer Rückfrage. Die Einkaufsliste der Integration „Einkaufsliste“ lässt sich nicht einzeln löschen. Listen gehören dem ganzen Haushalt, deshalb erscheinen sie auch auf Dashboards, die auf einzelne Räume beschränkt sind. Ohne `todo_lists` stehen alle Listen da, auch neu angelegte; mit `todo_lists` nur die gewählten, dann gibt es auch kein „Neue Liste“. `hide_domains: [todo]` blendet die Seite aus.
 - **Energie** (`energy`, nur mit Leistungssensoren): das ganze Haus mit dem Raum, der am meisten verbraucht, und dessen drei größten Verbrauchern. Darunter jeder Raum mit seinen Leistungssensoren und ihrem Anteil, darunter ein Verlauf der letzten 24 Stunden (HAs Verlaufsgraph). Erreichbar über die Kachel „Strom“ auf der Startseite.
 - **Wartung** (`maintenance`): alle Batterien, schwächste zuerst, nicht erreichbare Geräte und, nur für Admins, ausstehende Updates. Erreichbar über die Chips „Batterie“ und „Nicht erreichbar“ → „Alle anzeigen“.
+- **Zifferblatt** (`face`, für Wandtablets): Wenn eine Weile niemand den Bildschirm berührt (Standard zwei Minuten), legt sich eine ruhige Vollbildansicht über die Seite, gut lesbar aus der Entfernung. Ein Tipp blendet sie aus, die Seite darunter bleibt, wie sie war. Vier Stile: `clock` (große Uhr, Datum, Wetter, nächster Termin heute oder morgen), `analog` (Zeigeruhr mit denselben Angaben), `photo` (das Hintergrundbild des Dashboards mit Uhrzeit, Wetter und nächstem Termin; ohne Bild die Uhr) und `calendar` (Uhr links, die nächsten Termine der Woche rechts). Läuft Musik, steht sie klein unten. Damit sich nichts ins Display einbrennt, wandert der Inhalt jede Minute ein paar Pixel. Am besten nur für den Nutzer des Tablets einschalten (`users: … face:`); `after: 0` zeigt das Zifferblatt sofort, etwa auf einem Display, das sonst nur die Uhr zeigen soll.
 - **Navigation**: schwebende Leiste unten auf allen Geräten. Licht, Klima, Rollos, Sicherheit, Kameras, Kalender, Listen und die Räume sind Unteransichten, deshalb blendet HA seine eigene Tab-Leiste aus.
 
 **Rollos nach Zweck:** Rollläden, Jalousien und Rollos ohne Geräteklasse zählen als Beschattung. Markisen (Klasse `awning`, oder „Markise“/„Awning“ im Namen, weil z. B. Shelly sie als Rollladen anlegt) sind eine eigene Gruppe: Ihr Stoff fährt in der Kachel aus, die Knöpfe heißen Ausfahren und Einfahren. Rollos mit der Klasse `window` oder `door` gehören zu Fenster & Türen, `garage` und `gate` zu Tore. Jede Art hat ihre eigene Schnellkachel und ihren eigenen Sammelschalter, „Alle zu“ für die Beschattung fährt also nie das Garagentor. Die Geräteklasse lässt sich in HA in den Einstellungen des Entities unter „Anzeigen als“ ändern.
@@ -107,6 +108,9 @@ strategy:
   forecast_days: 3         # 0 = keine Vorhersage
   calendars: [calendar.familie, calendar.abfall_2026]   # Kalenderseite, sonst alle
   calendar_edit: false     # Kalenderseite nur zum Ansehen
+  face:                    # Zifferblatt nach einer Weile ohne Berührung
+    after: 120             # Sekunden, 0 = sofort
+    style: clock           # clock | analog | photo | calendar
   tv_apps: [magenta, netflix, prime]   # App-Knöpfe auf der TV-Karte
   appliances:              # Geräte ohne eigenen Betriebszustand; die anderen findet das Dashboard selbst
     - status: sensor.trockner_leistung   # Zustand: Leistung, Schalter, Binärsensor oder Status-Sensor
@@ -154,6 +158,8 @@ strategy:
       control_critical: false      # keine Schlösser, Alarmanlage, „Alle aus/zu“
     gast:
       read_only: true              # nur ansehen
+    wandtablet:
+      face: { style: calendar }    # Zifferblatt nur auf diesem Gerät; face: false schaltet es für einen Nutzer ab
     default:                       # alle übrigen Nicht-Admins
       control_critical: false
 ```

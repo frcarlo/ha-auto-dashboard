@@ -52,6 +52,8 @@ const config: StrategyConfig = {
     temperature: 'sensor.aussen_temperatur', humidity: 'sensor.aussen_luftfeuchte', illuminance: 'sensor.aussen_helligkeit', rain: 'sensor.aussen_regen',
   } : undefined,
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
+  // ?face=analog&after=3 shows that face after three seconds without a touch
+  face: params.has('face') ? { after: Number(params.get('after') ?? 3), style: (params.get('face') || 'clock') as NonNullable<StrategyConfig['face']>['style'] } : undefined,
   // ?as=leni&users={"leni":{"read_only":true}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,
 }

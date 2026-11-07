@@ -105,7 +105,18 @@ export interface CardLook {
 export type PagePath = 'lights' | 'climate' | 'covers' | 'security' | 'cameras' | 'calendar' | 'lists' | 'energy' | 'maintenance'
 
 /** Per-user rule under `users:`, keyed by user name, first name, user id or `default`. */
+export type FaceStyle = 'clock' | 'analog' | 'photo' | 'calendar'
+
+/** A calm full-screen view after a while without a touch, for a tablet on the wall */
+export interface FaceConfig {
+  /** Seconds without a touch, default 120; 0 shows the face right away */
+  after?: number
+  style?: FaceStyle
+}
+
 export interface UserRule {
+  /** The face for this user only; false switches the dashboard's face off */
+  face?: FaceConfig | false
   areas?: string[]
   floors?: string[]
   hide_pages?: PagePath[]
@@ -186,4 +197,6 @@ export interface StrategyConfig extends CardLook {
   calendars?: string[]
   /** false: the calendar page only shows events, no adding, changing or deleting */
   calendar_edit?: boolean
+  /** The face after a while without a touch; per user under users */
+  face?: FaceConfig
 }

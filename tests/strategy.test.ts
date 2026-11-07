@@ -438,3 +438,31 @@ describe('calendar page', () => {
     expect((await card({ calendar_edit: false })).edit).toBe(false)
   })
 })
+
+describe('face', () => {
+  const navFace = async (config: Record<string, unknown>, hass = createHass(true)) => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', ...config }, hass)
+    const nav = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).find(c => c.type === 'custom:ad-nav-bar')!
+    return nav.face
+  }
+
+  it('is off unless asked for', async () => {
+    expect(await navFace({})).toBeUndefined()
+  })
+
+  it('comes with the nav bar on every page, with the weather and the calendars', async () => {
+    const face = await navFace({ face: {}, background_image: '/local/garten.jpg' })
+    expect(face).toMatchObject({ after: 120, style: 'clock', image: '/local/garten.jpg' })
+    expect(face.weather).toMatch(/^weather\./)
+    expect(face.calendars.length).toBeGreaterThan(0)
+    expect(await navFace({ face: { after: 0, style: 'photo' } })).toMatchObject({ after: 0, style: 'photo' })
+  })
+
+  it('a user gets their own face, or none', async () => {
+    const hass = createHass(true)
+    const id = hass.user!.id
+    expect(await navFace({ users: { [id]: { face: { style: 'analog', after: 30 } } } }, hass)).toMatchObject({ style: 'analog', after: 30 })
+    expect(await navFace({ face: { style: 'calendar' }, users: { [id]: { face: { after: 60 } } } }, hass)).toMatchObject({ style: 'calendar', after: 60 })
+    expect(await navFace({ face: { style: 'calendar' }, users: { [id]: { face: false } } }, hass)).toBeUndefined()
+  })
+})

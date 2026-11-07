@@ -11,6 +11,7 @@ import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
+import type { FaceSettings } from './cards/face'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
 
 type Card = Record<string, unknown>
@@ -175,7 +176,17 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(calendars.length ? [{ path: 'calendar', icon: 'mdi:calendar-month-outline', label: t(hass, 'calendar') }] : []),
     ...(hasLists ? [{ path: 'lists', icon: 'mdi:clipboard-list-outline', label: t(hass, 'todos') }] : []),
   ]
-  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...look }])
+  // The face sits with the nav bar, which is on every page; a user's own face wins over the dashboard's
+  const faceConfig = rule?.face === false ? undefined : rule?.face || config.face ? { ...config.face, ...(rule?.face || {}) } : undefined
+  const face: FaceSettings | undefined = faceConfig ? {
+    after: Math.max(0, Number(faceConfig.after ?? 120) || 0),
+    style: faceConfig.style ?? 'clock',
+    ...(weather ? { weather } : {}),
+    ...(weatherSensors(hass, config.weather_sensors)?.temperature ? { temperature: weatherSensors(hass, config.weather_sensors)!.temperature } : {}),
+    ...(calendars.length ? { calendars: calendars.map(e => e.entity_id) } : {}),
+    ...(config.background_image?.trim() ? { image: config.background_image.trim() } : {}),
+  } : undefined
+  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...(face ? { face } : {}), ...look }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
   const has = (path: string) => domainPages.some(p => p.path === path) ? path : undefined

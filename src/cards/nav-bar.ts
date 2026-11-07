@@ -5,6 +5,8 @@ import { BaseCard, type BaseConfig } from './base'
 import { tokens } from '../styles/tokens'
 import type { NavPosition } from '../types'
 import { PALETTE_VARS, haGlassVars, haThemeVars } from '../styles/palette'
+import './face'
+import type { AdFace, FaceSettings } from './face'
 
 export interface NavItem {
   path: string
@@ -17,6 +19,8 @@ interface NavBarConfig extends BaseConfig {
   position?: NavPosition
   /** false: HA's header and sidebar keep their theme when an accent color is set */
   ha_colors?: boolean
+  /** The face after a while without a touch; the bar is on every page, so it carries it */
+  face?: FaceSettings
 }
 
 
@@ -52,6 +56,28 @@ const barStyles = css`
 
 let bar: HTMLElement | undefined
 let users = 0
+/** The face, one for the whole dashboard like the bar, so switching pages keeps its wait running */
+let face: AdFace | undefined
+
+function placeFace(settings: FaceSettings | undefined, from: HTMLElement, hass: unknown) {
+  if (!settings) {
+    face?.remove()
+    face = undefined
+    return
+  }
+  if (!face) {
+    face = document.createElement('ad-face') as AdFace
+    document.body.appendChild(face)
+  }
+  if (JSON.stringify(face.settings) !== JSON.stringify(settings)) face.settings = settings
+  face.hass = hass as AdFace['hass']
+  face.toggleAttribute('dark', from.hasAttribute('dark'))
+  for (const name of PALETTE_VARS) {
+    const value = from.style.getPropertyValue(name)
+    if (value) face.style.setProperty(name, value)
+    else face.style.removeProperty(name)
+  }
+}
 
 let sidebarObserver: ResizeObserver | undefined
 
@@ -177,8 +203,15 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
         sidebarObserver = undefined
         tintHa(undefined)
         pad(undefined, undefined)
+        placeFace(undefined, document.body, undefined)
       }
     }, 0)
+  }
+
+  // The bar itself only changes with the config or theme, but the face shows live states
+  protected shouldUpdate(changed: Map<string | number | symbol, unknown>) {
+    if (face && this.config?.face && changed.has('hass')) face.hass = this.hass
+    return super.shouldUpdate(changed as never)
   }
 
   protected willUpdate() {
@@ -208,6 +241,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     tintHa(tint || glass ? { ...tint, ...glass } : undefined)
     bar.style.setProperty('--ad-offset', `${sidebarRight()}px`)
     this.padView()
+    placeFace(this.config.face, this, this.hass)
     // A bare dashboard URL shows the first view
     const active = currentView() || this.config.items[0]?.path
     const dashboard = location.pathname.split('/')[1]

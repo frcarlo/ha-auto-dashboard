@@ -1,0 +1,322 @@
+// The face: when nobody has touched the screen for a while, a calm full-screen view takes over, readable from
+// across the room. A large clock with the date, the weather and the next events, or a picture with the time.
+// One tap brings back the page underneath, exactly as it was. The nav bar puts it into document.body.
+import { LitElement, css, html, nothing, svg } from 'lit'
+import { tokens } from '../styles/tokens'
+import { t } from '../i18n'
+import { CALENDAR_COLORS, addDays, sameDay, startOfDay, toEvent, type ApiEvent, type CalEvent } from '../calendar'
+import { conditionIcon } from '../weather'
+import { entityName } from '../presentation'
+import type { FaceStyle, HomeAssistant } from '../types'
+
+export interface FaceSettings {
+  /** Seconds without a touch; 0 shows the face right away */
+  after: number
+  style: FaceStyle
+  weather?: string
+  /** A sensor at the house that knows the temperature better than the weather service */
+  temperature?: string
+  calendars?: string[]
+  /** The dashboard's background picture, for the photo face */
+  image?: string
+}
+
+const ACTIVITY = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const
+const EVENTS_EVERY = 15 * 60_000
+const SHIFT_EVERY = 60_000
+
+export class AdFace extends LitElement {
+  static properties = {
+    hass: { attribute: false },
+    settings: { attribute: false },
+    shown: { type: Boolean, reflect: true },
+    now: { state: true },
+    events: { state: true },
+    picture: { state: true },
+    shift: { state: true },
+  }
+
+  hass?: HomeAssistant
+  settings?: FaceSettings
+  shown = false
+  now = new Date()
+  events: CalEvent[] = []
+  picture?: string
+  shift: [number, number] = [0, 0]
+
+  private idle?: number
+  private tick?: number
+  private loadedAt = 0
+  private shiftedAt = 0
+  private pictureFor?: string
+
+  private onActivity = () => {
+    if (!this.shown) this.arm()
+  }
+
+  connectedCallback() {
+    super.connectedCallback()
+    for (const type of ACTIVITY) window.addEventListener(type, this.onActivity, { capture: true, passive: true })
+    this.arm()
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    for (const type of ACTIVITY) window.removeEventListener(type, this.onActivity, { capture: true })
+    window.clearTimeout(this.idle)
+    window.clearInterval(this.tick)
+  }
+
+  /** Starts the wait for the face again */
+  arm() {
+    window.clearTimeout(this.idle)
+    if (!this.settings) return
+    this.idle = window.setTimeout(() => this.show(), Math.max(0, this.settings.after) * 1000)
+  }
+
+  private show() {
+    this.shown = true
+    this.now = new Date()
+    window.clearInterval(this.tick)
+    this.tick = window.setInterval(() => {
+      this.now = new Date()
+      // Pixels that never change wear into a wall screen; the content wanders a little every minute
+      if (Date.now() - this.shiftedAt > SHIFT_EVERY) {
+        this.shiftedAt = Date.now()
+        this.shift = [Math.round(Math.random() * 24 - 12), Math.round(Math.random() * 24 - 12)]
+      }
+      if (Date.now() - this.loadedAt > EVENTS_EVERY) void this.loadEvents()
+    }, 1000)
+    void this.loadEvents()
+    void this.loadPicture()
+  }
+
+  private hide(ev: Event) {
+    // The tap only wakes the screen; it must not reach what lies beneath
+    ev.preventDefault()
+    ev.stopPropagation()
+    this.shown = false
+    window.clearInterval(this.tick)
+    this.arm()
+  }
+
+  protected updated(changed: Map<string, unknown>) {
+    // A new wait when the settings change, e.g. a shorter time in the config
+    const before = changed.get('settings') as FaceSettings | undefined
+    if (changed.has('settings') && !this.shown && before?.after !== this.settings?.after) this.arm()
+  }
+
+  private async loadEvents() {
+    const hass = this.hass
+    const ids = this.settings?.calendars ?? []
+    if (!hass?.callApi || !ids.length) return
+    this.loadedAt = Date.now()
+    const from = startOfDay(new Date())
+    const to = addDays(from, 8)
+    const range = `start=${encodeURIComponent(from.toISOString())}&end=${encodeURIComponent(to.toISOString())}`
+    const lists = await Promise.all(ids.map(id => hass.callApi!<ApiEvent[]>('GET', `calendars/${id}?${range}`)
+      .then(list => list.map((e, i) => toEvent(id, e, i)).filter((e): e is CalEvent => !!e))
+      .catch(() => [] as CalEvent[])))
+    const now = Date.now()
+    this.events = lists.flat()
+      .filter(e => e.end.getTime() > now)
+      .sort((a, b) => a.start.getTime() - b.start.getTime() || Number(b.allDay) - Number(a.allDay))
+  }
+
+  /** Uploaded pictures are media-source ids; HA hands out a signed URL for them */
+  private async loadPicture() {
+    const image = this.settings?.image?.trim()
+    if (!image || this.pictureFor === image) return
+    this.pictureFor = image
+    if (!image.startsWith('media-source://')) {
+      this.picture = image
+      return
+    }
+    try {
+      const resolved = await this.hass?.callWS?.<{ url: string }>({ type: 'media_source/resolve_media', media_content_id: image, expires: 24 * 3600 })
+      this.picture = resolved?.url
+    } catch {
+      this.pictureFor = undefined
+    }
+  }
+
+  private get loc() {
+    return this.hass?.locale?.language ?? this.hass?.language ?? 'de'
+  }
+
+  private time() {
+    return this.now.toLocaleTimeString(this.loc, { hour: '2-digit', minute: '2-digit' })
+  }
+
+  private date() {
+    return this.now.toLocaleDateString(this.loc, { weekday: 'long', day: 'numeric', month: 'long' })
+  }
+
+  private weather() {
+    const hass = this.hass!
+    const w = this.settings?.weather ? hass.states[this.settings.weather] : undefined
+    const sensor = this.settings?.temperature ? hass.states[this.settings.temperature] : undefined
+    const fromSensor = sensor && Number.isFinite(Number(sensor.state)) ? Number(sensor.state) : undefined
+    const temp = fromSensor ?? (typeof w?.attributes.temperature === 'number' ? w.attributes.temperature : undefined)
+    if (temp === undefined && !w) return nothing
+    const unit = String((fromSensor !== undefined ? sensor?.attributes.unit_of_measurement : w?.attributes.temperature_unit) ?? '°C')
+    const value = temp === undefined ? '' : new Intl.NumberFormat(this.loc, { maximumFractionDigits: 0 }).format(temp)
+    return html`<span class="weather">
+      ${w ? html`<ha-icon icon=${conditionIcon(w.state)}></ha-icon>` : nothing}
+      ${value ? html`<span class="temp">${value}${unit.replace(/^°.*/, '°')}</span>` : nothing}
+      ${w ? html`<span class="cond">${hass.formatEntityState?.(w) ?? w.state}</span>` : nothing}
+    </span>`
+  }
+
+  /** When an event is, said the short way: "13:30", "Morgen 9:00", "Fr., 14. Nov." */
+  private when(e: CalEvent) {
+    const hass = this.hass!
+    const today = startOfDay(this.now)
+    const day = sameDay(e.start, today) || e.start < today ? '' : sameDay(e.start, addDays(today, 1)) ? t(hass, 'face.tomorrow')
+      : e.start.toLocaleDateString(this.loc, { weekday: 'short', day: 'numeric', month: 'short' })
+    const time = e.allDay ? t(hass, 'face.all_day') : e.start.toLocaleTimeString(this.loc, { hour: '2-digit', minute: '2-digit' })
+    return day ? `${day} · ${time}` : time
+  }
+
+  private color(e: CalEvent) {
+    const i = Math.max(0, this.settings?.calendars?.indexOf(e.calendar) ?? 0)
+    return CALENDAR_COLORS[i % CALENDAR_COLORS.length]
+  }
+
+  private eventRow(e: CalEvent) {
+    return html`<li><span class="dot" style="background: rgb(${this.color(e)})"></span>
+      <span class="when">${this.when(e)}</span><span class="what">${e.title}</span></li>`
+  }
+
+  /** The next event today or tomorrow, for the clock faces */
+  private nextEvent() {
+    const until = addDays(startOfDay(this.now), 2).getTime()
+    const next = this.events.find(e => e.start.getTime() < until)
+    return next ? html`<ul class="next">${this.eventRow(next)}</ul>` : nothing
+  }
+
+  /** What is going on right now, small at the bottom: music that plays */
+  private live() {
+    const hass = this.hass!
+    const playing = Object.values(hass.states).filter(s => s.entity_id.startsWith('media_player.') && s.state === 'playing').slice(0, 2)
+    if (!playing.length) return nothing
+    return html`<div class="live">${playing.map(p => {
+      const title = [p.attributes.media_title, p.attributes.media_artist].filter(Boolean).join(' – ')
+      return html`<span class="chip"><ha-icon icon="mdi:music"></ha-icon>${title || entityName(p)}</span>`
+    })}</div>`
+  }
+
+  private analog() {
+    const h = this.now.getHours() % 12
+    const m = this.now.getMinutes()
+    const s = this.now.getSeconds()
+    const hand = (deg: number, len: number, width: number, cls: string) =>
+      svg`<line class=${cls} x1="100" y1="100" x2=${100 + len * Math.sin(deg * Math.PI / 180)} y2=${100 - len * Math.cos(deg * Math.PI / 180)} stroke-width=${width} stroke-linecap="round"></line>`
+    return html`<svg class="dial" viewBox="0 0 200 200" role="img" aria-label=${this.time()}>
+      <circle class="rim" cx="100" cy="100" r="98"></circle>
+      ${Array.from({ length: 12 }, (_, i) => {
+        const a = i * 30 * Math.PI / 180
+        return svg`<line class="mark" x1=${100 + 84 * Math.sin(a)} y1=${100 - 84 * Math.cos(a)} x2=${100 + 92 * Math.sin(a)} y2=${100 - 92 * Math.cos(a)} stroke-width=${i % 3 ? 2 : 4} stroke-linecap="round"></line>`
+      })}
+      ${hand((h + m / 60) * 30, 50, 7, 'hour')}
+      ${hand((m + s / 60) * 6, 76, 4, 'minute')}
+      ${hand(s * 6, 82, 1.5, 'second')}
+      <circle cx="100" cy="100" r="4" class="pin"></circle>
+    </svg>`
+  }
+
+  private content(photo: boolean) {
+    const style = this.settings!.style
+    if (photo) return html`<div class="photo">
+      <div class="corner"><div class="time small">${this.time()}</div><div class="date">${this.date()}</div></div>
+      <div class="corner right">${this.weather()}${this.nextEvent()}</div>
+    </div>`
+    if (style === 'calendar') return html`<div class="agenda">
+      <div class="side"><div class="time medium">${this.time()}</div><div class="date">${this.date()}</div>${this.weather()}</div>
+      <ul class="events">${this.events.length ? this.events.slice(0, 7).map(e => this.eventRow(e)) : html`<li class="none">${t(this.hass, 'face.no_events')}</li>`}</ul>
+    </div>`
+    if (style === 'analog') return html`<div class="center">${this.analog()}<div class="date">${this.date()}</div><div class="info">${this.weather()}${this.nextEvent()}</div></div>`
+    return html`<div class="center"><div class="time">${this.time()}</div><div class="date">${this.date()}</div><div class="info">${this.weather()}${this.nextEvent()}</div></div>`
+  }
+
+  static styles = [tokens, css`
+    :host {
+      position: fixed; inset: 0; z-index: 9; display: none; overflow: hidden; cursor: pointer;
+      color: rgb(var(--ad-on-surface)); background: var(--ad-bg, #0f172a);
+      font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    :host([shown]) { display: block; animation: fade 0.8s ease both; }
+    @keyframes fade { from { opacity: 0; } }
+    /* A soft light in the accent color behind the clock, like the glass backdrop of the dashboard */
+    .wake { position: absolute; inset: 0; outline: none; }
+    .backdrop { position: absolute; inset: -10%; background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(var(--ad-primary), 0.22), transparent 70%); }
+    .picture { position: absolute; inset: 0; background-size: cover; background-position: center; }
+    .picture::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent 45%, transparent 75%, rgba(0, 0, 0, 0.25)); }
+    .stage { position: absolute; inset: 0; transition: transform 2s ease; }
+
+    .center { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px; box-sizing: border-box; text-align: center; }
+    .time { font-size: clamp(88px, min(24vw, 34vh), 280px); font-weight: 200; letter-spacing: -0.04em; line-height: 0.95; }
+    .time.medium { font-size: clamp(64px, min(12vw, 20vh), 160px); }
+    .time.small { font-size: clamp(56px, min(9vw, 14vh), 120px); }
+    .date { font-size: clamp(18px, 2.6vw, 30px); font-weight: 400; opacity: 0.7; }
+    .info { margin-top: clamp(16px, 4vh, 40px); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px 40px; }
+    .weather { display: inline-flex; align-items: center; gap: 12px; font-size: clamp(18px, 2.4vw, 28px); }
+    .weather ha-icon { --mdc-icon-size: clamp(28px, 3.4vw, 40px); opacity: 0.85; }
+    .weather .temp { font-weight: 500; }
+    .weather .cond { opacity: 0.65; }
+
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { display: flex; align-items: baseline; gap: 12px; min-width: 0; font-size: clamp(16px, 2vw, 24px); }
+    li .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; align-self: center; }
+    li .when { flex: none; opacity: 0.65; }
+    li .what { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .next li { max-width: 60vw; }
+
+    .dial { width: min(64vmin, 440px); height: auto; }
+    .dial .rim { fill: rgba(var(--ad-on-surface), 0.04); stroke: rgba(var(--ad-on-surface), 0.08); stroke-width: 1; }
+    .dial .mark { stroke: rgba(var(--ad-on-surface), 0.45); }
+    .dial .hour, .dial .minute { stroke: rgb(var(--ad-on-surface)); }
+    .dial .second { stroke: rgb(var(--ad-primary)); }
+    .dial .pin { fill: rgb(var(--ad-primary)); }
+
+    .photo { height: 100%; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 40px 48px; box-sizing: border-box; color: #fff; }
+    .photo .corner { display: flex; flex-direction: column; gap: 8px; min-width: 0; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4); }
+    .photo .right { align-items: flex-end; text-align: right; }
+
+    .agenda { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 48px; padding: 48px clamp(32px, 6vw, 96px); box-sizing: border-box; }
+    .agenda .side { display: flex; flex-direction: column; gap: 12px; }
+    .agenda .events { display: flex; flex-direction: column; gap: clamp(12px, 2.4vh, 22px); }
+    .agenda .none { opacity: 0.6; }
+    @media (max-width: 700px) {
+      .agenda { grid-template-columns: 1fr; align-content: center; gap: 32px; }
+    }
+
+    .live { position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; max-width: calc(100vw - 48px); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 18px; min-width: 0;
+      background: rgba(var(--ad-on-surface), 0.1); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chip ha-icon { --mdc-icon-size: 18px; }
+    .on-photo .chip { background: rgba(0, 0, 0, 0.35); color: #fff; }
+
+    @media (prefers-reduced-motion: reduce) {
+      :host([shown]) { animation: none; }
+      .stage { transition: none; }
+    }
+  `]
+
+  protected render() {
+    if (!this.shown || !this.hass || !this.settings) return nothing
+    // Without its picture (none set, or still loading) the photo face shows the clock
+    const photo = this.settings.style === 'photo' && !!this.picture
+    return html`<div class="wake ${photo ? 'on-photo' : ''}" @click=${(ev: Event) => this.hide(ev)}
+      role="button" tabindex="0" aria-label=${t(this.hass, 'face.wake')}
+      @keydown=${(ev: KeyboardEvent) => { if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Escape') this.hide(ev) }}>
+      ${photo ? html`<div class="picture" style="background-image: url(${JSON.stringify(this.picture)})"></div>` : html`<div class="backdrop"></div>`}
+      <div class="stage" style="transform: translate(${this.shift[0]}px, ${this.shift[1]}px)">${this.content(photo)}</div>
+      ${this.live()}
+    </div>`
+  }
+}
+
+if (!customElements.get('ad-face')) customElements.define('ad-face', AdFace)
