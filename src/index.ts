@@ -17,6 +17,7 @@ import { AdAppliance } from './cards/appliance'
 import { AdTv } from './cards/tv'
 import { AdRow } from './cards/row'
 import { AdCalendar } from './cards/calendar'
+import { AdLists } from './cards/lists'
 import { AdStrategyEditor } from './editor'
 import { AdRoomSettings } from './editor-rooms'
 import type { HomeAssistant, StrategyConfig } from './types'
@@ -72,6 +73,7 @@ define('ad-appliance', AdAppliance)
 define('ad-tv', AdTv)
 define('ad-row', AdRow)
 define('ad-calendar', AdCalendar)
+define('ad-lists', AdLists)
 define('ad-strategy-editor', AdStrategyEditor)
 define('ad-room-settings', AdRoomSettings)
 

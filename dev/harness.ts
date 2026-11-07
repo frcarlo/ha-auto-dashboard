@@ -73,6 +73,40 @@ async function callService(domain: string, service: string, data?: Record<string
   for (const card of cards) card.hass = hass
 }
 
+// Adding and deleting lists like HA's Local To-do integration: a config flow adds one, deleting its entry removes it
+const baseApi = hass.callApi!
+const baseWS = hass.callWS!
+function setLists(change: (states: HomeAssistant['states'], entities: HomeAssistant['entities']) => void) {
+  const states = { ...hass.states }
+  const entities = { ...hass.entities }
+  change(states, entities)
+  hass = { ...hass, states, entities }
+  for (const card of cards) card.hass = hass
+}
+hass.callApi = async <T,>(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>) => {
+  if (path === 'config/config_entries/flow') return { type: 'form', flow_id: 'f1' } as T
+  if (path.startsWith('config/config_entries/flow/')) {
+    const name = String(body?.todo_list_name ?? '')
+    const id = `todo.${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`
+    if (hass.states[id]) return { type: 'abort', reason: 'already_configured' } as T
+    setTimeout(() => setLists((states, entities) => {
+      states[id] = { entity_id: id, state: '0', attributes: { friendly_name: name } }
+      entities[id] = { entity_id: id, platform: 'local_todo', labels: [] }
+    }), 300)
+    return { type: 'create_entry' } as T
+  }
+  return baseApi<T>(method, path, body)
+}
+hass.callWS = async <T,>(msg: Record<string, unknown>) => {
+  if (msg.type === 'config/entity_registry/get') return { config_entry_id: `entry-${msg.entity_id}` } as T
+  if (msg.type === 'config_entries/delete') {
+    const id = String(msg.entry_id).replace('entry-', '')
+    setTimeout(() => setLists((states, entities) => { delete states[id]; delete entities[id] }), 300)
+    return { require_restart: false } as T
+  }
+  return baseWS<T>(msg)
+}
+
 function toast(text: string) {
   const el = document.getElementById('toast')!
   el.textContent = text

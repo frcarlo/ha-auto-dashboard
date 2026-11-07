@@ -150,6 +150,9 @@ export function createHass(dark: boolean): HomeAssistant {
     states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - minutesAgo * 60_000).toISOString() }
     entities[entity_id] = { entity_id, area_id: area, labels: [] }
   }
+  // The shopping list integration has one list; Local To-do lists can be deleted on their own
+  entities['todo.einkauf']!.platform = 'shopping_list'
+  entities['todo.werkstatt']!.platform = 'local_todo'
   // ?labels=technik hides these
   entities['switch.kuche_kaffee']!.labels = ['technik']
   entities['sensor.buro_keller_leistung']!.labels = ['technik']

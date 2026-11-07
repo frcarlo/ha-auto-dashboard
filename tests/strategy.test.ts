@@ -345,31 +345,43 @@ describe('hand-written YAML', () => {
 
 describe('to-do lists', () => {
   const generate = (config: Record<string, unknown>, hass = createHass(true)) => generateDashboard({ type: 'custom:auto-dashboard', ...config }, hass)
-  const lists = async (config: Record<string, unknown>, hass?: ReturnType<typeof createHass>) => {
+  const listsCard = async (config: Record<string, unknown>, hass?: ReturnType<typeof createHass>) => {
     const page = (await generate(config, hass)).views.find(v => v.path === 'lists')
-    return page ? (page.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).filter(c => c.type === 'todo-list') : []
+    return page && (page.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).find(c => c.type === 'custom:ad-lists')
   }
 
-  it('get their own page in the nav, side by side, and leave the home page', async () => {
+  it('get their own page in the nav and leave the home page', async () => {
     const { views } = await generate({})
     const home = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
-    expect(JSON.stringify(home)).not.toContain('todo-list')
+    expect(JSON.stringify(home)).not.toContain('todo')
     expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).toContain('lists')
-    const page = views.find(v => v.path === 'lists')!
-    expect(page.subview).toBe(true)
-    expect((page.sections as { column_span: number; cards: any[] }[]).filter(s => s.cards[0].type === 'todo-list').map(s => s.column_span)).toEqual([2, 2])
-    expect((await lists({})).map(c => [c.entity, c.title])).toEqual([['todo.einkauf', 'Einkaufsliste'], ['todo.werkstatt', 'Werkstatt']])
+    expect(views.find(v => v.path === 'lists')!.subview).toBe(true)
+    // Without a pick the card finds the lists itself, so new ones show at once
+    expect(await listsCard({ hide_labels: ['technik'] })).toMatchObject({ hide_labels: ['technik'] })
+    expect((await listsCard({}))!.entities).toBeUndefined()
   })
 
   it('todo_lists picks lists, hide_domains todo or hide_pages drops the page', async () => {
-    expect((await lists({ todo_lists: ['todo.werkstatt'] })).map(c => c.entity)).toEqual(['todo.werkstatt'])
-    expect((await generate({ hide_domains: ['todo'], todo_lists: ['todo.werkstatt'] })).views.some(v => v.path === 'lists')).toBe(false)
+    expect((await listsCard({ todo_lists: ['todo.werkstatt'] }))!.entities).toEqual(['todo.werkstatt'])
+    expect(await listsCard({ hide_domains: ['todo'], todo_lists: ['todo.werkstatt'] })).toBeUndefined()
     const hass = createHass(true)
-    expect((await generate({ users: { [hass.user!.id]: { hide_pages: ['lists'] } } }, hass)).views.some(v => v.path === 'lists')).toBe(false)
+    expect(await listsCard({ users: { [hass.user!.id]: { hide_pages: ['lists'] } } }, hass)).toBeUndefined()
   })
 
   it('belong to the household, so a room filter keeps them', async () => {
-    expect((await lists({ areas: ['wohnzimmer'] })).map(c => c.entity)).toEqual(['todo.einkauf', 'todo.werkstatt'])
+    expect(await listsCard({ areas: ['wohnzimmer'] })).toBeDefined()
+  })
+
+  it('without any list only admins get the page, to add the first one', async () => {
+    const empty = () => {
+      const hass = createHass(true)
+      for (const id of Object.keys(hass.states).filter(id => id.startsWith('todo.'))) delete hass.states[id]
+      return hass
+    }
+    expect(await listsCard({}, empty())).toBeDefined()
+    const guest = empty()
+    guest.user = { id: 'g', name: 'Gast', is_admin: false }
+    expect(await listsCard({}, guest)).toBeUndefined()
   })
 })
 
