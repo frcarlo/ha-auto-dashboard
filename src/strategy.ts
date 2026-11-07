@@ -85,10 +85,6 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const scenes = sceneEntities(hass, config.scenes, hide, areaIds)
   const ofDomain = (domain: string) => (e: HassEntity) => domainOf(e.entity_id) === domain
   const cameras = all.filter(ofDomain('camera'))
-  // Picked lists in their order, else every visible one
-  const todos = config.hide_domains?.includes('todo') ? []
-    : config.todo_lists?.length ? favoriteEntities(hass, config.todo_lists, areaIds).filter(ofDomain('todo'))
-    : all.filter(ofDomain('todo'))
   // HA's own cards for what it draws best: camera streams, editable to-do lists, statistics graphs
   // Under its room's heading a camera named like the room shows no caption, a "Garage Einfahrt" just "Einfahrt"
   const cameraCard = (e: HassEntity, areaName?: string): Card => {
@@ -166,10 +162,15 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const calendars = config.hide_domains?.includes('calendar') || !pageAllowed('calendar') ? []
     : config.calendars?.length ? favoriteEntities(hass, config.calendars).filter(ofDomain('calendar'))
     : allEntities(hass, hide).filter(ofDomain('calendar'))
+  // Lists, like calendars, belong to the household: picked ones in their order, else every visible one
+  const todos = config.hide_domains?.includes('todo') || !pageAllowed('lists') ? []
+    : config.todo_lists?.length ? favoriteEntities(hass, config.todo_lists).filter(ofDomain('todo'))
+    : allEntities(hass, hide).filter(ofDomain('todo'))
   const navItems: NavItem[] = [
     { path: 'home', icon: 'mdi:home-outline', label: t(hass, 'home') },
     ...domainPages.map(p => ({ path: p.path, icon: p.icon, label: p.title })),
     ...(calendars.length ? [{ path: 'calendar', icon: 'mdi:calendar-month-outline', label: t(hass, 'calendar') }] : []),
+    ...(todos.length ? [{ path: 'lists', icon: 'mdi:clipboard-list-outline', label: t(hass, 'todos') }] : []),
   ]
   const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...look }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
@@ -267,10 +268,6 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })),
         ],
       })),
-      ...(todos.length ? [fullWidth([
-        heading(t(hass, 'todos'), 'mdi:clipboard-list-outline'),
-        ...todos.map(e => ({ type: 'todo-list', entity: e.entity_id, title: entityName(e), grid_options: { columns: 12 } })),
-      ])] : []),
     ]),
   }
 
@@ -284,6 +281,12 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const calendarView = subview('calendar', t(hass, 'calendar'), 'mdi:calendar-month-outline', [
     fullWidth([{ type: 'custom:ad-calendar', entities: calendars.map(e => e.entity_id), ...(config.calendar_edit === false ? { edit: false } : {}), ...look }]),
   ])
+
+  // HA's own list card, where entries can be ticked off and added; several lists stand side by side
+  const listsView = subview('lists', t(hass, 'todos'), 'mdi:clipboard-list-outline', todos.map(e => ({
+    type: 'grid' as const, column_span: todos.length > 1 ? 2 : MAX_COLUMNS,
+    cards: [{ type: 'todo-list', entity: e.entity_id, title: entityName(e), grid_options: { columns: 12 } }],
+  })))
 
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
   const powerOpts = { ...hideOpts, ...look }
@@ -380,7 +383,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const background = config.background_image?.trim() ? imageBackground(config.background_image, config.theme)
     : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
-  const views = [home, ...domainViews, ...(calendars.length ? [calendarView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
+  const views = [home, ...domainViews, ...(calendars.length ? [calendarView] : []), ...(todos.length ? [listsView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {
     title: config.title ?? t(hass, 'home'),
     views: background ? views.map((view): View => ({ ...view, background })) : views,

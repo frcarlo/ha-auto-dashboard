@@ -16,7 +16,7 @@ describe('generateDashboard', () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const sections = views[0]!.sections as { cards: Record<string, any>[] }[]
     const floors = sections.slice(1, -1).map(s => s.cards[0]!.heading)
-    expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume', 'Listen'])
+    expect(floors).toEqual(['Obergeschoss', 'Erdgeschoss', 'Keller', 'Weitere Räume'])
     const rooms = sections.flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c]).filter(c => c.type === 'custom:ad-room-card').map(c => c.area)
     expect(new Set(rooms).size).toBe(rooms.length)
   })
@@ -240,7 +240,6 @@ describe('energy, maintenance, cameras and lists', () => {
     const page = cards(views.find(v => v.path === 'cameras')!)
     expect(page.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage', name: 'Kamera' })
     expect(page.find(c => c.type === 'custom:ad-group-heading')).toMatchObject({ title: 'Garage', path: 'area-garage' })
-    expect(home.find(c => c.type === 'todo-list')).toMatchObject({ entity: 'todo.einkauf' })
     expect(cards(views.find(v => v.path === 'area-garage')!).some(c => c.type === 'picture-entity')).toBe(true)
     const hass = createHass(true)
     const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['energy', 'maintenance', 'cameras'] } } }, hass)
@@ -345,18 +344,32 @@ describe('hand-written YAML', () => {
 })
 
 describe('to-do lists', () => {
-  const lists = async (config: Record<string, unknown>) => {
-    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', ...config }, createHass(true))
-    return (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c]).filter(c => c.type === 'todo-list')
+  const generate = (config: Record<string, unknown>, hass = createHass(true)) => generateDashboard({ type: 'custom:auto-dashboard', ...config }, hass)
+  const lists = async (config: Record<string, unknown>, hass?: ReturnType<typeof createHass>) => {
+    const page = (await generate(config, hass)).views.find(v => v.path === 'lists')
+    return page ? (page.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).filter(c => c.type === 'todo-list') : []
   }
 
-  it('shows every list with its name as title', async () => {
+  it('get their own page in the nav, side by side, and leave the home page', async () => {
+    const { views } = await generate({})
+    const home = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    expect(JSON.stringify(home)).not.toContain('todo-list')
+    expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).toContain('lists')
+    const page = views.find(v => v.path === 'lists')!
+    expect(page.subview).toBe(true)
+    expect((page.sections as { column_span: number; cards: any[] }[]).filter(s => s.cards[0].type === 'todo-list').map(s => s.column_span)).toEqual([2, 2])
     expect((await lists({})).map(c => [c.entity, c.title])).toEqual([['todo.einkauf', 'Einkaufsliste'], ['todo.werkstatt', 'Werkstatt']])
   })
 
-  it('todo_lists picks lists, hide_domains todo hides them all', async () => {
+  it('todo_lists picks lists, hide_domains todo or hide_pages drops the page', async () => {
     expect((await lists({ todo_lists: ['todo.werkstatt'] })).map(c => c.entity)).toEqual(['todo.werkstatt'])
-    expect(await lists({ hide_domains: ['todo'], todo_lists: ['todo.werkstatt'] })).toEqual([])
+    expect((await generate({ hide_domains: ['todo'], todo_lists: ['todo.werkstatt'] })).views.some(v => v.path === 'lists')).toBe(false)
+    const hass = createHass(true)
+    expect((await generate({ users: { [hass.user!.id]: { hide_pages: ['lists'] } } }, hass)).views.some(v => v.path === 'lists')).toBe(false)
+  })
+
+  it('belong to the household, so a room filter keeps them', async () => {
+    expect((await lists({ areas: ['wohnzimmer'] })).map(c => c.entity)).toEqual(['todo.einkauf', 'todo.werkstatt'])
   })
 })
 
