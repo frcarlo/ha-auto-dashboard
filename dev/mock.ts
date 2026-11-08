@@ -73,6 +73,47 @@ const still = (top: string, bottom: string, shape: string) => `data:image/svg+xm
 const MOTION = { device_class: 'motion' }
 
 // Appliances and a TV as their integrations bring them: one device with many entities each
+
+// Music Assistant: a few speakers, one Spotify account, a small library. Covers are drawn, so the harness needs no network.
+const cover = (hue: number, text = '') => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 70% 55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360} 60% 25%)"/></linearGradient></defs><rect width="300" height="300" fill="url(#g)"/><circle cx="220" cy="80" r="70" fill="#fff" opacity=".12"/><text x="24" y="270" font-family="sans-serif" font-size="34" font-weight="700" fill="#fff" opacity=".85">${text}</text></svg>`)}`
+type Mi = { uri: string; name: string; media_type: string; image?: string; artists?: { name: string }[]; album?: { name: string }; favorite?: boolean }
+const mi = (media_type: string, id: number, name: string, hue: number, artist?: string): Mi => ({
+  uri: `library://${media_type}/${id}`, name, media_type, image: cover(hue, name.split(' ')[0]!.slice(0, 10)),
+  ...(artist ? { artists: [{ name: artist }] } : {}),
+})
+const library: Record<string, Mi[]> = {
+  playlist: [
+    mi('playlist', 1, 'Sonntagmorgen', 30), mi('playlist', 2, 'Kochen mit Musik', 340), mi('playlist', 3, 'Italo Classics', 200),
+    mi('playlist', 4, 'Fokus', 260), mi('playlist', 5, 'Party im Garten', 120), mi('playlist', 6, 'Einschlafen', 230), mi('playlist', 7, 'Roadtrip 2026', 10),
+  ],
+  album: [
+    mi('album', 11, 'Mezzanine', 280, 'Massive Attack'), mi('album', 12, 'Che Fantastica Storia', 40, 'Antonello Venditti'), mi('album', 13, 'Random Access Memories', 50, 'Daft Punk'),
+    mi('album', 14, 'Blue', 210, 'Joni Mitchell'), mi('album', 15, 'In Rainbows', 15, 'Radiohead'),
+  ],
+  artist: [mi('artist', 21, 'Massive Attack', 280), mi('artist', 22, 'Lucio Dalla', 30), mi('artist', 23, 'Daft Punk', 50), mi('artist', 24, 'Radiohead', 15), mi('artist', 25, 'Nina Simone', 320)],
+  track: [
+    mi('track', 31, 'Teardrop', 280, 'Massive Attack'), mi('track', 32, 'Caruso', 30, 'Lucio Dalla'), mi('track', 33, 'Get Lucky', 50, 'Daft Punk'),
+    mi('track', 34, 'Feeling Good', 320, 'Nina Simone'), mi('track', 35, 'Nude', 15, 'Radiohead'),
+  ],
+  radio: [mi('radio', 41, 'Radio Bremen Eins', 190), mi('radio', 42, 'Deutschlandfunk', 0), mi('radio', 43, 'FluxFM', 300), mi('radio', 44, 'LolliRadio Italia', 100), mi('radio', 45, 'WDR 2', 220)],
+}
+const tracksOf = (item: Mi) => library.track.concat(library.track.map((t, i) => ({ ...t, uri: `${t.uri}-${item.uri}-${i}`, name: `${t.name} (Live)` })))
+
+export const musicDefs: Def[] = [
+  ['media_player.ma_kuche', 'playing', {
+    friendly_name: 'Lautsprecher', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.42, shuffle: false, repeat: 'off',
+    media_title: 'Teardrop', media_artist: 'Massive Attack', media_album_name: 'Mezzanine', media_content_id: 'library://track/31', media_duration: 331, media_position: 74,
+    media_position_updated_at: new Date().toISOString(), entity_picture_local: cover(280, 'Mezzanine'), group_members: ['media_player.ma_kuche'], supported_features: 8320575,
+  }, 'kuche'],
+  ['media_player.ma_wohnzimmer', 'idle', { friendly_name: 'Lautsprecher', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.3, group_members: [], supported_features: 8320575 }, 'wohnzimmer'],
+  ['media_player.ma_schlafzimmer', 'paused', {
+    friendly_name: 'Nest Mini', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.18, group_members: [], supported_features: 8320575,
+    media_title: 'Deutschlandfunk', media_content_id: 'library://radio/42', entity_picture_local: cover(0, 'DLF'),
+  }, 'schlafzimmer'],
+  ['media_player.ma_buro', 'unavailable', { friendly_name: 'Büro Sonos', mass_player_type: 'player', supported_features: 8320575 }, 'buro_keller'],
+  ['media_player.spotify_frank', 'idle', { friendly_name: 'Spotify Frank', volume_level: 0.6, supported_features: 444983 }, ''],
+]
+
 const deviceDefs: DeviceDef[] = [
   // A Reolink doorbell: three streams, of which the page shows one, and its detections
   {
@@ -216,6 +257,10 @@ export function createHass(dark: boolean): HomeAssistant {
     states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - minutesAgo * 60_000).toISOString() }
     entities[entity_id] = { entity_id, area_id: area, labels: [] }
   }
+  for (const [entity_id, state, attributes, area] of musicDefs) {
+    states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - 4 * 60_000).toISOString() }
+    entities[entity_id] = { entity_id, area_id: area || null, labels: [], platform: entity_id.includes('spotify') ? 'spotify' : 'music_assistant' }
+  }
   // The shopping list integration has one list; Local To-do lists can be deleted on their own
   entities['todo.einkauf']!.platform = 'shopping_list'
   entities['todo.werkstatt']!.platform = 'local_todo'
@@ -298,6 +343,17 @@ export function createHass(dark: boolean): HomeAssistant {
     },
     callWS: async <T,>(msg: Record<string, unknown>) => {
       if (String(msg.type).startsWith('calendar/event/')) return calendarCommand(msg) as T
+      if (msg.type === 'call_service' && msg.domain === 'music_assistant') return { context: {}, response: musicResponse(msg, latest ?? states) } as T
+      if (msg.type === 'media_player/browse_media') {
+        const item = Object.values(library).flat().find(i => i.uri === msg.media_content_id)
+        await new Promise(r => setTimeout(r, 300))
+        if (!item) throw new Error('not found')
+        const children = item.media_type === 'artist' ? library.album.slice(0, 3) : tracksOf(item)
+        return { title: item.name, thumbnail: item.image, children: children.map(c => ({
+          title: c.media_type === 'track' ? `${c.artists?.[0]?.name} - ${c.name}` : c.name, media_class: c.media_type, media_content_id: c.uri,
+          media_content_type: 'music', thumbnail: c.image, can_play: true, can_expand: c.media_type !== 'track',
+        })) } as T
+      }
       if (msg.type === 'history/history_during_period') return cameraHistory(Date.parse(String(msg.start_time)), msg.entity_ids as string[]) as T
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [
@@ -320,6 +376,34 @@ export function createHass(dark: boolean): HomeAssistant {
     },
   }
   return hass
+}
+
+/** The newest fake states, for the queue */
+let latest: Record<string, HassEntity> | undefined
+
+/** Music Assistant's services that answer: library, search, queue */
+async function musicResponse(msg: Record<string, any>, states: Record<string, HassEntity>) {
+  await new Promise(r => setTimeout(r, 250))
+  const data = msg.service_data ?? {}
+  if (msg.service === 'get_library') {
+    let items = [...(library[data.media_type] ?? [])]
+    if (data.order_by === 'last_played_desc') items = items.slice().reverse()
+    if (data.favorite) items = items.slice(0, 5)
+    return { items: items.slice(0, data.limit ?? 25), limit: data.limit, offset: 0, media_type: data.media_type }
+  }
+  if (msg.service === 'search') {
+    const q = String(data.name).toLowerCase()
+    const hit = (list: Mi[]) => list.filter(i => i.name.toLowerCase().includes(q) || i.artists?.some(a => a.name.toLowerCase().includes(q)))
+    return { tracks: hit(library.track), artists: hit(library.artist), albums: hit(library.album), playlists: hit(library.playlist), radio: hit(library.radio) }
+  }
+  if (msg.service === 'get_queue') {
+    const id = [msg.target?.entity_id].flat()[0] as string
+    const e = states[id]
+    const current = library.track.find(t => t.uri === e?.attributes.media_content_id) ?? library.track[0]!
+    const next = library.track[(library.track.indexOf(current) + 1) % library.track.length]!
+    return { [id]: { items: 24, current_item: { name: current.name, media_item: current }, next_item: { name: next.name, media_item: next } } }
+  }
+  return {}
 }
 
 /** Applies a service call to the fake states, so the harness reacts like HA would. */
@@ -345,8 +429,50 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
     }
     if (domain === 'lock') state = service === 'lock' ? 'locked' : 'unlocked'
     if (domain === 'media_player' && service === 'media_play_pause') state = state === 'playing' ? 'paused' : 'playing'
+    if (domain === 'media_player' && service === 'media_play') state = 'playing'
+    if (domain === 'media_player' && service === 'media_pause') state = 'paused'
+    if (domain === 'media_player' && service === 'volume_set') attributes.volume_level = data.volume_level
+    if (domain === 'media_player' && service === 'volume_mute') attributes.is_volume_muted = data.is_volume_muted
+    if (domain === 'media_player' && service === 'shuffle_set') attributes.shuffle = data.shuffle
+    if (domain === 'media_player' && service === 'repeat_set') attributes.repeat = data.repeat
+    if (domain === 'media_player' && service === 'media_seek') Object.assign(attributes, { media_position: data.seek_position, media_position_updated_at: new Date().toISOString() })
+    if (domain === 'media_player' && service === 'join') attributes.group_members = [id, ...((attributes.group_members ?? []) as string[]).filter((m: string) => m !== id), ...data.group_members]
+    if (domain === 'media_player' && service === 'unjoin') {
+      for (const [other, o] of Object.entries(states)) {
+        if (other !== id && (o.attributes.group_members as string[] | undefined)?.includes(id)) {
+          states[other] = { ...o, attributes: { ...o.attributes, group_members: (o.attributes.group_members as string[]).filter(m => m !== id) } }
+        }
+      }
+    }
+    if (domain === 'media_player' && ['media_next_track', 'media_previous_track'].includes(service)) {
+      const list = library.track
+      const at = list.findIndex(t => t.uri === attributes.media_content_id)
+      const next = list[(at + (service === 'media_next_track' ? 1 : list.length - 1)) % list.length]!
+      Object.assign(attributes, { media_title: next.name, media_artist: next.artists?.[0]?.name, media_content_id: next.uri, entity_picture_local: next.image, media_position: 0, media_position_updated_at: new Date().toISOString(), media_duration: 240 })
+    }
+    if (called === 'music_assistant' && service === 'play_media') {
+      const all = Object.values(library).flat()
+      const item = all.find(i => i.uri === data.media_id)
+      const start = all.find(i => i.uri === data.start_item) ?? (item?.media_type === 'track' || item?.media_type === 'radio' ? item : library.track[0])
+      if (['play', 'replace', undefined].includes(data.enqueue) && start) {
+        state = 'playing'
+        Object.assign(attributes, {
+          media_title: start.name, media_artist: start.artists?.[0]?.name, media_content_id: start.uri, entity_picture_local: start.image,
+          media_position: 0, media_position_updated_at: new Date().toISOString(), media_duration: start.media_type === 'radio' ? 0 : 240,
+        })
+      }
+    }
+    if (called === 'music_assistant' && service === 'transfer_queue') {
+      const from = states[data.source_player]
+      if (from) {
+        for (const key of ['media_title', 'media_artist', 'media_content_id', 'entity_picture_local', 'media_duration', 'media_position', 'media_position_updated_at']) attributes[key] = from.attributes[key]
+        state = 'playing'
+        states[data.source_player] = { ...from, state: 'idle' }
+      }
+    }
     states[id] = { ...e, state, attributes }
   }
+  latest = states
   return { ...hass, states }
 }
 

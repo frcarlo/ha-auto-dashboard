@@ -9,6 +9,7 @@ import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { findCameras } from './cameras'
+import { findMusicPlayers } from './music'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
@@ -175,9 +176,14 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     : config.todo_lists?.length ? favoriteEntities(hass, config.todo_lists).filter(ofDomain('todo'))
     : allEntities(hass, hide).filter(ofDomain('todo'))
   const hasLists = listsPage && (todos.length > 0 || (!!hass.user?.is_admin && !config.todo_lists?.length))
+  // Music, like the lists, belongs to the house: Music Assistant's speakers and the Spotify accounts, wherever they stand.
+  // Without Music Assistant there is no library to show, so no page.
+  const musicPlayers = config.hide_domains?.includes('media_player') || !pageAllowed('music') ? [] : findMusicPlayers(hass, hide)
+  const hasMusic = musicPlayers.some(p => p.ma)
   const navItems: NavItem[] = [
     { path: 'home', icon: 'mdi:home-outline', label: t(hass, 'home') },
     ...domainPages.map(p => ({ path: p.path, icon: p.icon, label: p.title })),
+    ...(hasMusic ? [{ path: 'music', icon: 'mdi:music', label: t(hass, 'music') }] : []),
     ...(calendars.length ? [{ path: 'calendar', icon: 'mdi:calendar-month-outline', label: t(hass, 'calendar') }] : []),
     ...(hasLists ? [{ path: 'lists', icon: 'mdi:clipboard-list-outline', label: t(hass, 'todos') }] : []),
   ]
@@ -308,6 +314,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     fullWidth([{ type: 'custom:ad-lists', ...(config.todo_lists?.length ? { entities: todos.map(e => e.entity_id) } : hideOpts), ...look }]),
   ])
 
+  const musicView = subview('music', t(hass, 'music'), 'mdi:music', [
+    fullWidth([{ type: 'custom:ad-music', players: musicPlayers, nav_position: position, ...look }]),
+  ])
+
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
   const powerOpts = { ...hideOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
@@ -403,7 +413,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const background = config.background_image?.trim() ? imageBackground(config.background_image, config.theme)
     : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
-  const views = [home, ...domainViews, ...(calendars.length ? [calendarView] : []), ...(hasLists ? [listsView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
+  const views = [home, ...domainViews, ...(hasMusic ? [musicView] : []), ...(calendars.length ? [calendarView] : []), ...(hasLists ? [listsView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
   return {
     title: config.title ?? t(hass, 'home'),
     views: background ? views.map((view): View => ({ ...view, background })) : views,

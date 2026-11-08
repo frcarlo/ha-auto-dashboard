@@ -40,7 +40,7 @@ const TABS: [Tab, Key][] = [['look', 'ed.look'], ['home', 'ed.home'], ['house', 
 type Tool = 'hide' | 'outdoor' | 'only'
 const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide: 'hide_areas', outdoor: 'outdoor_areas', only: 'areas' }
 
-const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'calendar', 'lists', 'energy', 'maintenance']
+const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
   'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
