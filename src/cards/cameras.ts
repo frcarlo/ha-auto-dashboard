@@ -66,15 +66,33 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
   connectedCallback() {
     super.connectedCallback()
     this.timer = window.setInterval(() => this.tick(), 1000)
+    window.addEventListener('resize', this.fitFeed)
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
     window.clearInterval(this.timer)
     window.clearTimeout(this.reload)
+    window.removeEventListener('resize', this.fitFeed)
     // The stream stops with its card
     this.live = undefined
     this.liveFor = undefined
+  }
+
+  /**
+   * Beside the cameras the list of detections reaches from where it starts down to just above the nav bar,
+   * never further; below the first entry it scrolls on its own. Stacked on a phone it keeps its full length.
+   */
+  private fitFeed = () => {
+    const feed = this.renderRoot.querySelector<HTMLElement>('.feed')
+    if (!feed) return
+    if (getComputedStyle(feed).position !== 'sticky') {
+      feed.style.removeProperty('max-height')
+      return
+    }
+    const bottom = parseFloat(getComputedStyle(this).getPropertyValue('--bottom')) || 12
+    const height = `${Math.max(320, Math.floor(window.innerHeight - feed.getBoundingClientRect().top - bottom))}px`
+    if (feed.style.maxHeight !== height) feed.style.maxHeight = height
   }
 
   private tick() {
@@ -92,6 +110,7 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
     const old = changed.get('hass') as typeof this.hass
     if (!this.hass || !this.config) return
     this.setAttribute('nav', this.config.nav_position ?? 'bottom')
+    this.fitFeed()
     if (!this.historyAt) void this.loadHistory()
     // A sensor just saw something: read the day again in a moment, when HA has written it down
     const fresh = (this.config.cameras ?? []).flatMap(c => c.detections ?? [])

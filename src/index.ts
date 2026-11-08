@@ -2,6 +2,7 @@ import { generateDashboard } from './strategy'
 import { AdTile } from './cards/tile'
 import { AdRoomCard } from './cards/room-card'
 import { AdStatusBar } from './cards/status-bar'
+import { AdActivity } from './cards/activity'
 import { AdHeader } from './cards/header'
 import { AdNavBar } from './cards/nav-bar'
 import { AdGroupHeading } from './cards/group-heading'
@@ -77,6 +78,7 @@ define('ad-row', AdRow)
 define('ad-calendar', AdCalendar)
 define('ad-lists', AdLists)
 define('ad-cameras', AdCameras)
+define('ad-activity', AdActivity)
 define('ad-music', AdMusic)
 define('ad-strategy-editor', AdStrategyEditor)
 define('ad-room-settings', AdRoomSettings)

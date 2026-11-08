@@ -128,6 +128,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const domainPages = [
     {
       path: 'lights', icon: 'mdi:lightbulb-group', title: t(hass, 'lights'),
+      // What happened today, beside the tiles
+      activity: true,
       pick: (e: HassEntity) => domainOf(e.entity_id) === 'light',
       count_label: 'n_on', action: { label: 'all_off', icon: 'mdi:lightbulb-off-outline', service: 'turn_off' },
     },
@@ -143,6 +145,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     },
     {
       path: 'covers', icon: 'mdi:window-shutter', title: t(hass, 'covers'),
+      // What happened today, beside the tiles
+      activity: true,
       // Shading and awnings: garage doors and window drives belong to security, so "all down" never moves them
       pick: (e: HassEntity) => domainOf(e.entity_id) === 'cover' && ['shading', 'awning'].includes(coverKind(e)),
       // Blinds and awnings of a room each get their own heading, so up/down never mixes with out/in
@@ -151,6 +155,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     },
     {
       path: 'security', icon: 'mdi:shield-home-outline', title: t(hass, 'security'),
+      // What happened today, beside the tiles
+      activity: true,
       pick: (e: HassEntity) => SECURITY_GROUPS.includes(groupOf(e)!), count_label: 'n_open',
       // Motion and smoke are not "open"; only openings, gates and locks count
       counts: (e: HassEntity) => ['opening', 'gate', 'lock'].includes(groupOf(e)!),
@@ -394,6 +400,17 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     }).filter(section => section.cards.length)
     const placed = new Set(areas.flatMap(area => inArea(area.area_id)))
     const rest = page.entities.filter(e => !placed.has(e))
+    const content: Section[] = page.whole ? [fullWidth(page.whole())] : [
+      ...floorSections,
+      ...(rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => tile(e))] }] : []),
+    ]
+    // With today's changes beside them, the floors go into one section two columns wide and the list takes the third.
+    // Phones stack them: the tiles first, the list beneath.
+    const withActivity = 'activity' in page && page.activity && !page.whole
+    const sections: Section[] = withActivity ? [
+      { type: 'grid', column_span: 2, cards: content.flatMap(section => section.cards) },
+      { type: 'grid', column_span: 1, cards: [{ type: 'custom:ad-activity', entities: page.entities.map(e => e.entity_id), nav_position: position, ...look }] },
+    ] : content
     // Subviews like the rooms: with only Home as a top-level view HA shows no tab bar,
     // and the nav bar is the one navigation
     return {
@@ -403,7 +420,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       icon: page.icon,
       subview: true,
       back_path: `/${dashboardPath()}/home`,
-      max_columns: MAX_COLUMNS,
+      max_columns: withActivity ? 3 : MAX_COLUMNS,
       sections: withNav([
         fullWidth([{
           type: 'custom:ad-header', variant: 'page', title: page.title, ...look,
@@ -411,8 +428,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           ...(page.count_label ? { count_label: page.count_label } : {}),
           ...(page.action ? { action: page.action } : {}),
         }]),
-        ...(page.whole ? [fullWidth(page.whole())] : floorSections),
-        ...(!page.whole && rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => tile(e))] }] : []),
+        ...sections,
       ]),
     }
   })

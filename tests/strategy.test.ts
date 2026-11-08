@@ -156,6 +156,19 @@ describe('room page, favorites and scenes', () => {
     expect(lights!.entities).toHaveLength(2)
   })
 
+  it('lights, covers and security list what happened today beside the tiles; climate does not', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    for (const path of ['lights', 'covers', 'security']) {
+      const view = views.find(v => v.path === path)! as any
+      const feed = view.sections.find((s: any) => s.cards.some((c: any) => c.type === 'custom:ad-activity'))
+      expect(feed, path).toMatchObject({ column_span: 1 })
+      expect(view.max_columns).toBe(3)
+    }
+    const lights = (views.find(v => v.path === 'lights') as any).sections.flatMap((s: any) => s.cards).find((c: any) => c.type === 'custom:ad-activity')
+    expect(lights.entities.every((id: string) => id.startsWith('light.'))).toBe(true)
+    expect(cards(views.find(v => v.path === 'climate')!).some(c => c.type === 'custom:ad-activity')).toBe(false)
+  })
+
   it('domain pages get one heading per room linking to the room', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const lights = cards(views.find(v => v.path === 'lights')!).filter(c => c.type === 'custom:ad-group-heading')

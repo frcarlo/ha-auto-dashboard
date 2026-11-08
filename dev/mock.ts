@@ -268,7 +268,21 @@ function cameraHistory(since: number, ids: string[]) {
   ]
   const now = Date.now()
   const out: Record<string, { s: string; lu: number }[]> = {}
+  // Everything else switched a few times today, so the pages' activity lists have something to show
+  const pairs: Record<string, [string, string]> = { light: ['on', 'off'], switch: ['on', 'off'], cover: ['open', 'closed'], lock: ['unlocked', 'locked'], binary_sensor: ['on', 'off'] }
+  for (const [i, id] of ids.entries()) {
+    const pair = pairs[id.split('.')[0]!]
+    if (!pair || seen.some(([e]) => e === id)) continue
+    const rows = [{ s: pair[1], lu: since / 1000 }]
+    for (let k = 3; k >= 0; k--) {
+      const at = now - ((i * 37 + k * 140) % 900 + 5) * 60_000
+      if (at < since || at / 1000 <= rows[rows.length - 1]!.lu) continue
+      rows.push({ s: pair[0], lu: at / 1000 }, { s: pair[1], lu: at / 1000 + 600 })
+    }
+    out[id] = rows.filter(r => r.lu * 1000 <= now)
+  }
   for (const id of ids) {
+    if (out[id]) continue
     const rows = [{ s: 'off', lu: since / 1000 }]
     for (const [, ago] of seen.filter(([e]) => e === id).sort((a, b) => b[1] - a[1])) {
       const at = now - ago * 60_000
