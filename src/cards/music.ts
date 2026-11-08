@@ -5,8 +5,8 @@ import { css, html, nothing, type TemplateResult } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import {
-  browseToItem, canOpenItem, formatTime, groupMembers, itemSub, mediaPosition, playerPicture, playsItem,
-  type MediaItem, type MusicPlayer,
+  SPOTIFY_SECTIONS, browseToItem, canOpenItem, formatTime, groupMembers, isSpotifyItem, itemSub, mediaPosition, playableUri, playerPicture, playsItem,
+  type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
 } from '../music'
 import { tokens } from '../styles/tokens'
 import type { HassEntity, NavPosition } from '../types'
@@ -15,6 +15,17 @@ interface MusicCardConfig extends BaseConfig {
   players: MusicPlayer[]
   /** Where the nav bar floats, so the player bar stays clear of it */
   nav_position?: NavPosition
+  /** Sonos or Cast speakers whose media browser lists the Spotify accounts */
+  spotify_browsers?: string[]
+}
+
+type BrowseNode = Parameters<typeof browseToItem>[0] & { children?: Parameters<typeof browseToItem>[0][] }
+
+/** One part of a Spotify library on Home: its folder (for "show all") and the first items */
+interface Shelf {
+  key: SpotifySection
+  folder: MediaItem
+  items: MediaItem[]
 }
 
 type View = 'home' | 'search' | 'radio' | 'players' | 'detail'
@@ -47,6 +58,9 @@ type SearchResults = Partial<Record<'tracks' | 'artists' | 'albums' | 'playlists
 const F = { PAUSE: 1, SEEK: 2, VOLUME_SET: 4, VOLUME_MUTE: 8, PREVIOUS: 16, NEXT: 32, PLAY: 16384, SHUFFLE: 32768, REPEAT: 262144, GROUPING: 524288 }
 
 const PLAYER_KEY = 'ad-music-player'
+const ACCOUNT_KEY = 'ad-music-spotify'
+/** Music Assistant takes this many tracks at once when a Spotify list is played track by track */
+const MAX_TRACKS = 100
 const TYPES = ['playlist', 'album', 'artist', 'track', 'radio', 'podcast', 'audiobook', 'folder']
 /** The library is read again after this long, when the page is shown */
 const LIBRARY_EVERY = 10 * 60_000
@@ -54,9 +68,12 @@ const LIBRARY_EVERY = 10 * 60_000
 /** One Music Assistant config entry per HA; found once, through the registry entry of one of its players */
 let entryId: Promise<string | undefined> | undefined
 let library: { at: number; data: Library } | undefined
+/** The Spotify accounts and the speaker that lists them, found once */
+let spotifyRoot: Promise<{ browser?: string; accounts: SpotifyAccount[] }> | undefined
+const shelfCache = new Map<string, { at: number; shelves: Shelf[] }>()
 
-function readSaved() {
-  try { return localStorage.getItem(PLAYER_KEY) ?? undefined } catch { return undefined }
+function readSaved(key = PLAYER_KEY) {
+  try { return localStorage.getItem(key) ?? undefined } catch { return undefined }
 }
 
 const eq = html`<span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`
@@ -80,6 +97,9 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     queue: { state: true },
     now: { state: true },
     message: { state: true },
+    accounts: { state: true },
+    account: { state: true },
+    shelves: { state: true },
   }
 
   view: View = 'home'
@@ -103,6 +123,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   queue?: QueueInfo
   now = Date.now()
   message?: string
+  /** Spotify accounts offered for the library; the chosen one is remembered on this device */
+  accounts?: SpotifyAccount[]
+  account?: string = readSaved(ACCOUNT_KEY)
+  shelves?: Shelf[]
+  private spotifyBrowser?: string
+  private spotifyLoading = false
 
   private timer?: number
   private queueFor = ''
@@ -141,7 +167,14 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .lib:hover { background: rgba(var(--ad-on-surface), 0.05); }
     .lib[aria-current=true] { background: rgba(var(--ad-primary), 0.12); }
     .lib .art { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; }
-    .lib span { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lib-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .lib-text span { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lib-text small { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.5; }
+    .lib-text small ha-icon { --mdc-icon-size: 11px; }
+    .home-head { display: flex; justify-content: flex-end; margin: -4px 0 14px; }
+    .chip.spotify { padding: 6px 12px; font-size: 13px; }
+    .chip.spotify ha-icon:first-child { color: #1db954; --mdc-icon-size: 16px; }
+    .pill.small { height: 30px; padding: 0 12px; font-size: 12px; }
 
     /* Artwork with an icon until the picture loads, and when it doesn't */
     .art { position: relative; overflow: hidden; display: grid; place-items: center; background: rgba(var(--ad-on-surface), 0.08); color: rgba(var(--ad-on-surface), 0.35); }
@@ -391,6 +424,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     if (!this.hass || !this.config) return
     this.setAttribute('nav', this.config.nav_position ?? 'bottom')
     if (!this.libLoading && (!library || Date.now() - library.at > LIBRARY_EVERY) && !this.libFailed) void this.loadLibrary()
+    if (!this.spotifyLoading && !this.shelves && this.config.spotify_browsers?.length) void this.loadSpotify()
     // The queue changes with the track; read it again when the panel is open and something new plays
     const p = this.player
     const key = `${p?.entity_id}|${p?.attributes.media_content_id}|${p?.state}`
@@ -516,6 +550,79 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     }
   }
 
+  private get currentAccount(): SpotifyAccount | undefined {
+    const saved = this.account?.toLowerCase()
+    return this.accounts?.find(a => a.id.toLowerCase() === saved) ?? this.accounts?.[0]
+  }
+
+  private browse(entity: string, item: MediaItem) {
+    return this.hass!.callWS!<BrowseNode>({
+      type: 'media_player/browse_media', entity_id: entity, media_content_id: item.uri,
+      media_content_type: isSpotifyItem(item) ? item.browse_type ?? item.media_type : item.media_type,
+    })
+  }
+
+  /**
+   * The Spotify accounts, from the first speaker whose browser lists them. HA's own Spotify players only browse
+   * while something plays on them; Sonos and Cast list every account at any time. The accounts are named
+   * after their Spotify player in HA (Spotify Jonathan → Jonathan), else after the Spotify user.
+   */
+  private async findAccounts(browsers: string[]) {
+    const hass = this.hass!
+    const order = [...browsers].sort((a, b) => Number(!this.reachable(a)) - Number(!this.reachable(b)))
+    for (const browser of order) {
+      const root = await hass.callWS!<BrowseNode>({ type: 'media_player/browse_media', entity_id: browser }).catch(() => undefined)
+      const found = (root?.children ?? []).filter(c => c.media_content_type === 'spotify://library')
+      if (!found.length) continue
+      const names = new Map<string, string>()
+      await Promise.all(this.players.filter(p => p.spotify).map(async p => {
+        const reg = await hass.callWS!<{ config_entry_id?: string }>({ type: 'config/entity_registry/get', entity_id: p.entity }).catch(() => undefined)
+        if (reg?.config_entry_id) names.set(`spotify://${reg.config_entry_id}`.toLowerCase(), p.name.replace(/^spotify\s+/i, '') || p.name)
+      }))
+      const accounts = found.map(c => ({ id: c.media_content_id, name: names.get(c.media_content_id.toLowerCase()) ?? c.title }))
+      return { browser, accounts }
+    }
+    return { accounts: [] }
+  }
+
+  private async loadSpotify() {
+    const browsers = this.config?.spotify_browsers ?? []
+    if (!browsers.length || !this.hass?.callWS) return
+    this.spotifyLoading = true
+    try {
+      const root = await (spotifyRoot ??= this.findAccounts(browsers))
+      if (!root.accounts.length) spotifyRoot = undefined
+      this.accounts = root.accounts
+      this.spotifyBrowser = root.browser
+      const account = this.currentAccount
+      if (!account || !root.browser) return (this.shelves = [])
+      const cached = shelfCache.get(account.id)
+      if (cached && Date.now() - cached.at < LIBRARY_EVERY) return (this.shelves = cached.shelves)
+      const shelves = await Promise.all(SPOTIFY_SECTIONS.map(async (key): Promise<Shelf> => {
+        const folder: MediaItem = { uri: `${account.id}/${key}`, name: t(this.hass, `mu.sp.${key}`), media_type: 'folder', expand: true, browse_type: `spotify://${key}` }
+        const node = await this.browse(root.browser!, folder).catch(() => undefined)
+        return { key, folder, items: (node?.children ?? []).map(browseToItem).filter(i => i.name.trim()) }
+      }))
+      const kept = shelves.filter(shelf => shelf.items.length)
+      shelfCache.set(account.id, { at: Date.now(), shelves: kept })
+      // Another account picked meanwhile: its own load brings its shelves
+      if (this.currentAccount?.id === account.id) this.shelves = kept
+    } catch {
+      this.shelves = []
+    } finally {
+      this.spotifyLoading = false
+    }
+  }
+
+  private selectAccount(id: string) {
+    this.menu = undefined
+    if (id === this.currentAccount?.id) return
+    this.account = id
+    try { localStorage.setItem(ACCOUNT_KEY, id) } catch { /* private window */ }
+    this.shelves = shelfCache.get(id)?.shelves
+    if (!this.shelves) void this.loadSpotify()
+  }
+
   private retryLibrary() {
     this.libFailed = false
     library = undefined
@@ -554,12 +661,11 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     this.view = 'detail'
     this.menu = undefined
     this.detail = { item, loading: true }
-    const browser = this.target ?? this.maPlayers.find(p => this.reachable(p.entity))?.entity
+    // Spotify through the speaker that lists the accounts, the rest through Music Assistant
+    const browser = isSpotifyItem(item) ? this.spotifyBrowser : this.target ?? this.maPlayers.find(p => this.reachable(p.entity))?.entity
     try {
       if (!browser) throw new Error('no player')
-      const node = await this.hass!.callWS!<{ children?: Parameters<typeof browseToItem>[0][]; thumbnail?: string | null }>({
-        type: 'media_player/browse_media', entity_id: browser, media_content_id: item.uri, media_content_type: item.media_type,
-      })
+      const node = await this.browse(browser, item)
       if (this.detail?.item !== item) return
       this.detail = { item: { ...item, image: item.image ?? node.thumbnail }, children: (node.children ?? []).map(browseToItem) }
     } catch {
@@ -574,9 +680,18 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     if (!id) return this.say(t(this.hass, 'mu.not_ma'))
     if (!this.canControl(id)) return
     this.busy = (options.start ?? item).uri
-    const data = (media: MediaItem) => ({ media_id: media.uri, media_type: media.media_type, enqueue, ...(options.radio ? { radio_mode: true } : {}) })
+    const data = (media: MediaItem) => ({ media_id: playableUri(media), media_type: media.media_type, enqueue, ...(options.radio ? { radio_mode: true } : {}) })
     try {
-      if (options.start) {
+      if (isSpotifyItem(item) && ['playlist', 'album', 'folder'].includes(item.media_type) && !options.radio) {
+        // A Spotify list plays as its tracks: Music Assistant's own Spotify login may not see another account's
+        // private playlists, and lists like "Liked songs" have no address at all
+        const tracks = (this.detail?.item.uri === item.uri && this.detail.children ? this.detail.children
+          : (await this.browse(this.spotifyBrowser!, item)).children?.map(browseToItem) ?? []).filter(c => c.media_type === 'track')
+        const from = Math.max(0, options.start ? tracks.findIndex(c => c.uri === options.start!.uri) : 0)
+        const list = tracks.slice(from, from + MAX_TRACKS)
+        if (!list.length) throw new Error(t(this.hass, 'mu.open_failed'))
+        await this.call('music_assistant', 'play_media', id, { media_id: list.map(playableUri), media_type: 'track', enqueue })
+      } else if (options.start) {
         // A track in a playlist or album: the whole list from that track on, as in HArmony; alone if that fails
         await this.call('music_assistant', 'play_media', id, { ...data(item), start_item: options.start.uri })
           ?.catch(() => this.call('music_assistant', 'play_media', id, data(options.start!)))
@@ -689,8 +804,30 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     </div>`
   }
 
-  private section(title: string, body: TemplateResult) {
-    return html`<div class="section"><div class="section-head"><h3>${title}</h3></div>${body}</div>`
+  private section(title: string, body: TemplateResult, more?: () => void) {
+    return html`<div class="section"><div class="section-head"><h3>${title}</h3>
+      ${more ? html`<button class="pill quiet small" @click=${more}>${t(this.hass, 'mu.all')}</button>` : nothing}</div>${body}</div>`
+  }
+
+  /** The Spotify account chip with its menu, as at the top of HArmony's music page */
+  private accountChip() {
+    const accounts = this.accounts ?? []
+    const current = this.currentAccount
+    if (!current) return nothing
+    const open = this.menu === 'account'
+    return html`<div class="menu-wrap">
+      <button class="chip spotify" aria-haspopup="menu" aria-expanded=${open} title=${t(this.hass, 'mu.account')}
+        @click=${(e: Event) => { e.stopPropagation(); this.menuUp = false; this.panel = undefined; this.menu = open ? undefined : 'account' }}>
+        <ha-icon icon="mdi:spotify"></ha-icon><span>${current.name}</span>
+        ${this.spotifyLoading ? html`<span class="spinner small"></span>` : accounts.length > 1 ? html`<ha-icon icon="mdi:chevron-down"></ha-icon>` : nothing}
+      </button>
+      ${open && accounts.length > 1 ? html`<div class="menu" role="menu">
+        <div class="pop-head">${t(this.hass, 'mu.account')}</div>
+        ${accounts.map(a => html`<button role="menuitemradio" aria-checked=${a.id === current.id} @click=${(e: Event) => { e.stopPropagation(); this.selectAccount(a.id) }}>
+          <ha-icon icon="mdi:spotify" style="color:#1db954;opacity:1"></ha-icon><span style="flex:1">${a.name}</span>
+          ${a.id === current.id ? html`<ha-icon icon="mdi:check"></ha-icon>` : nothing}</button>`)}
+      </div>` : nothing}
+    </div>`
   }
 
   private notMa() {
@@ -704,17 +841,27 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     if (!lib) {
       return this.libFailed ? this.failed(() => this.retryLibrary()) : html`<div class="center"><span class="spinner"></span></div>`
     }
-    const quick = (lib.recent.filter(i => i.media_type === 'playlist').length ? lib.recent.filter(i => i.media_type === 'playlist') : lib.playlists).slice(0, 8)
-    if (!quick.length && !lib.recent.length && !lib.artists.length && !lib.tracks.length) {
-      return html`<div class="placeholder"><ha-icon icon="mdi:music-circle-outline"></ha-icon>${t(this.hass, 'mu.empty')}</div>`
+    const shelves = this.shelves ?? []
+    const spotifyPlaylists = shelves.find(s => s.key === 'current_user_playlists')?.items ?? []
+    const maRecent = lib.recent.filter(i => i.media_type === 'playlist')
+    // Spotify's playlists first, as in HArmony; without Spotify the ones Music Assistant played last
+    const quick = (spotifyPlaylists.length ? spotifyPlaylists : maRecent.length ? maRecent : lib.playlists).slice(0, 8)
+    const head = this.accounts?.length ? html`<div class="home-head">${this.accountChip()}</div>` : nothing
+    if (!quick.length && !shelves.length && !lib.recent.length && !lib.artists.length && !lib.tracks.length) {
+      return html`${head}<div class="placeholder"><ha-icon icon="mdi:music-circle-outline"></ha-icon>${t(this.hass, 'mu.empty')}</div>`
     }
+    const ma = lib.recent.length || lib.artists.length || lib.tracks.length || lib.radio.length
     return html`
+      ${head}
       ${this.notMa()}
       ${quick.length ? html`<div class="section"><div class="quick">${quick.map(item => html`
         <div class="quick-item" role="button" tabindex="0" @click=${() => this.open(item)}
           @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.open(item)}>
           ${this.art(item.image, 'mdi:playlist-music')}<span>${item.name}</span>${this.playButton(item)}
         </div>`)}</div></div>` : nothing}
+      ${shelves.map(shelf => this.section(shelf.folder.name, html`<div class="tiles">${shelf.items.slice(0, 12).map(i => this.tile(i))}</div>`,
+        shelf.items.length > 6 ? () => this.open(shelf.folder) : undefined))}
+      ${shelves.length && ma ? html`<div class="sub-head" style="margin-top:30px"><ha-icon icon="mdi:music-circle"></ha-icon>${t(this.hass, 'mu.ma_players')}</div>` : nothing}
       ${lib.recent.length ? this.section(t(this.hass, 'mu.recent'), html`<div class="tiles">${lib.recent.map(i => this.tile(i))}</div>`) : nothing}
       ${lib.artists.length ? this.section(t(this.hass, 'mu.artists'), html`<div class="tiles">${lib.artists.map(i => this.tile(i))}</div>`) : nothing}
       ${lib.tracks.length ? this.section(t(this.hass, 'mu.tracks'), html`<div class="rows">${lib.tracks.map((i, n) => this.row(i, n + 1))}</div>`) : nothing}
@@ -788,7 +935,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
         : d.failed ? html`<p class="hint">${t(this.hass, 'mu.open_failed')}</p>`
         : html`
           ${others.length ? html`<div class="tiles wrap" style="margin-bottom:24px">${others.map(i => this.tile(i))}</div>` : nothing}
-          ${tracks.length ? html`<div class="rows">${tracks.map((i, n) => this.row(i, n + 1, ['playlist', 'album'].includes(item.media_type) ? item : undefined))}</div>` : nothing}
+          ${tracks.length ? html`<div class="rows">${tracks.map((i, n) => this.row(i, n + 1, ['playlist', 'album'].includes(item.media_type) || (item.media_type === 'folder' && isSpotifyItem(item)) ? item : undefined))}</div>` : nothing}
         `}
     `
   }
@@ -955,14 +1102,17 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const current = this.view === 'detail' ? this.from : this.view
     const go = (view: View) => { this.view = view; this.detail = undefined; this.menu = undefined }
     const glow = playerPicture(this.player)
+    const playlists = [...(this.shelves?.find(s => s.key === 'current_user_playlists')?.items ?? []), ...(this.lib?.playlists ?? [])]
     return html`<div class="music">
       <aside class="side card">
         <nav>${views.map(([view, icon, label]) => html`<button class="nav" aria-current=${current === view && this.view !== 'detail'} @click=${() => go(view)}>
           <ha-icon icon=${icon}></ha-icon><span>${t(this.hass, label)}</span></button>`)}</nav>
-        ${this.lib?.playlists.length ? html`
-          <div class="lib-head"><ha-icon icon="mdi:bookshelf"></ha-icon>${t(this.hass, 'mu.library')}<span style="margin-left:auto">${this.lib.playlists.length}</span></div>
-          <div class="libs">${this.lib.playlists.map(item => html`<button class="lib" aria-current=${this.view === 'detail' && this.detail?.item.uri === item.uri}
-            @click=${() => this.open(item)}>${this.art(item.image, 'mdi:playlist-music')}<span>${item.name}</span></button>`)}</div>` : nothing}
+        ${playlists.length ? html`
+          <div class="lib-head"><ha-icon icon="mdi:bookshelf"></ha-icon>${t(this.hass, 'mu.library')}<span style="margin-left:auto">${playlists.length}</span></div>
+          <div class="libs">${playlists.map(item => html`<button class="lib" aria-current=${this.view === 'detail' && this.detail?.item.uri === item.uri}
+            @click=${() => this.open(item)}>${this.art(item.image, 'mdi:playlist-music')}
+            <span class="lib-text"><span>${item.name}</span><small><ha-icon icon=${isSpotifyItem(item) ? 'mdi:spotify' : 'mdi:music-circle'}></ha-icon>${isSpotifyItem(item) ? this.currentAccount?.name ?? 'Spotify' : 'Music Assistant'}</small></span>
+          </button>`)}</div>` : nothing}
       </aside>
       <main class="main card">
         ${glow && ['playing', 'paused'].includes(this.player?.state ?? '') ? html`<div class="glow-wrap"><div class="glow" style="background-image:url('${glow}')"></div></div>` : nothing}

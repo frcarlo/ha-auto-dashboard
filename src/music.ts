@@ -27,6 +27,40 @@ export interface MediaItem {
   duration?: number
   /** Can be opened (album, playlist, artist); otherwise only played */
   expand?: boolean
+  /** The content type to browse it with, as the media browser gave it */
+  browse_type?: string
+}
+
+/** A Spotify account as HA's Spotify integration offers it through a Sonos or Cast speaker's media browser */
+export interface SpotifyAccount {
+  /** The account's root in the browser: spotify://<config entry id> */
+  id: string
+  name: string
+}
+
+/** The parts of a Spotify library shown on Home, in HArmony's order: recently played first */
+export const SPOTIFY_SECTIONS = [
+  'current_user_recently_played', 'current_user_playlists', 'current_user_followed_artists', 'current_user_saved_albums',
+  'current_user_saved_tracks', 'current_user_top_artists', 'current_user_top_tracks',
+] as const
+export type SpotifySection = (typeof SPOTIFY_SECTIONS)[number]
+
+/** Players whose media browser lists the Spotify accounts, whether or not anything plays on them */
+export const SPOTIFY_BROWSER_PLATFORMS = ['sonos', 'cast']
+
+/** Speakers that can browse Spotify, reachable ones of the preferred platform first */
+export function findSpotifyBrowsers(hass: HomeAssistant): string[] {
+  return Object.values(hass.entities)
+    .filter(e => domainOf(e.entity_id) === 'media_player' && SPOTIFY_BROWSER_PLATFORMS.includes(e.platform ?? '') && hass.states[e.entity_id])
+    .sort((a, b) => SPOTIFY_BROWSER_PLATFORMS.indexOf(a.platform!) - SPOTIFY_BROWSER_PLATFORMS.indexOf(b.platform!))
+    .map(e => e.entity_id)
+}
+
+export const isSpotifyItem = (item: MediaItem) => item.uri.startsWith('spotify://')
+
+/** What Music Assistant plays: spotify://<entry>/spotify:playlist:… becomes spotify:playlist:… */
+export function playableUri(item: MediaItem): string {
+  return /^spotify:\/\/[^/]+\/(spotify:.+)$/.exec(item.uri)?.[1] ?? item.uri
 }
 
 export const isMusicAssistant = (hass: HomeAssistant, entity: HassEntity) =>
@@ -67,7 +101,8 @@ export function browseToItem(node: { title: string; media_content_id: string; me
   const type = node.media_class === 'directory' ? 'folder' : node.media_class ?? node.media_content_type ?? 'track'
   let name = node.title
   let artists: { name: string }[] | undefined
-  const split = type === 'track' ? / - /.exec(name) : null
+  // Music Assistant writes "Artist - Title"; Spotify's own titles stay whole
+  const split = type === 'track' && !node.media_content_id.startsWith('spotify://') ? / - /.exec(name) : null
   if (split) {
     artists = [{ name: name.slice(0, split.index) }]
     name = name.slice(split.index + 3)
@@ -75,6 +110,7 @@ export function browseToItem(node: { title: string; media_content_id: string; me
   return {
     uri: node.media_content_id, name, media_type: type, image: node.thumbnail ?? null,
     ...(artists ? { artists } : {}), ...(node.can_expand || EXPANDABLE.includes(type) ? { expand: true } : {}),
+    ...(node.media_content_type ? { browse_type: node.media_content_type } : {}),
   }
 }
 
@@ -115,7 +151,8 @@ export const playerPicture = (entity: HassEntity | undefined): string | undefine
 /** Whether a player plays this item right now (a station, a track, a playlist it was started from) */
 export const playsItem = (entity: HassEntity | undefined, item: MediaItem) =>
   !!entity && ['playing', 'paused', 'buffering'].includes(entity.state) &&
-  (entity.attributes.media_content_id === item.uri || (item.media_type === 'radio' && entity.attributes.media_title === item.name))
+  (entity.attributes.media_content_id === item.uri || entity.attributes.media_content_id === playableUri(item) ||
+    (item.media_type === 'radio' && entity.attributes.media_title === item.name))
 
 /** Players grouped with this one, without itself */
 export const groupMembers = (entity: HassEntity | undefined): string[] =>

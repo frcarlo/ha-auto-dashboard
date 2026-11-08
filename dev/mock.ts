@@ -99,6 +99,33 @@ const library: Record<string, Mi[]> = {
 }
 const tracksOf = (item: Mi) => library.track.concat(library.track.map((t, i) => ({ ...t, uri: `${t.uri}-${item.uri}-${i}`, name: `${t.name} (Live)` })))
 
+// Two Spotify accounts, as a Sonos speaker's media browser lists them; the first belongs to spotify_frank
+const SPOTIFY_ACCOUNTS = [{ id: 'spotify://entry-media_player.spotify_frank', title: 'frank.c' }, { id: 'spotify://01LENI', title: 'lenimusik' }]
+function spotifyBrowse(id: string) {
+  const sp = (account: string, kind: string, n: number, name: string, hue: number, cls: string) => ({
+    title: name, media_class: cls, media_content_type: `spotify://${cls}`, media_content_id: `${account.toLowerCase()}/spotify:${kind}:${n}`,
+    thumbnail: cover(hue, name.split(' ')[0]!.slice(0, 10)), can_play: true, can_expand: cls !== 'track',
+  })
+  const account = SPOTIFY_ACCOUNTS.find(a => id.toLowerCase().startsWith(a.id.toLowerCase()))
+  if (!account) return undefined
+  const leni = account.title === 'lenimusik'
+  const names = leni ? ['Pferde-Hörspiele', 'Tanzen!', 'Hausaufgaben', 'Lieblingslieder'] : ['Discover Weekly', 'Italo Disco', 'Jazz am Abend', 'Workout', 'Daniel Caesar Mix', 'Release Radar', 'Kochen', 'Sommer 2026']
+  const tracks = (k: string) => ['Little Rowboat', 'Get You', 'Best Part', 'Vasco', 'Sere nere', 'Azzurro', 'Volare', 'Caruso', 'Ciao'].map((t, i) => sp(account.id, 'track', i + (k.length * 10), t, (i * 40 + k.length * 7) % 360, 'track'))
+  const lists: Record<string, ReturnType<typeof sp>[]> = {
+    current_user_playlists: names.map((n, i) => sp(account.id, 'playlist', i, n, (i * 47 + (leni ? 90 : 0)) % 360, 'playlist')),
+    current_user_recently_played: tracks('recent'),
+    current_user_followed_artists: ['Daniel Caesar', 'Vasco Rossi', 'Mina', 'Frank Ocean', 'Coez'].map((n, i) => sp(account.id, 'artist', i, n, i * 70, 'artist')),
+    current_user_saved_albums: ['Never Enough', 'Blonde', 'Freudian'].map((n, i) => sp(account.id, 'album', i, n, i * 90 + 20, 'album')),
+    current_user_saved_tracks: tracks('saved_tracks'),
+    current_user_top_artists: leni ? [] : ['Daniel Caesar', 'A$AP Rocky'].map((n, i) => sp(account.id, 'artist', 10 + i, n, i * 120, 'artist')),
+    current_user_top_tracks: [],
+  }
+  const key = id.split('/').pop()!
+  if (id.toLowerCase() === account.id.toLowerCase()) return { title: account.title, children: Object.keys(lists).map(k => ({ title: k, media_class: 'directory', media_content_type: `spotify://${k}`, media_content_id: `${account.id}/${k}`, can_expand: true, can_play: false })) }
+  if (lists[key]) return { title: key, children: lists[key] }
+  return { title: 'Playlist', thumbnail: null, children: tracks(key) }
+}
+
 export const musicDefs: Def[] = [
   ['media_player.ma_kuche', 'playing', {
     friendly_name: 'Lautsprecher', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.42, shuffle: false, repeat: 'off',
@@ -111,7 +138,9 @@ export const musicDefs: Def[] = [
     media_title: 'Deutschlandfunk', media_content_id: 'library://radio/42', entity_picture_local: cover(0, 'DLF'),
   }, 'schlafzimmer'],
   ['media_player.ma_buro', 'unavailable', { friendly_name: 'Büro Sonos', mass_player_type: 'player', supported_features: 8320575 }, 'buro_keller'],
-  ['media_player.spotify_frank', 'idle', { friendly_name: 'Spotify Frank', volume_level: 0.6, supported_features: 444983 }, ''],
+  ['media_player.spotify_frank', 'idle', { friendly_name: 'Spotify Frank', supported_features: 2048 }, ''],
+  // Sonos lists every Spotify account in its media browser
+  ['media_player.wohnzimmer_sonos_raw', 'idle', { friendly_name: 'Wohnzimmer Sonos (direkt)', supported_features: 8321599 }, 'wohnzimmer'],
 ]
 
 const deviceDefs: DeviceDef[] = [
@@ -259,7 +288,7 @@ export function createHass(dark: boolean): HomeAssistant {
   }
   for (const [entity_id, state, attributes, area] of musicDefs) {
     states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - 4 * 60_000).toISOString() }
-    entities[entity_id] = { entity_id, area_id: area || null, labels: [], platform: entity_id.includes('spotify') ? 'spotify' : 'music_assistant' }
+    entities[entity_id] = { entity_id, area_id: area || null, labels: [], platform: entity_id.includes('spotify') ? 'spotify' : entity_id.endsWith('_raw') ? 'sonos' : 'music_assistant' }
   }
   // The shopping list integration has one list; Local To-do lists can be deleted on their own
   entities['todo.einkauf']!.platform = 'shopping_list'
@@ -344,6 +373,13 @@ export function createHass(dark: boolean): HomeAssistant {
     callWS: async <T,>(msg: Record<string, unknown>) => {
       if (String(msg.type).startsWith('calendar/event/')) return calendarCommand(msg) as T
       if (msg.type === 'call_service' && msg.domain === 'music_assistant') return { context: {}, response: musicResponse(msg, latest ?? states) } as T
+      if (msg.type === 'media_player/browse_media' && msg.entity_id === 'media_player.wohnzimmer_sonos_raw') {
+        await new Promise(r => setTimeout(r, 300))
+        if (!msg.media_content_id) return { title: 'Sonos', children: SPOTIFY_ACCOUNTS.map(a => ({ title: a.title, media_class: 'app', media_content_type: 'spotify://library', media_content_id: a.id, can_expand: true, can_play: false })) } as T
+        const node = spotifyBrowse(String(msg.media_content_id))
+        if (!node) throw new Error('not found')
+        return node as T
+      }
       if (msg.type === 'media_player/browse_media') {
         const item = Object.values(library).flat().find(i => i.uri === msg.media_content_id)
         await new Promise(r => setTimeout(r, 300))

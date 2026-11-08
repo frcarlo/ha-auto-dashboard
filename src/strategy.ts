@@ -9,7 +9,7 @@ import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { findCameras } from './cameras'
-import { findMusicPlayers } from './music'
+import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
@@ -315,7 +315,11 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   ])
 
   const musicView = subview('music', t(hass, 'music'), 'mdi:music', [
-    fullWidth([{ type: 'custom:ad-music', players: musicPlayers, nav_position: position, ...look }]),
+    fullWidth([{
+      type: 'custom:ad-music', players: musicPlayers, nav_position: position, ...look,
+      // A Sonos or Cast speaker lists every Spotify account in its media browser, even while nothing plays
+      ...(musicPlayers.some(p => p.spotify) ? { spotify_browsers: findSpotifyBrowsers(hass) } : {}),
+    }]),
   ])
 
   // Energy: the house, then per floor each room's sensors next to a graph of the last day

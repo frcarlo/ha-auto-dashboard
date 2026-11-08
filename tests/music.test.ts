@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateDashboard } from '../src/strategy'
-import { browseToItem, findMusicPlayers, formatTime, groupMembers, itemSub, mediaPosition, playsItem } from '../src/music'
+import { browseToItem, findMusicPlayers, findSpotifyBrowsers, formatTime, groupMembers, itemSub, mediaPosition, playableUri, playsItem } from '../src/music'
 import { createHass } from '../dev/mock'
 
 const musicCard = async (config: Record<string, unknown> = {}, hass = createHass(true)) => {
@@ -65,5 +65,21 @@ describe('music helpers', () => {
     expect(playsItem(e, { uri: 'tunein://radio/9', name: 'FluxFM', media_type: 'radio' })).toBe(true)
     expect(playsItem({ ...e, state: 'idle' }, { uri: 'library://radio/1', name: 'x', media_type: 'radio' })).toBe(false)
     expect(groupMembers(e)).toEqual(['media_player.b'])
+  })
+
+  it('plays Spotify items by their own address and browses them through a Sonos or Cast speaker', () => {
+    const playlist = browseToItem({
+      title: 'Italo Disco', media_content_id: 'spotify://01abc/spotify:playlist:73nW', media_class: 'playlist', media_content_type: 'spotify://playlist', can_expand: true,
+    })
+    expect(playableUri(playlist)).toBe('spotify:playlist:73nW')
+    expect(playlist.browse_type).toBe('spotify://playlist')
+    // Spotify's titles keep their dashes, Music Assistant's "Artist - Title" is split
+    expect(browseToItem({ title: 'Jay-Z - Remix', media_content_id: 'spotify://01abc/spotify:track:1', media_class: 'track' }).name).toBe('Jay-Z - Remix')
+    expect(playableUri({ uri: 'library://track/1', name: 'x', media_type: 'track' })).toBe('library://track/1')
+    expect(findSpotifyBrowsers(createHass(true))).toEqual(['media_player.wohnzimmer_sonos_raw'])
+  })
+
+  it('passes the speakers that list Spotify accounts to the card', async () => {
+    expect((await musicCard()).card!.spotify_browsers).toEqual(['media_player.wohnzimmer_sonos_raw'])
   })
 })
