@@ -32,10 +32,22 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     :host { display: block; container-type: inline-size; }
     .wrap { padding: 8px 4px 4px; display: flex; flex-direction: column; gap: 14px; }
     .top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 20px; }
-    /* Area picture: the name sits on the photo, darkened at the bottom so it stays readable */
+    /*
+     * Area picture: whole, at its own proportions, on the right; a blurred and darkened copy fills the band behind
+     * the name. Area pictures are often small; stretched across the page they would be a smear.
+     */
     .top.photo {
-      min-height: 160px; box-sizing: border-box; padding: 18px; border-radius: var(--ad-radius); color: #fff; align-content: flex-end;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.05) 70%), var(--photo) center / cover no-repeat;
+      position: relative; isolation: isolate; overflow: hidden; flex-wrap: nowrap; align-items: stretch; gap: 16px;
+      min-height: 160px; box-sizing: border-box; padding: 14px; border-radius: var(--ad-radius); color: #fff;
+    }
+    .top.photo::before {
+      content: ''; position: absolute; inset: -40px; z-index: -1;
+      background: var(--photo) center / cover no-repeat; filter: blur(32px) brightness(0.5) saturate(1.3);
+    }
+    .top.photo .name { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; align-content: flex-end; gap: 6px 20px; padding: 4px; }
+    .top.photo .pic {
+      flex: none; align-self: center; height: 132px; max-width: 45%; object-fit: cover;
+      border-radius: calc(var(--ad-radius) - 8px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
     }
     /* The room name is the page's one big type element */
     h1 { min-width: 0; margin: 0; font-size: 44px; font-weight: 200; letter-spacing: -0.045em; line-height: 1; }
@@ -71,6 +83,9 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
     @container (max-width: 480px) {
       h1 { font-size: 34px; }
+      /* Narrow: the picture small in the corner, the name beneath it across the whole width */
+      .top.photo { flex-direction: column; gap: 8px; }
+      .top.photo .pic { order: -1; align-self: flex-end; height: 84px; max-width: 60%; }
     }
   `]
 
@@ -205,6 +220,14 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     </div>`
   }
 
+  private renderName(name: string, summary: ReturnType<typeof roomSummary>, climate: boolean) {
+    return html`<h1>${name}</h1>
+      <div class="values">
+        ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer', 1)}
+        ${this.valueChip(summary.humidity, 'mdi:water-percent', 0)}
+      </div>`
+  }
+
   protected render() {
     const area = this.hass!.areas[this.config!.area]
     if (!area) return nothing
@@ -213,13 +236,10 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const climate = this.thermostat
     const quick = quickGroups(entities)
     return html`<div class="wrap">
-      <div class="top ${area.picture ? 'photo' : ''}" style=${area.picture ? `--photo: url('${area.picture}')` : ''}>
-        <h1>${area.name}</h1>
-        <div class="values">
-          ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer', 1)}
-          ${this.valueChip(summary.humidity, 'mdi:water-percent', 0)}
-        </div>
-      </div>
+      ${area.picture ? html`<div class="top photo" style="--photo: url('${area.picture}')">
+        <div class="name">${this.renderName(area.name, summary, !!climate)}</div>
+        <img class="pic" src=${area.picture} alt="">
+      </div>` : html`<div class="top">${this.renderName(area.name, summary, !!climate)}</div>`}
       ${climate || quick.length ? html`<div class="row">
         ${climate ? this.renderThermostat(climate) : nothing}
         ${quick.map(group => this.renderQuick(group.key, group.entities))}
