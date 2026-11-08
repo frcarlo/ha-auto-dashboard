@@ -18,9 +18,12 @@ interface StatusBarConfig extends BaseConfig {
   links?: Partial<Record<StatusKey, string>>
   /** false on a room page: who is home and the alarm belong to the house, not to one room */
   people?: boolean
+  /** On a room page: a chip while motion or presence is detected in the room */
+  presence?: boolean
 }
 
 const ICONS: Record<StatusKey, string> = {
+  presence: 'mdi:motion-sensor',
   lights: 'mdi:lightbulb-group',
   openings: 'mdi:window-open-variant',
   unlocked: 'mdi:lock-open-variant-outline',
@@ -31,6 +34,7 @@ const ICONS: Record<StatusKey, string> = {
 }
 
 const COLORS: Record<StatusKey, string> = {
+  presence: 'primary',
   lights: 'warning', openings: 'warning', unlocked: 'warning', heating: 'warning',
   media: 'primary', battery: 'error', unavailable: 'muted',
 }
@@ -96,7 +100,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   protected render() {
     const { hide_labels: labels, hide_entities: hidden, areas } = this.config!
     const hide = hideOf(this.config!)
-    const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas, labels, hidden), unavailableDevices(this.hass!, hide, areas))
+    const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas, labels, hidden), unavailableDevices(this.hass!, hide, areas), { presence: !!this.config!.presence })
     const openItem = items.find(i => i.key === this.open)
     const link = openItem && this.config!.links?.[openItem.key]
     return html`
@@ -106,7 +110,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
         ${items.length ? items.map(item => html`
           <button class="chip ${COLORS[item.key]}" aria-expanded=${this.open === item.key} @click=${() => (this.open = this.open === item.key ? null : item.key)}>
             <ha-icon icon=${ICONS[item.key]}></ha-icon>
-            <span class="n">${item.entities.length}</span>
+            ${item.key === 'presence' ? nothing : html`<span class="n">${item.entities.length}</span>`}
             <span class="l">${t(this.hass, `status.${item.key}`)}</span>
           </button>`)
         : html`<span class="chip quiet"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="l">${t(this.hass, 'all_quiet')}</span></span>`}

@@ -124,6 +124,14 @@ describe('homeStatus', () => {
     const counts = Object.fromEntries(items.map(i => [i.key, i.entities.length]))
     expect(counts).toEqual({ lights: 2, openings: 1, heating: 1, battery: 1 })
   })
+
+  it('shows motion or presence only when asked, as on a room page', () => {
+    const entities = [st('binary_sensor.bad_bewegung', 'on', { device_class: 'motion' }), st('binary_sensor.bad_radar', 'off', { device_class: 'occupancy' }), st('binary_sensor.bad_fenster', 'on', { device_class: 'window' })]
+    expect(homeStatus(entities).map(i => i.key)).toEqual(['openings'])
+    const items = homeStatus(entities, [], [], { presence: true })
+    expect(items.map(i => i.key)).toEqual(['presence', 'openings'])
+    expect(items[0]!.entities.map(e => e.entity_id)).toEqual(['binary_sensor.bad_bewegung'])
+  })
 })
 
 describe('presentation', () => {

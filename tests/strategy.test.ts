@@ -150,7 +150,7 @@ describe('room page, favorites and scenes', () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const room = cards(views.find(v => v.path === 'area-wohnzimmer')!)
     expect(room[0]).toMatchObject({ type: 'custom:ad-room-header', area: 'wohnzimmer' })
-    expect(room[1]).toMatchObject({ type: 'custom:ad-status-bar', areas: ['wohnzimmer'], people: false })
+    expect(room[1]).toMatchObject({ type: 'custom:ad-status-bar', areas: ['wohnzimmer'], people: false, presence: true })
     const lights = room.find(c => c.type === 'custom:ad-group-heading' && c.title === 'Licht')
     expect(lights).toMatchObject({ control: 'toggle' })
     expect(lights!.entities).toHaveLength(2)

@@ -363,7 +363,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         fullWidth([
           { type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look },
           // The home page's chips, counted for this room only
-          { type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, ...look },
+          { type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look },
         ]),
         ...roomSections(area),
       ]),

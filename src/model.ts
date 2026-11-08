@@ -261,7 +261,7 @@ export function roomSummary(entities: HassEntity[], area?: AreaRegistryEntry, st
   }
 }
 
-export type StatusKey = 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'battery' | 'unavailable'
+export type StatusKey = 'presence' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'battery' | 'unavailable'
 
 export interface StatusItem {
   key: StatusKey
@@ -315,9 +315,20 @@ export function deviceName(hass: HomeAssistant, entity: HassEntity) {
 }
 
 /** Things worth a glance on the home page. Only non-empty items are returned. */
-export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [], unavailable: HassEntity[] = []): StatusItem[] {
+/** Sensors that say someone is there: motion, and presence or occupancy (mmWave radar and the like) */
+export const PRESENCE_CLASSES = ['motion', 'moving', 'occupancy', 'presence']
+
+/**
+ * What is going on, for the status chips. Presence only on request: in one room it says someone is there,
+ * across the house every hallway sensor would count.
+ */
+export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [], unavailable: HassEntity[] = [], options: { presence?: boolean } = {}): StatusItem[] {
   const is = (domain: string) => (e: HassEntity) => domainOf(e.entity_id) === domain
   const items: StatusItem[] = [
+    ...(options.presence ? [{
+      key: 'presence' as const,
+      entities: entities.filter(is('binary_sensor')).filter(e => PRESENCE_CLASSES.includes(deviceClassOf(e) ?? '') && e.state === 'on'),
+    }] : []),
     { key: 'lights', entities: entities.filter(is('light')).filter(e => e.state === 'on') },
     { key: 'openings', entities: entities.filter(is('binary_sensor')).filter(e => OPENING_CLASSES.includes(deviceClassOf(e) ?? '') && e.state === 'on') },
     { key: 'unlocked', entities: entities.filter(is('lock')).filter(e => ['unlocked', 'open', 'opening', 'unlocking'].includes(e.state)) },
