@@ -353,7 +353,11 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       back_path: `/${dashboardPath()}/home`,
       max_columns: MAX_COLUMNS,
       sections: withNav([
-        fullWidth([{ type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look }]),
+        fullWidth([
+          { type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look },
+          // The home page's chips, counted for this room only
+          { type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, ...look },
+        ]),
         ...roomSections(area),
       ]),
     }

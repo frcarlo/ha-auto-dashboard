@@ -16,6 +16,8 @@ interface StatusBarConfig extends BaseConfig {
   areas?: string[]
   /** Status keys whose list ends with a link to a view showing all of them */
   links?: Partial<Record<StatusKey, string>>
+  /** false on a room page: who is home and the alarm belong to the house, not to one room */
+  people?: boolean
 }
 
 const ICONS: Record<StatusKey, string> = {
@@ -82,7 +84,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
 
   protected watched() {
     const { areas, hide_labels: labels, hide_entities: hidden } = this.config!
-    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id), ...peopleIds(this.hass!, this.config!)]
+    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id), ...(this.config!.people === false ? [] : peopleIds(this.hass!, this.config!))]
   }
 
   private areaName(entity: HassEntity) {
@@ -99,7 +101,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     const link = openItem && this.config!.links?.[openItem.key]
     return html`
       <div class="chips">
-        ${renderPeople(this.hass!, this.config!, id => this.moreInfo(id))}
+        ${this.config!.people === false ? nothing : renderPeople(this.hass!, this.config!, id => this.moreInfo(id))}
         <span class="sep"></span>
         ${items.length ? items.map(item => html`
           <button class="chip ${COLORS[item.key]}" aria-expanded=${this.open === item.key} @click=${() => (this.open = this.open === item.key ? null : item.key)}>
