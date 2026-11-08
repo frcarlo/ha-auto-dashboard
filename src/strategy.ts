@@ -159,7 +159,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       path: 'cameras', icon: 'mdi:cctv', title: t(hass, 'cameras'),
       pick: ofDomain('camera'),
       // The pictures side by side and what they saw today, instead of one section per room
-      whole: (): Card[] => [{ type: 'custom:ad-cameras', cameras: cameraInfos, ...look }],
+      whole: (): Card[] => [{ type: 'custom:ad-cameras', cameras: cameraInfos, nav_position: position, ...look }],
     },
   ]
     .filter(page => pageAllowed(page.path as PagePath))

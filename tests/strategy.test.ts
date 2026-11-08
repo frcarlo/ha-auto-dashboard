@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateDashboard } from '../src/strategy'
-import { findCameras, detectionsFrom } from '../src/cameras'
+import { findCameras, detectionsFrom, detectionKind } from '../src/cameras'
 import { createHass } from '../dev/mock'
 
 describe('generateDashboard', () => {
@@ -512,6 +512,16 @@ describe('cameras', () => {
       'binary_sensor.haustur_besucher': 'visitor', 'binary_sensor.haustur_bewegung': 'motion',
     })
     expect(cams.find(c => c.name === 'Esszimmer')!.detections).toBeUndefined()
+  })
+
+  it('reads a sensor without the device name, so a doorbell called Türklingel does not ring on motion', () => {
+    const sensor = (id: string, name: string, device_class?: string) => ({ entity_id: id, state: 'off', attributes: { friendly_name: name, ...(device_class ? { device_class } : {}) } }) as any
+    const names = ['Türklingel', 'Doorbell']
+    expect(detectionKind(sensor('binary_sensor.front_door_bewegung_2', 'Türklingel Bewegung', 'motion'), names)).toBe('motion')
+    expect(detectionKind(sensor('binary_sensor.front_door_person_2', 'Türklingel Person'), names)).toBe('person')
+    expect(detectionKind(sensor('binary_sensor.turklingel_tier', 'Türklingel Tier'), names)).toBe('animal')
+    expect(detectionKind(sensor('binary_sensor.front_door_besucher_2', 'Türklingel Besucher'), names)).toBe('visitor')
+    expect(detectionKind(sensor('binary_sensor.eingangstur_doorbell_manipulation', 'Türklingel Manipulation', 'tamper'), names)).toBeUndefined()
   })
 
   it('takes the floodlight of the camera and the lights of its room', () => {

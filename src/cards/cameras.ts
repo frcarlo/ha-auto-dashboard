@@ -7,9 +7,12 @@ import { t, type Key } from '../i18n'
 import { DETECTION_ICON, detectionsFrom, type CameraInfo, type Detection } from '../cameras'
 import { entityName } from '../presentation'
 import { tokens } from '../styles/tokens'
+import type { NavPosition } from '../types'
 
 interface CamerasCardConfig extends BaseConfig {
   cameras: CameraInfo[]
+  /** Where the nav bar sits, so the list of detections stops above it */
+  nav_position?: NavPosition
 }
 
 type CardHelpers = { createCardElement(config: object): HTMLElement & { hass?: unknown } }
@@ -88,6 +91,7 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
   protected updated(changed: Map<string, unknown>) {
     const old = changed.get('hass') as typeof this.hass
     if (!this.hass || !this.config) return
+    this.setAttribute('nav', this.config.nav_position ?? 'bottom')
     if (!this.historyAt) void this.loadHistory()
     // A sensor just saw something: read the day again in a moment, when HA has written it down
     const fresh = (this.config.cameras ?? []).flatMap(c => c.detections ?? [])
@@ -183,11 +187,21 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
   }
 
   static styles = [tokens, css`
-    :host { display: block; container-type: inline-size; }
+    :host { display: block; container-type: inline-size; --bottom: 96px; }
+    :host([nav=top]) { --bottom: 12px; }
+    @media (min-width: 1024px) { :host([nav=left]), :host([nav=right]) { --bottom: 12px; } }
     button { all: unset; box-sizing: border-box; cursor: pointer; }
     button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-    @container (min-width: 880px) { .page.with-feed { grid-template-columns: minmax(0, 1fr) 320px; } }
+    /* Beside the cameras the list is at most a screen high and scrolls on its own; it stays in view while the cameras scroll */
+    @container (min-width: 880px) {
+      .page.with-feed { grid-template-columns: minmax(0, 1fr) 320px; }
+      .page.with-feed .feed {
+        position: sticky; top: calc(var(--header-height, 56px) + 12px); display: flex; flex-direction: column;
+        max-height: calc(100vh - var(--header-height, 56px) - var(--bottom) - 120px);
+      }
+      .page.with-feed .rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    }
 
     .tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
     .tile { grid-column: span 2; display: flex; flex-direction: column; }

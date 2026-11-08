@@ -31,9 +31,17 @@ function pictureScore(e: HassEntity) {
     + (/hoch|main|high|clear/.test(words) ? 1 : 0)
 }
 
-export function detectionKind(e: HassEntity): DetectionKind | undefined {
+/** How HA turns a name into an entity id: "Türklingel" becomes "turklingel" */
+const slug = (name: string) => name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+
+/**
+ * What a sensor detects, from its own words. The device name comes off first: on a doorbell named "Türklingel"
+ * every sensor is called "Türklingel …", and its motion sensor is no ring at the door.
+ */
+export function detectionKind(e: HassEntity, deviceNames: string[] = []): DetectionKind | undefined {
   const domain = domainOf(e.entity_id)
-  const words = text(e)
+  let words = text(e)
+  for (const name of deviceNames.flatMap(n => [n.toLowerCase(), slug(n)])) if (name) words = words.split(name).join(' ')
   if (domain === 'event') return e.attributes.device_class === 'doorbell' || /klingel|doorbell|ring|besucher|visitor/.test(words) ? 'visitor' : undefined
   if (domain !== 'binary_sensor') return undefined
   // A camera's binary sensors also say whether it sleeps, was tampered with or runs low
@@ -67,11 +75,13 @@ export function findCameras(hass: HomeAssistant, cameras: HassEntity[], hide: Hi
     const best = [...list].sort((a, b) => pictureScore(b) - pictureScore(a))[0]!
     const device = hass.devices[key]
     const name = (device?.name_by_user ?? device?.name ?? entityName(best)).replace(/\s*\([^)]*\)\s*$/, '').trim()
+    // Both names of the device: what the user called it shows in the entity names, what it called itself in the ids
+    const deviceNames = [device?.name_by_user, device?.name].filter((n): n is string => !!n)
     const area = entityAreaId(hass, best.entity_id)
     const own = device ? Object.values(hass.entities).filter(e => e.device_id === key).map(e => hass.states[e.entity_id]).filter((e): e is HassEntity => !!e) : []
     // Detection sensors may well be hidden from the rooms; they still say what the camera saw
     const detections = own
-      .map(e => ({ entity: e.entity_id, kind: detectionKind(e) }))
+      .map(e => ({ entity: e.entity_id, kind: detectionKind(e, deviceNames) }))
       .filter((d): d is { entity: string; kind: DetectionKind } => !!d.kind && !hass.entities[d.entity]?.entity_category)
     const lights = [
       ...own.filter(e => domainOf(e.entity_id) === 'light' && visible.has(e.entity_id)),
