@@ -79,6 +79,16 @@ function readSaved(key = PLAYER_KEY) {
 
 const eq = html`<span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`
 
+/** HA's sections view a card lives in, found across shadow roots */
+function sectionsView(from: Node): HTMLElement | undefined {
+  let node: Node | null = from
+  while (node) {
+    node = node.parentNode ?? (node instanceof ShadowRoot ? node.host : null)
+    if (node instanceof HTMLElement && node.tagName === 'HUI-SECTIONS-VIEW') return node
+  }
+  return undefined
+}
+
 export class AdMusic extends BaseCard<MusicCardConfig> {
   static properties = {
     ...BaseCard.properties,
@@ -102,6 +112,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     account: { state: true },
     shelves: { state: true },
     lyrics: { state: true },
+    fit: { state: true },
   }
 
   view: View = 'home'
@@ -137,6 +148,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   /** Where the big player was opened from, for the way back */
   private nowFrom: View = 'home'
   private lastLine = -2
+  /** Height of the page on screen, 0 where it scrolls as a whole */
+  fit = 0
+  /** The view and item shown last, to start a new one at its top */
+  private shown = ''
   /** The lyrics stop following the song for a moment after a hand scrolls them */
   private freeUntil = 0
 
@@ -156,6 +171,13 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .music { display: grid; grid-template-columns: 236px minmax(0, 1fr); grid-template-areas: 'side main' 'bar bar'; gap: 12px; align-items: start; }
     .side { grid-area: side; padding: 10px; position: sticky; top: calc(var(--header-height, 56px) + 12px); max-height: calc(100vh - var(--header-height, 56px) - var(--bottom) - 120px); display: flex; flex-direction: column; }
     .main { grid-area: main; min-height: 420px; padding: 18px 20px 24px; overflow: visible; }
+    /* Like an app: the page stands still, the side and the content scroll each in itself, the bar sits below */
+    .music.fit { height: var(--fit); grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; }
+    .music.fit .side { position: static; max-height: none; min-height: 0; }
+    .music.fit .main { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    .music.fit .bar { position: relative; bottom: auto; }
+    /* The cover gives way on low screens, so cover and title stand beside the lyrics without scrolling */
+    .music.fit .now-track .art { max-width: min(380px, max(160px, calc(var(--lyr-h) - 150px))); }
     /* Frosted like the nav bar, since the page scrolls beneath it */
     .bar { grid-area: bar; position: sticky; bottom: var(--bottom); z-index: 2; overflow: visible;
       background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur);
@@ -466,6 +488,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       if (this.view === 'now' || Date.now() - this.now >= 1000) this.now = Date.now()
     }, 250)
     document.addEventListener('click', this.closeMenu)
+    window.addEventListener('resize', this.measure)
   }
 
   disconnectedCallback() {
@@ -473,11 +496,65 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     window.clearInterval(this.timer)
     window.clearTimeout(this.messageTimer)
     document.removeEventListener('click', this.closeMenu)
+    window.removeEventListener('resize', this.measure)
+  }
+
+  /**
+   * The height left on screen below the page title and above the nav bar, so the page fits the screen and
+   * nothing but the content scrolls. Phones (tabs instead of the side) and very low screens scroll as a page.
+   */
+  private measure = () => {
+    const box = this.renderRoot.querySelector<HTMLElement>('.music')
+    const rect = box?.getBoundingClientRect()
+    if (!box || !rect?.width) return
+    // Below the page in HA's view: its padding, and the row of the nav bar card. A bar at the bottom needs that
+    // row as room; a rail at the side or a bar on top leaves it empty, so the page reaches over it.
+    const bottomBar = (parseFloat(getComputedStyle(this).getPropertyValue('--bottom')) || 12) > 12
+    const viewEl = sectionsView(this)
+    let below = bottomBar ? 96 : 12
+    let overlap = 0
+    if (viewEl) {
+      const pad = parseFloat(getComputedStyle(viewEl).paddingBottom) || 0
+      const rest = Math.max(0, viewEl.getBoundingClientRect().bottom - rect.bottom - pad + this.overlap)
+      overlap = bottomBar ? 0 : rest
+      below = pad + (bottomBar ? rest : 0)
+    }
+    const height = Math.floor(window.innerHeight - (rect.top + window.scrollY) - below)
+    const fit = rect.width > 760 && height >= 420 ? height : 0
+    if (!fit) overlap = 0
+    if (Math.abs(fit - this.fit) > 2) this.fit = fit
+    if (Math.abs(overlap - this.overlap) > 1) {
+      this.overlap = overlap
+      this.style.marginBottom = overlap ? `-${overlap}px` : ''
+    }
+    this.fitLyrics()
+  }
+  /** How far the page reaches over the empty row below it */
+  private overlap = 0
+
+  /** In the big player the lyrics reach down to the bar instead of a fixed height */
+  private fitLyrics() {
+    const main = this.renderRoot.querySelector<HTMLElement>('.music.fit .main')
+    const now = main?.querySelector<HTMLElement>('.now')
+    const lyrics = now?.querySelector<HTMLElement>('.lyrics')
+    if (!main || !now || !lyrics) return now?.style.removeProperty('--lyr-h')
+    const foot = lyrics.querySelector<HTMLElement>('.lyr-foot')?.offsetHeight ?? 0
+    const top = lyrics.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop
+    const height = Math.floor(main.clientHeight - top - parseFloat(getComputedStyle(main).paddingBottom) - foot)
+    const value = `${Math.max(280, height)}px`
+    if (now.style.getPropertyValue('--lyr-h') !== value) now.style.setProperty('--lyr-h', value)
   }
 
   protected updated() {
     if (!this.hass || !this.config) return
     this.setAttribute('nav', this.config.nav_position ?? 'bottom')
+    this.measure()
+    const shown = `${this.view}|${this.detail?.item.uri ?? ''}`
+    if (shown !== this.shown) {
+      this.shown = shown
+      const main = this.renderRoot.querySelector<HTMLElement>('.music.fit .main')
+      if (main) main.scrollTop = 0
+    }
     if (!this.libLoading && (!library || Date.now() - library.at > LIBRARY_EVERY) && !this.libFailed) void this.loadLibrary()
     if (!this.spotifyLoading && !this.shelves && this.config.spotify_browsers?.length) void this.loadSpotify()
     // The queue changes with the track; read it again when the panel is open and something new plays
@@ -1270,7 +1347,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const go = (view: View) => { this.view = view; this.detail = undefined; this.menu = undefined }
     const glow = playerPicture(this.player)
     const playlists = [...(this.shelves?.find(s => s.key === 'current_user_playlists')?.items ?? []), ...(this.lib?.playlists ?? [])]
-    return html`<div class="music">
+    return html`<div class="music ${this.fit ? 'fit' : ''}" style=${this.fit ? `--fit:${this.fit}px` : ''}>
       <aside class="side card">
         <nav>${views.map(([view, icon, label]) => html`<button class="nav" aria-current=${current === view && this.view !== 'detail'} @click=${() => go(view)}>
           <ha-icon icon=${icon}></ha-icon><span>${t(this.hass, label)}</span></button>`)}</nav>
