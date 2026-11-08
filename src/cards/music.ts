@@ -5,8 +5,8 @@ import { css, html, nothing, type TemplateResult } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import {
-  SPOTIFY_SECTIONS, browseToItem, canOpenItem, formatTime, groupMembers, isSpotifyItem, itemSub, mediaPosition, playableUri, playerPicture, playsItem,
-  type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
+  SPOTIFY_SECTIONS, browseToItem, canOpenItem, currentLine, fetchLyrics, formatTime, groupMembers, isSpotifyItem, itemSub, mediaPosition, playableUri,
+  playerPicture, playsItem, type Lyrics, type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
 } from '../music'
 import { tokens } from '../styles/tokens'
 import type { HassEntity, NavPosition } from '../types'
@@ -28,7 +28,8 @@ interface Shelf {
   items: MediaItem[]
 }
 
-type View = 'home' | 'search' | 'radio' | 'players' | 'detail'
+/** "now" is the big player with the lyrics, opened from the cover in the bar */
+type View = 'home' | 'search' | 'radio' | 'players' | 'detail' | 'now'
 type Enqueue = 'play' | 'replace' | 'next' | 'add'
 
 interface Library {
@@ -100,6 +101,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     accounts: { state: true },
     account: { state: true },
     shelves: { state: true },
+    lyrics: { state: true },
   }
 
   view: View = 'home'
@@ -129,6 +131,14 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   shelves?: Shelf[]
   private spotifyBrowser?: string
   private spotifyLoading = false
+  /** The lyrics of what plays, looked up when the big player is open */
+  lyrics: Lyrics | 'loading' | 'none' = 'none'
+  private lyricsFor = ''
+  /** Where the big player was opened from, for the way back */
+  private nowFrom: View = 'home'
+  private lastLine = -2
+  /** The lyrics stop following the song for a moment after a hand scrolls them */
+  private freeUntil = 0
 
   private timer?: number
   private queueFor = ''
@@ -283,6 +293,43 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .hero .meta { font-size: 13px; opacity: 0.6; }
     .actions { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 
+    /* Big player: the cover large, the lyrics beside it */
+    .main.big .glow { height: 100%; opacity: 0.5; -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+    .now { --lyr-h: min(58vh, 560px); display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 32px; align-items: start; }
+    .now-track { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+    .now-track .art { width: 100%; max-width: 380px; aspect-ratio: 1; border-radius: 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+    .now-track .art ha-icon { --mdc-icon-size: 72px; }
+    .now-text { min-width: 0; }
+    .now .type { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+    .now h1 { margin: 6px 0; font-size: clamp(22px, 3.4cqw, 38px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+    .now-artist { font-size: 16px; opacity: 0.8; }
+    .now-album { font-size: 13px; opacity: 0.55; margin-top: 2px; }
+    .now-text .chip { margin-top: 14px; max-width: 100%; }
+    .lyrics { display: flex; flex-direction: column; min-width: 0; border-radius: 20px; background: rgba(var(--ad-on-surface), 0.04); box-shadow: inset 0 0 0 1px rgba(var(--ad-on-surface), 0.06); }
+    .lyr { position: relative; height: var(--lyr-h); overflow-y: auto; box-sizing: border-box; padding: calc(var(--lyr-h) / 2 - 24px) 26px; scrollbar-width: none;
+      -webkit-mask-image: linear-gradient(transparent, #000 16%, #000 84%, transparent); mask-image: linear-gradient(transparent, #000 16%, #000 84%, transparent); }
+    .lyr::-webkit-scrollbar { display: none; }
+    .line { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 7px 0; cursor: pointer; font-size: clamp(18px, 2.3cqw, 26px); font-weight: 700; line-height: 1.3;
+      opacity: 0.4; transition: opacity 0.35s, color 0.35s; overflow-wrap: anywhere; }
+    .line.past { opacity: 0.22; }
+    .line.on { opacity: 1; color: rgb(var(--ad-on-surface)); }
+    .line:hover { opacity: 0.75; }
+    .line[disabled] { cursor: default; }
+    .line:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; border-radius: 6px; }
+    .lyr.plain { padding: 24px 26px; white-space: pre-line; font-size: 17px; line-height: 1.7; opacity: 0.85; -webkit-mask-image: none; mask-image: none; }
+    .lyr-empty { height: var(--lyr-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; opacity: 0.5; font-size: 14px; }
+    .lyr-empty ha-icon { --mdc-icon-size: 40px; }
+    .lyr-foot { padding: 10px 20px 14px; font-size: 11px; opacity: 0.5; }
+    .lyr-foot a { color: inherit; }
+    @media (prefers-reduced-motion: reduce) { .line { transition: none; } }
+    /* The cover in the bar opens the big player */
+    .cover { all: unset; position: relative; flex: none; border-radius: 12px; cursor: pointer; }
+    .cover:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    .cover-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: #fff; background: rgba(0, 0, 0, 0.45);
+      opacity: 0; transition: opacity 0.15s; --mdc-icon-size: 26px; }
+    .cover:hover .cover-hint, .cover:focus-visible .cover-hint { opacity: 1; }
+    @media (hover: none) { .cover-hint { display: none; } }
+
     /* Search */
     .search { display: flex; gap: 8px; margin-bottom: 22px; }
     .search label { flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 46px; border-radius: 999px; background: rgba(var(--ad-on-surface), 0.07); }
@@ -383,6 +430,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       .quick-item { height: 48px; gap: 10px; }
       .quick-item .art { width: 48px; height: 48px; flex-basis: 48px; }
       .quick-item .play { display: none; }
+      .now { --lyr-h: 52vh; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+      .now-track { flex-direction: row; align-items: center; gap: 16px; }
+      .now-track .art { width: 112px; flex: 0 0 112px; border-radius: 14px; }
+      .now-track .art ha-icon { --mdc-icon-size: 40px; }
+      .now-text .chip { margin-top: 10px; }
+      .lyr { padding-inline: 18px; }
     }
     @container (min-width: 761px) { .vol-btn { display: none; } }
     /* Phones: the four tabs fit when only the open one says its name */
@@ -407,9 +460,11 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
 
   connectedCallback() {
     super.connectedCallback()
+    // Every second for the progress bar; the lyrics want it finer
     this.timer = window.setInterval(() => {
-      if (this.player?.state === 'playing' && document.visibilityState !== 'hidden') this.now = Date.now()
-    }, 1000)
+      if (this.player?.state !== 'playing' || document.visibilityState === 'hidden') return
+      if (this.view === 'now' || Date.now() - this.now >= 1000) this.now = Date.now()
+    }, 250)
     document.addEventListener('click', this.closeMenu)
   }
 
@@ -432,6 +487,66 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       this.queueFor = key
       void this.loadQueue()
     }
+    if (this.view === 'now') {
+      this.loadLyrics()
+      this.followLyrics()
+    } else this.lastLine = -2
+  }
+
+  // ── Big player ───────────────────────────────────────────
+
+  /** What plays, for the big player and the lyrics */
+  private get track() {
+    const p = this.player
+    if (!p || !['playing', 'paused', 'buffering'].includes(p.state)) return undefined
+    const a = p.attributes
+    const title = (a.media_title ?? a.app_name) as string | undefined
+    if (!title) return undefined
+    return {
+      title, artist: (a.media_artist ?? a.media_album_artist) as string | undefined, album: a.media_album_name as string | undefined,
+      duration: Number(a.media_duration) || undefined, picture: playerPicture(p),
+    }
+  }
+
+  private openNow() {
+    if (this.view === 'now') return this.closeNow()
+    this.nowFrom = this.view
+    this.view = 'now'
+    this.menu = undefined
+    this.panel = undefined
+    this.renderRoot.querySelector('.main')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+
+  private closeNow() {
+    this.view = this.nowFrom === 'detail' && !this.detail ? 'home' : this.nowFrom
+  }
+
+  /** Looked up only while the big player is open: the title and artist go to LRCLIB */
+  private loadLyrics() {
+    const track = this.track
+    const key = track?.artist ? `${track.artist}\n${track.title}` : ''
+    if (key === this.lyricsFor) return
+    this.lyricsFor = key
+    this.lastLine = -2
+    if (!track?.artist) return void (this.lyrics = 'none')
+    this.lyrics = 'loading'
+    void fetchLyrics(track.title, track.artist, track.album, track.duration).then(found => {
+      if (this.lyricsFor === key) this.lyrics = found ?? 'none'
+    })
+  }
+
+  /** Keeps the line being sung in the middle of the lyrics, unless a hand just scrolled them */
+  private followLyrics() {
+    if (typeof this.lyrics !== 'object' || !this.lyrics.synced) return
+    const index = currentLine(this.lyrics.synced, mediaPosition(this.player, this.now))
+    if (index === this.lastLine) return
+    const first = this.lastLine === -2
+    this.lastLine = index
+    const box = this.renderRoot.querySelector<HTMLElement>('.lyr')
+    const line = box?.children[Math.max(0, index)] as HTMLElement | undefined
+    if (!box || !line || Date.now() < this.freeUntil) return
+    const smooth = !first && !matchMedia('(prefers-reduced-motion: reduce)').matches
+    box.scrollTo({ top: line.offsetTop - box.clientHeight / 2 + line.offsetHeight / 2, behavior: smooth ? 'smooth' : 'auto' })
   }
 
   // ── Players ──────────────────────────────────────────────
@@ -984,6 +1099,54 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     `
   }
 
+  private renderLyrics() {
+    const lyrics = this.lyrics
+    const p = this.player
+    const canSeek = !!p && this.canControl(p.entity_id) && !!(this.features(p) & F.SEEK)
+    const body = lyrics === 'loading' ? html`<div class="center lyr-empty"><span class="spinner"></span></div>`
+      : lyrics === 'none' ? html`<div class="lyr-empty"><ha-icon icon="mdi:music-note-off"></ha-icon><span>${t(this.hass, 'mu.no_lyrics')}</span></div>`
+      : lyrics.synced ? (() => {
+        const index = currentLine(lyrics.synced!, mediaPosition(p, this.now))
+        return html`<div class="lyr" @wheel=${this.hold} @touchstart=${this.hold} @keydown=${this.hold}>${lyrics.synced!.map((line, i) => html`
+          <button class="line ${i === index ? 'on' : i < index ? 'past' : ''}" ?disabled=${!canSeek} aria-current=${i === index ? 'true' : 'false'}
+            @click=${() => { this.freeUntil = 0; this.control('media_seek', { seek_position: line.time }) }}>${line.text}</button>`)}</div>`
+      })()
+      : html`<div class="lyr plain" @wheel=${this.hold} @touchstart=${this.hold}>${lyrics.plain}</div>`
+    return html`<section class="lyrics" aria-label=${t(this.hass, 'mu.lyrics')}>
+      ${body}
+      <div class="lyr-foot">${t(this.hass, 'mu.lyrics_by')} <a href="https://lrclib.net" target="_blank" rel="noopener noreferrer">LRCLIB</a></div>
+    </section>`
+  }
+
+  private hold = () => { this.freeUntil = Date.now() + 5000 }
+
+  private renderNow() {
+    const track = this.track
+    const back = this.nowFrom === 'detail' && !this.detail ? 'home' : this.nowFrom
+    const backLabel = back === 'detail' ? this.detail?.item.name ?? '' : t(this.hass, `mu.${back}` as Key)
+    const members = groupMembers(this.player)
+    return html`
+      <button class="back" @click=${() => this.closeNow()}><ha-icon icon="mdi:arrow-left"></ha-icon>${backLabel}</button>
+      ${!track ? html`<div class="placeholder"><ha-icon icon="mdi:music-note-off"></ha-icon>${t(this.hass, 'mu.idle')}</div>` : html`
+        <div class="now">
+          <div class="now-track">
+            ${this.art(track.picture)}
+            <div class="now-text">
+              <div class="type">${t(this.hass, 'mu.now')}</div>
+              <h1>${track.title}</h1>
+              ${track.artist ? html`<div class="now-artist">${track.artist}</div>` : nothing}
+              ${track.album ? html`<div class="now-album">${track.album}</div>` : nothing}
+              <button class="chip" @click=${() => { this.view = 'players' }}>
+                <ha-icon icon=${this.info?.spotify ? 'mdi:spotify' : members.length ? 'mdi:speaker-multiple' : 'mdi:speaker'}></ha-icon>
+                ${this.info?.name}${members.length ? ` + ${members.length}` : ''}
+              </button>
+            </div>
+          </div>
+          ${this.renderLyrics()}
+        </div>`}
+    `
+  }
+
   // ── Player bar ───────────────────────────────────────────
 
   private renderQueue() {
@@ -1040,7 +1203,9 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     return html`<div class="bar card"><div class="bar-in">
       ${this.message ? html`<div class="message" role="status">${this.message}</div>` : nothing}
       <div class="track">
-        ${this.art(active ? playerPicture(p) : undefined)}
+        <button class="cover ${this.view === 'now' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.big_player')} title=${t(this.hass, 'mu.big_player')}
+          aria-pressed=${this.view === 'now'} @click=${() => this.openNow()}>${this.art(active ? playerPicture(p) : undefined)}
+          <ha-icon class="cover-hint" icon=${this.view === 'now' ? 'mdi:chevron-down' : 'mdi:chevron-up'}></ha-icon></button>
         <div class="text">
           <span class="t">${title ?? t(this.hass, 'mu.idle')}</span>
           ${sub ? html`<span class="s">${sub}</span>` : nothing}
@@ -1072,6 +1237,8 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
         </div>` : nothing}
       </div>
       <div class="right">
+        <button class="ctrl small ${this.view === 'now' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.lyrics')} title=${t(this.hass, 'mu.lyrics')}
+          aria-pressed=${this.view === 'now'} ?disabled=${!active} @click=${() => this.openNow()}><ha-icon icon="mdi:microphone-variant"></ha-icon></button>
         ${this.target ? html`<div class="panel-wrap">
           <button class="ctrl small ${this.panel === 'queue' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.queue')} title=${t(this.hass, 'mu.queue')} aria-expanded=${this.panel === 'queue'}
             @click=${toggle('queue')}><ha-icon icon="mdi:playlist-play"></ha-icon></button>
@@ -1114,12 +1281,13 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
             <span class="lib-text"><span>${item.name}</span><small><ha-icon icon=${isSpotifyItem(item) ? 'mdi:spotify' : 'mdi:music-circle'}></ha-icon>${isSpotifyItem(item) ? this.currentAccount?.name ?? 'Spotify' : 'Music Assistant'}</small></span>
           </button>`)}</div>` : nothing}
       </aside>
-      <main class="main card">
+      <main class="main card ${this.view === 'now' ? 'big' : ''}">
         ${glow && ['playing', 'paused'].includes(this.player?.state ?? '') ? html`<div class="glow-wrap"><div class="glow" style="background-image:url('${glow}')"></div></div>` : nothing}
         ${this.view === 'home' ? this.renderHome()
           : this.view === 'search' ? this.renderSearch()
           : this.view === 'radio' ? this.renderRadio()
           : this.view === 'players' ? this.renderPlayers()
+          : this.view === 'now' ? this.renderNow()
           : this.renderDetail()}
       </main>
       ${this.renderBar()}

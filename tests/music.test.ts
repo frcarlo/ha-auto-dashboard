@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateDashboard } from '../src/strategy'
-import { browseToItem, findMusicPlayers, findSpotifyBrowsers, formatTime, groupMembers, itemSub, mediaPosition, playableUri, playsItem } from '../src/music'
+import { browseToItem, cleanTitle, currentLine, fetchLyrics, findMusicPlayers, parseLrc, findSpotifyBrowsers, formatTime, groupMembers, itemSub, mediaPosition, playableUri, playsItem } from '../src/music'
 import { createHass } from '../dev/mock'
 
 const musicCard = async (config: Record<string, unknown> = {}, hass = createHass(true)) => {
@@ -42,6 +42,15 @@ describe('music helpers', () => {
     expect(names).toContain('Nest Mini')
   })
 
+  it('leaves out the dashboard entity Music Assistant adds for Cast displays, but keeps unavailable players', () => {
+    const ids = findMusicPlayers(createHass(true)).map(p => p.entity)
+    expect(ids).not.toContain('media_player.ma_nest_hub_dashboard')
+    expect(ids).toContain('media_player.ma_buro')
+    const hass = createHass(true)
+    hass.states['media_player.ma_buro'] = { ...hass.states['media_player.ma_buro']!, attributes: { friendly_name: 'Büro Sonos', supported_features: 8320575 } }
+    expect(findMusicPlayers(hass).map(p => p.entity)).toContain('media_player.ma_buro')
+  })
+
   it('splits the artist off a browsed track and marks lists as openable', () => {
     expect(browseToItem({ title: 'Lucio Dalla - Caruso', media_content_id: 'library://track/1', media_class: 'track' }))
       .toMatchObject({ name: 'Caruso', artists: [{ name: 'Lucio Dalla' }], media_type: 'track' })
@@ -81,5 +90,52 @@ describe('music helpers', () => {
 
   it('passes the speakers that list Spotify accounts to the card', async () => {
     expect((await musicCard()).card!.spotify_browsers).toEqual(['media_player.wohnzimmer_sonos_raw'])
+  })
+})
+
+describe('lyrics', () => {
+  it('reads LRC with several stamps on a line and skips empty lines', () => {
+    const lines = parseLrc('[ar: Someone]\n[00:12.50]Second\n[00:03.00][01:00.0]First and again\n[00:20.00]\n')
+    expect(lines).toEqual([
+      { time: 3, text: 'First and again' }, { time: 12.5, text: 'Second' }, { time: 60, text: 'First and again' },
+    ])
+  })
+
+  it('finds the line sung at a position', () => {
+    const lines = parseLrc('[00:05.00]a\n[00:10.00]b\n[00:15.00]c')
+    expect(currentLine(lines, 2)).toBe(-1)
+    expect(currentLine(lines, 5)).toBe(0)
+    expect(currentLine(lines, 12)).toBe(1)
+    expect(currentLine(lines, 99)).toBe(2)
+  })
+
+  it('cleans titles for the search', () => {
+    expect(cleanTitle('Bohemian Rhapsody - Remastered 2011')).toBe('Bohemian Rhapsody')
+    expect(cleanTitle('Lose Control (feat. Someone)')).toBe('Lose Control')
+    expect(cleanTitle('Song 2')).toBe('Song 2')
+  })
+
+  it('asks LRCLIB for the track, then searches, and keeps the answer', async () => {
+    const calls: string[] = []
+    const get = (async (url: string) => {
+      calls.push(url)
+      if (url.includes('/get?')) return { ok: false, json: async () => null }
+      return { ok: true, json: async () => [
+        { duration: 400, plainLyrics: 'far off' },
+        { duration: 241, syncedLyrics: '[00:01.00]right one' },
+      ] }
+    }) as unknown as typeof fetch
+    const lyrics = await fetchLyrics('Testsong - Remastered 2011', 'Band A & Band B', 'Album', 240, get)
+    expect(lyrics).toEqual({ synced: [{ time: 1, text: 'right one' }] })
+    expect(calls[0]).toContain('track_name=Testsong+-+Remastered+2011')
+    expect(calls[0]).toContain('duration=240')
+    expect(calls[1]).toContain('track_name=Testsong&artist_name=Band+A')
+    await fetchLyrics('Testsong - Remastered 2011', 'Band A & Band B', 'Album', 240, get)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('says none when LRCLIB has nothing', async () => {
+    const get = (async () => ({ ok: true, json: async () => [] })) as unknown as typeof fetch
+    expect(await fetchLyrics('Unknown', 'Nobody', undefined, undefined, get)).toBeNull()
   })
 })

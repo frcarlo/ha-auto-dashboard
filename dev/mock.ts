@@ -138,6 +138,8 @@ export const musicDefs: Def[] = [
     media_title: 'Deutschlandfunk', media_content_id: 'library://radio/42', entity_picture_local: cover(0, 'DLF'),
   }, 'schlafzimmer'],
   ['media_player.ma_buro', 'unavailable', { friendly_name: 'Büro Sonos', mass_player_type: 'player', supported_features: 8320575 }, 'buro_keller'],
+  // Music Assistant's dashboard entity for a Cast display: same platform, but no player
+  ['media_player.ma_nest_hub_dashboard', 'idle', { friendly_name: 'Nest Hub', device_class: 'tv', supported_features: 131840 }, 'kuche'],
   ['media_player.spotify_frank', 'idle', { friendly_name: 'Spotify Frank', supported_features: 2048 }, ''],
   // Sonos lists every Spotify account in its media browser
   ['media_player.wohnzimmer_sonos_raw', 'idle', { friendly_name: 'Wohnzimmer Sonos (direkt)', supported_features: 8321599 }, 'wohnzimmer'],

@@ -63,8 +63,21 @@ export function playableUri(item: MediaItem): string {
   return /^spotify:\/\/[^/]+\/(spotify:.+)$/.exec(item.uri)?.[1] ?? item.uri
 }
 
+/** MediaPlayerEntityFeature.PLAY: a Music Assistant player keeps it in its features, also while unavailable */
+const PLAY = 16384
+
+/**
+ * The second entity Music Assistant adds for Cast displays and TVs ("dashboard:…" in the registry), which only
+ * shows a dashboard on the screen: no mass_player_type, cannot play, refuses MA's services. It is neither a speaker nor a TV.
+ */
+export const isMusicAssistantDashboard = (hass: HomeAssistant, entity: HassEntity) =>
+  hass.entities[entity.entity_id]?.platform === 'music_assistant' && entity.attributes.mass_player_type === undefined &&
+  ((Number(entity.attributes.supported_features) || 0) & PLAY) === 0
+
+/** A Music Assistant player */
 export const isMusicAssistant = (hass: HomeAssistant, entity: HassEntity) =>
-  hass.entities[entity.entity_id]?.platform === 'music_assistant' || entity.attributes.mass_player_type !== undefined
+  entity.attributes.mass_player_type !== undefined ||
+  (hass.entities[entity.entity_id]?.platform === 'music_assistant' && !isMusicAssistantDashboard(hass, entity))
 
 const isSpotify = (hass: HomeAssistant, entity: HassEntity) => hass.entities[entity.entity_id]?.platform === 'spotify'
 
@@ -157,3 +170,96 @@ export const playsItem = (entity: HassEntity | undefined, item: MediaItem) =>
 /** Players grouped with this one, without itself */
 export const groupMembers = (entity: HassEntity | undefined): string[] =>
   ((entity?.attributes.group_members ?? []) as string[]).filter(id => id !== entity?.entity_id)
+
+// ── Lyrics ─────────────────────────────────────────────────
+
+/** A line of synced lyrics, from where it starts in the track */
+export interface LyricLine {
+  time: number
+  text: string
+}
+
+export interface Lyrics {
+  synced?: LyricLine[]
+  plain?: string
+}
+
+/** LRC as lrclib sends it: "[01:02.34] text", one or more stamps per line; empty lines are breaks, not lines */
+export function parseLrc(lrc: string): LyricLine[] {
+  const lines: LyricLine[] = []
+  for (const raw of lrc.split('\n')) {
+    const stamps = [...raw.matchAll(/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g)]
+    const text = raw.replace(/\[[^\]]*\]/g, '').trim()
+    if (!text) continue
+    for (const m of stamps) {
+      const fraction = m[3] ? Number(m[3]) / 10 ** m[3].length : 0
+      lines.push({ time: Number(m[1]) * 60 + Number(m[2]) + fraction, text })
+    }
+  }
+  return lines.sort((a, b) => a.time - b.time)
+}
+
+/** The line sung at this position, -1 before the first */
+export function currentLine(lines: LyricLine[], position: number): number {
+  let index = -1
+  for (let i = 0; i < lines.length && lines[i]!.time <= position + 0.2; i++) index = i
+  return index
+}
+
+/** The title as lyric sites know it: without "- Remastered 2011", "(feat. …)", "[Live]" */
+export function cleanTitle(title: string): string {
+  return title
+    .replace(/\s+-\s+.*\b(remaster(ed)?|live|version|edit|mix|mono|stereo|bonus|deluxe|single)\b.*$/i, '')
+    .replace(/\s*[([](feat\.?|ft\.?|with|remaster(ed)?|live|radio edit|single version|album version|explicit)[^)\]]*[)\]]/gi, '')
+    .trim() || title
+}
+
+/** The first artist, as lyric sites list it */
+const firstArtist = (artist: string) => artist.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bx\b|\/)\s*/i)[0]!.trim() || artist
+
+const LRCLIB = 'https://lrclib.net/api'
+const lyricsCache = new Map<string, Promise<Lyrics | null>>()
+
+type LrclibTrack = { syncedLyrics?: string | null; plainLyrics?: string | null; instrumental?: boolean }
+
+const toLyrics = (data: LrclibTrack | null | undefined): Lyrics | null => {
+  if (!data) return null
+  const synced = data.syncedLyrics ? parseLrc(data.syncedLyrics) : []
+  if (synced.length) return { synced }
+  return data.plainLyrics?.trim() ? { plain: data.plainLyrics.trim() } : null
+}
+
+/**
+ * Lyrics from LRCLIB, which HArmony uses as well: the exact track first (with the length, when known), then a
+ * search with the cleaned-up title. Straight from the browser, LRCLIB allows that. Once per track and page load.
+ */
+export function fetchLyrics(title: string, artist: string, album?: string, duration?: number, get: typeof fetch = fetch): Promise<Lyrics | null> {
+  const key = `${artist}\n${title}`.toLowerCase()
+  const cached = lyricsCache.get(key)
+  if (cached) return cached
+  const headers = { 'Lrclib-Client': 'Auto Dashboard (https://github.com/frcarlo/ha-auto-dashboard)' }
+  const ask = async <T>(path: string, params: Record<string, string | undefined>): Promise<T | null> => {
+    const query = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1]))
+    const res = await get(`${LRCLIB}/${path}?${query}`, { headers })
+    return res.ok ? await res.json() as T : null
+  }
+  const track = cleanTitle(title)
+  const lead = firstArtist(artist)
+  const result = (async () => {
+    const exact = await ask<LrclibTrack>('get', {
+      track_name: title, artist_name: artist, album_name: album, duration: duration ? String(Math.round(duration)) : undefined,
+    }).catch(() => null)
+    const found = toLyrics(exact)
+    if (found) return found
+    const list = await ask<(LrclibTrack & { duration?: number })[]>('search', { track_name: track, artist_name: lead }) ?? []
+    // Closest in length first, and synced lyrics over plain ones
+    const ranked = list
+      .filter(r => !r.instrumental && (r.syncedLyrics || r.plainLyrics))
+      .sort((a, b) => Number(!a.syncedLyrics) - Number(!b.syncedLyrics) ||
+        (duration ? Math.abs((a.duration ?? 0) - duration) - Math.abs((b.duration ?? 0) - duration) : 0))
+    return toLyrics(ranked[0])
+  })()
+  // A failed request is tried again next time, a track without lyrics is not
+  lyricsCache.set(key, result.catch(() => { lyricsCache.delete(key); return null }))
+  return lyricsCache.get(key)!
+}

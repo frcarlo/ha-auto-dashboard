@@ -4,6 +4,7 @@
 // A TV is a media player of class tv, with the remote on the same device for the arrow keys.
 import { HIDE_LABEL, allEntities, entityAreaId } from './model'
 import { domainOf, entityName } from './presentation'
+import { isMusicAssistantDashboard } from './music'
 import type { ApplianceConfig, ApplianceKind, HassEntity, HomeAssistant } from './types'
 
 export interface Appliance {
@@ -236,7 +237,7 @@ export function findTvs(hass: HomeAssistant, hide: { domains?: string[]; labels?
   if (hide.domains?.includes('media_player')) return []
   const devices = byDevice(hass)
   const candidates = allEntities(hass, hide, areaIds)
-    .filter(e => domainOf(e.entity_id) === 'media_player' && e.attributes.device_class === 'tv')
+    .filter(e => domainOf(e.entity_id) === 'media_player' && e.attributes.device_class === 'tv' && !isMusicAssistantDashboard(hass, e))
     .map(player => {
       const deviceId = hass.entities[player.entity_id]?.device_id
       const device = deviceId ? hass.devices[deviceId] : undefined
