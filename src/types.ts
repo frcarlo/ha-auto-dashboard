@@ -93,12 +93,16 @@ export interface RoomSettings {
 /** What the viewing user may operate. Only shapes the UI; HA itself does not enforce it. */
 export type Access = 'full' | 'no_critical' | 'read_only'
 
-/** Options shared by every card the strategy emits. */
-export interface CardLook {
+/** Look options of the dashboard, passed on to every card. */
+export interface Look {
   theme?: ThemeMode
   glass?: boolean
   /** Accent as hex (#0ea5e9); background, surfaces and text are derived from it */
   primary_color?: string
+}
+
+/** Options shared by every card the strategy emits: the look and what the viewing user may operate. */
+export interface CardLook extends Look {
   access?: Access
 }
 
@@ -120,10 +124,8 @@ export interface UserRule {
   areas?: string[]
   floors?: string[]
   hide_pages?: PagePath[]
-  /** Nothing can be switched; only plain information opens */
-  read_only?: boolean
-  /** false: no locks, alarm panels or bulk actions like "all off" */
-  control_critical?: boolean
+  /** full (default), no_critical: no locks, alarm panels or bulk actions like "all off", read_only: nothing can be switched */
+  access?: Access
 }
 
 export type NavPosition = 'bottom' | 'top' | 'left' | 'right'
@@ -152,7 +154,7 @@ export interface ApplianceConfig {
   notices?: string[]
 }
 
-export interface StrategyConfig extends CardLook {
+export interface StrategyConfig extends Look {
   type: string
   title?: string
   /** Only these areas (e.g. a dashboard for one room) */
@@ -160,6 +162,8 @@ export interface StrategyConfig extends CardLook {
   /** Only areas on these floors */
   floors?: string[]
   nav_position?: NavPosition
+  /** Pages left out for everyone, admins included; per user under users */
+  hide_pages?: PagePath[]
   users?: Record<string, UserRule>
   hide_areas?: string[]
   area_order?: string[]

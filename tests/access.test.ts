@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { accessOf, canControl, canOpen, intersect, ruleFor } from '../src/access'
 
 const users = {
-  leni: { areas: ['zimmer_leni'], control_critical: false },
-  'Gast Zugang': { read_only: true },
+  leni: { areas: ['zimmer_leni'], access: 'no_critical' as const },
+  'Gast Zugang': { access: 'read_only' as const },
   abc123: { hide_pages: ['security' as const] },
-  default: { control_critical: false },
+  default: { access: 'no_critical' as const },
 }
 
 describe('ruleFor', () => {
@@ -22,15 +22,16 @@ describe('ruleFor', () => {
   })
 
   it('never treats a user named "default" as their own entry', () => {
-    expect(ruleFor({ default: { read_only: true } }, { id: 'd', name: 'Default', is_admin: true })).toBeUndefined()
+    expect(ruleFor({ default: { access: 'read_only' } }, { id: 'd', name: 'Default', is_admin: true })).toBeUndefined()
   })
 })
 
 describe('access', () => {
   it('derives the access level', () => {
     expect(accessOf(undefined)).toBe('full')
-    expect(accessOf({ control_critical: false })).toBe('no_critical')
-    expect(accessOf({ read_only: true, control_critical: true })).toBe('read_only')
+    expect(accessOf({ access: 'no_critical' })).toBe('no_critical')
+    expect(accessOf({ access: 'read_only' })).toBe('read_only')
+    expect(accessOf({ access: 'nonsense' as never })).toBe('full')
   })
 
   it('gates controls and more-info', () => {

@@ -10,7 +10,8 @@ import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
-import type { ApplianceConfig, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
+import { accessOf } from './access'
+import type { Access, ApplianceConfig, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
 interface HaUser {
   id: string
@@ -455,6 +456,9 @@ export class AdStrategyEditor extends LitElement {
           })}`)}
         ${this.field(this.l('ed.hide_domains'), this.chips(
           DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
+        ${this.field(this.l('ed.hide_pages'), this.chips(
+          PAGES.map(p => ({ id: p, label: this.l(p) })), c.hide_pages, hide_pages => this.change({ hide_pages: hide_pages as PagePath[] })),
+          this.l('ed.hide_pages_hint'))}
         ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
           this.labelOptions, c.hide_labels, hide_labels => this.change({ hide_labels })), this.l('ed.hide_labels_hint')) : nothing}
         ${this.field(this.l('ed.order'), html`<div class="order">
@@ -492,9 +496,9 @@ export class AdStrategyEditor extends LitElement {
         <span>${this.userLabel(key)}</span>
         <button class="link" @click=${() => this.changeRule(key, null)}>${this.l('ed.remove')}</button>
       </div>
-      ${this.toggle(this.l('ed.read_only'), !!rule.read_only, read_only => this.changeRule(key, { read_only }))}
-      ${rule.read_only ? nothing : this.toggle(this.l('ed.critical'), rule.control_critical !== false,
-        on => this.changeRule(key, { control_critical: on }))}
+      ${this.field(this.l('ed.access'), this.seg<Access>(
+        [['full', 'ed.access_full'], ['no_critical', 'ed.access_no_critical'], ['read_only', 'ed.access_read_only']],
+        accessOf(rule), access => this.changeRule(key, { access })), this.l('ed.access_hint'))}
       ${this.field(this.l('ed.hide_pages'), this.chips(
         PAGES.map(p => ({ id: p, label: this.l(p) })),
         rule.hide_pages, hide_pages => this.changeRule(key, { hide_pages: hide_pages as PagePath[] })))}

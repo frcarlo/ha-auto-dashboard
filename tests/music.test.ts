@@ -27,6 +27,7 @@ describe('music page', () => {
   it('hide_pages, hide_domains media_player or no Music Assistant drop the page', async () => {
     const hass = createHass(true)
     expect((await musicCard({ users: { [hass.user!.id]: { hide_pages: ['music'] } } }, hass)).nav).not.toContain('music')
+    expect((await musicCard({ hide_pages: ['music'] })).nav).not.toContain('music')
     expect((await musicCard({ hide_domains: ['media_player'] })).page).toBeUndefined()
     const without = createHass(true)
     for (const id of Object.keys(without.states)) if (without.entities[id]?.platform === 'music_assistant') delete without.states[id]

@@ -106,8 +106,8 @@ describe('per-user rules', () => {
     return hass
   }
   const users = {
-    leni: { areas: ['schlafzimmer', 'wohnzimmer'], hide_pages: ['security' as const], control_critical: false },
-    gast: { read_only: true },
+    leni: { areas: ['schlafzimmer', 'wohnzimmer'], hide_pages: ['security' as const], access: 'no_critical' as const },
+    gast: { access: 'read_only' as const },
   }
 
   it('narrows rooms and pages and passes the access level to every card', async () => {
@@ -123,6 +123,22 @@ describe('per-user rules', () => {
     expect(cards(guest.views[0]!).find(c => c.type === 'custom:ad-header')!.access).toBe('read_only')
     const admin = await generateDashboard({ type: 'custom:auto-dashboard', users }, asUser('Francesco', true))
     expect(admin.views.flatMap(cards).some(c => 'access' in c)).toBe(false)
+    expect(admin.views.map(v => v.path)).toContain('security')
+  })
+
+  it('still understands rules written before 1.0', async () => {
+    const old = { gast: { read_only: true } } as never
+    const guest = await generateDashboard({ type: 'custom:auto-dashboard', users: old }, asUser('Gast'))
+    expect(cards(guest.views[0]!).find(c => c.type === 'custom:ad-header')!.access).toBe('read_only')
+  })
+
+  it('hide_pages on the dashboard hides pages for admins too, on top of the rules', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', hide_pages: ['cameras'], users }, asUser('Leni'))
+    expect(views.map(v => v.path)).not.toContain('cameras')
+    expect(views.map(v => v.path)).not.toContain('security')
+    const admin = await generateDashboard({ type: 'custom:auto-dashboard', hide_pages: ['cameras', 'energy'] }, asUser('Francesco', true))
+    expect(admin.views.map(v => v.path)).not.toContain('cameras')
+    expect(admin.views.map(v => v.path)).not.toContain('energy')
     expect(admin.views.map(v => v.path)).toContain('security')
   })
 })

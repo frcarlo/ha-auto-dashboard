@@ -2,7 +2,7 @@
 import type { RoomSettings, StrategyConfig, UserRule } from './types'
 
 const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', ha_colors: true, forecast_days: 3 }
-const RULE_DEFAULTS: Partial<Record<string, unknown>> = { read_only: false, control_critical: true }
+const RULE_DEFAULTS: Partial<Record<string, unknown>> = { access: 'full' }
 
 const isEmpty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)
 
@@ -32,7 +32,10 @@ export function cleanConfig(config: StrategyConfig): StrategyConfig {
   return { type: config.type, ...out }
 }
 
-const LIST_KEYS = ['areas', 'floors', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities', 'favorites', 'scenes', 'todo_lists', 'outdoor_areas', 'weather_warnings'] as const
+const LIST_KEYS = [
+  'areas', 'floors', 'hide_pages', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities',
+  'favorites', 'scenes', 'todo_lists', 'outdoor_areas', 'weather_warnings', 'calendars', 'tv_apps',
+] as const
 const RULE_LIST_KEYS = ['areas', 'floors', 'hide_pages'] as const
 const ROOM_LIST_KEYS = ['hide_groups', 'group_order', 'order'] as const
 
@@ -46,10 +49,34 @@ function listify<T extends object>(obj: T, keys: readonly string[]): T {
   return out as T
 }
 
-/** Hand-written YAML tolerated: single values for lists, in the dashboard, user rules and room settings. */
+/**
+ * Old names keep working: each maps to its new key and, where the meaning changed shape, its new value.
+ * The new key wins when both are set; earlier aliases win over later ones. Renaming a key adds it here,
+ * so existing configs never break.
+ */
+interface Alias { to: string; value?: (v: unknown) => unknown }
+const ALIASES: Record<string, Alias> = {}
+const RULE_ALIASES: Record<string, Alias> = {
+  // Before 1.0 two switches stood for the three access levels
+  read_only: { to: 'access', value: v => v === true ? 'read_only' : undefined },
+  control_critical: { to: 'access', value: v => v === false ? 'no_critical' : undefined },
+}
+
+function unalias<T extends object>(obj: T, aliases: Record<string, Alias>): T {
+  const out = { ...obj } as Record<string, unknown>
+  for (const [old, { to, value }] of Object.entries(aliases)) {
+    if (!(old in out)) continue
+    const v = value ? value(out[old]) : out[old]
+    delete out[old]
+    if (out[to] === undefined && v !== undefined) out[to] = v
+  }
+  return out as T
+}
+
+/** Hand-written YAML tolerated: old key names, and single values for lists, in the dashboard, user rules and room settings. */
 export function normalizeConfig(config: StrategyConfig): StrategyConfig {
-  const out = listify(config, LIST_KEYS)
-  if (out.users) out.users = Object.fromEntries(Object.entries(out.users).map(([k, rule]) => [k, listify(rule ?? {}, RULE_LIST_KEYS)]))
+  const out = listify(unalias(config, ALIASES), LIST_KEYS)
+  if (out.users) out.users = Object.fromEntries(Object.entries(out.users).map(([k, rule]) => [k, listify(unalias(rule ?? {}, RULE_ALIASES), RULE_LIST_KEYS)]))
   if (out.rooms) out.rooms = Object.fromEntries(Object.entries(out.rooms).map(([k, room]) => [k, listify(room ?? {}, ROOM_LIST_KEYS)]))
   return out
 }

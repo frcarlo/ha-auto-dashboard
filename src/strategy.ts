@@ -111,7 +111,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ({ type: 'custom:ad-appliance', appliance, ...(home ? { only_active: true } : {}), ...look })
   const outdoor = config.outdoor_areas ?? []
   const indoor = areas.filter(a => !outdoor.includes(a.area_id))
-  const pageAllowed = (path: PagePath) => !rule?.hide_pages?.includes(path)
+  // Pages hidden on the dashboard go for everyone, a rule's on top of them for that user
+  const pageAllowed = (path: PagePath) => !config.hide_pages?.includes(path) && !rule?.hide_pages?.includes(path)
   // The energy settings know the house meter; without them (or without access) the rooms' sum stands in
   const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
   const sources = powerSources(hass, prefs)
@@ -161,7 +162,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       whole: (): Card[] => [{ type: 'custom:ad-cameras', cameras: cameraInfos, ...look }],
     },
   ]
-    .filter(page => !rule?.hide_pages?.includes(page.path as PagePath))
+    .filter(page => pageAllowed(page.path as PagePath))
     .map(page => ({ ...page, entities: all.filter(page.pick) }))
     .filter(page => page.entities.length)
 

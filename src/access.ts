@@ -28,10 +28,11 @@ export function ruleFor(users: StrategyConfig['users'], user: HomeAssistant['use
   return user.is_admin ? undefined : users.default
 }
 
+const ACCESS: Access[] = ['full', 'no_critical', 'read_only']
+
+/** The rule's access; anything unknown counts as full, as without a rule. */
 export function accessOf(rule?: UserRule): Access {
-  if (rule?.read_only) return 'read_only'
-  if (rule?.control_critical === false) return 'no_critical'
-  return 'full'
+  return rule?.access && ACCESS.includes(rule.access) ? rule.access : 'full'
 }
 
 /** Both filters apply: the dashboard's own and the user's. */
@@ -47,7 +48,7 @@ export function canControl(access: Access | undefined, entityId: string) {
   return true
 }
 
-/** Bulk actions ("all off", all covers of a room) need full access, as `control_critical: false` promises. */
+/** Bulk actions ("all off", all covers of a room) need full access, as `access: no_critical` promises. */
 export function canBulk(access: Access | undefined, entityIds: string[]) {
   return (access ?? 'full') === 'full' && entityIds.length > 0
 }
