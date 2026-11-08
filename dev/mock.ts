@@ -49,7 +49,6 @@ const defs: Def[] = [
   ['sensor.buro_keller_pc', '86', { friendly_name: 'Büro Keller PC', device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' }, 'buro_keller'],
   ['sensor.kuche_backofen', '1.85', { friendly_name: 'Küche Backofen', device_class: 'power', unit_of_measurement: 'kW', state_class: 'measurement' }, 'kuche'],
   ['sensor.wohnzimmer_tv_leistung', '96', { friendly_name: 'Wohnzimmer TV Leistung', device_class: 'power', unit_of_measurement: 'W' }, 'wohnzimmer'],
-  ['camera.garage', 'idle', { friendly_name: 'Garage Kamera' }, 'garage'],
   ['todo.einkauf', '3', { friendly_name: 'Einkaufsliste' }, 'kuche'],
   ['todo.werkstatt', '0', { friendly_name: 'Werkstatt' }, 'garage'],
   ['sensor.garten_temperatur', '9.4', { friendly_name: 'Garten Temperatur', device_class: 'temperature', unit_of_measurement: '°C' }, 'garten'],
@@ -57,6 +56,7 @@ const defs: Def[] = [
   ['switch.buro_keller_drucker', 'unavailable', { friendly_name: 'Drucker' }, 'buro_keller'],
 
   ['light.garage', 'off', { friendly_name: 'Garage', supported_color_modes: ['onoff'] }, 'garage'],
+  ['light.haustur', 'off', { friendly_name: 'Haustürlicht', supported_color_modes: ['onoff'] }, 'eingangstur'],
   ['binary_sensor.garage_tor', 'on', { friendly_name: 'Garagentor', device_class: 'garage_door' }, 'garage'],
   ['cover.garage_tor', 'open', { friendly_name: 'Garagentorantrieb', device_class: 'garage' }, 'garage'],
   ['binary_sensor.garage_rauch', 'off', { friendly_name: 'Garage Rauchmelder', device_class: 'smoke' }, 'garage'],
@@ -67,8 +67,52 @@ type DeviceDef = { id: string; name: string; model?: string; area: string; platf
 const PROGRAMS = ['dishcare_dishwasher_program_eco_50', 'dishcare_dishwasher_program_auto_2', 'dishcare_dishwasher_program_quick_45']
 const ENUM = (options: string[]) => ({ device_class: 'enum', options })
 
+// A still for each camera, drawn: sky or wall, ground, and a shape for what stands there
+const still = (top: string, bottom: string, shape: string) => `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><defs><linearGradient id="g" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient></defs><rect width="640" height="400" fill="url(#g)"/>${shape}</svg>`)}`
+const MOTION = { device_class: 'motion' }
+
 // Appliances and a TV as their integrations bring them: one device with many entities each
 const deviceDefs: DeviceDef[] = [
+  // A Reolink doorbell: three streams, of which the page shows one, and its detections
+  {
+    id: 'dev-cam-haustur', name: 'Haustür', model: 'Reolink Video Doorbell', area: 'eingangstur', platform: 'reolink', entities: [
+      ['camera.haustur_standardauflosung', 'idle', { friendly_name: 'Haustür Standardauflösung', entity_picture: still('#cbd5e1', '#64748b', '<rect x="380" y="60" width="160" height="300" fill="#e2e8f0"/><rect x="120" y="150" width="140" height="190" rx="8" fill="#1e293b"/>') }],
+      ['camera.haustur_hochauflosung', 'idle', { friendly_name: 'Haustür Hochauflösung' }],
+      ['camera.haustur_schnappschusse', 'idle', { friendly_name: 'Haustür Schnappschüsse' }],
+      ['binary_sensor.haustur_person', 'off', { friendly_name: 'Haustür Person', ...MOTION }],
+      ['binary_sensor.haustur_paket', 'off', { friendly_name: 'Haustür Paket', ...MOTION }],
+      ['binary_sensor.haustur_besucher', 'off', { friendly_name: 'Haustür Besucher' }],
+      ['binary_sensor.haustur_bewegung', 'off', { friendly_name: 'Haustür Bewegung', ...MOTION }],
+      ['binary_sensor.haustur_schlafstatus', 'off', { friendly_name: 'Haustür Schlafstatus' }],
+    ],
+  },
+  {
+    id: 'dev-cam-terrasse', name: 'Terrasse', model: 'Argus 4', area: 'garten', platform: 'reolink', entities: [
+      ['camera.terrasse', 'idle', { friendly_name: 'Terrasse', entity_picture: still('#334155', '#14532d', '<path d="M0 260 Q160 200 320 250 T640 230 V400 H0Z" fill="#166534"/><ellipse cx="300" cy="300" rx="40" ry="22" fill="#a16207"/>') }],
+      ['binary_sensor.terrasse_tier', 'off', { friendly_name: 'Terrasse Tier', ...MOTION }],
+      ['binary_sensor.terrasse_person', 'off', { friendly_name: 'Terrasse Person', ...MOTION }],
+      ['light.terrasse_flutlicht', 'off', { friendly_name: 'Terrasse Flutlicht', supported_color_modes: ['onoff'] }],
+    ],
+  },
+  {
+    id: 'dev-cam-einfahrt', name: 'Einfahrt', model: 'RLC-810A', area: 'garage', platform: 'reolink', entities: [
+      ['camera.einfahrt', 'idle', { friendly_name: 'Einfahrt', entity_picture: still('#e2e8f0', '#94a3b8', '<rect y="250" width="640" height="150" fill="#cbd5e1"/><rect x="60" y="120" width="120" height="160" fill="#78716c"/><circle cx="420" cy="320" r="18" fill="#57534e"/>') }],
+      ['binary_sensor.einfahrt_person', 'off', { friendly_name: 'Einfahrt Person', ...MOTION }],
+      ['binary_sensor.einfahrt_fahrzeug', 'off', { friendly_name: 'Einfahrt Fahrzeug', ...MOTION }],
+    ],
+  },
+  {
+    id: 'dev-cam-esszimmer', name: 'Esszimmer', model: 'E1 Zoom', area: 'esszimmer', platform: 'reolink', entities: [
+      ['camera.esszimmer', 'idle', { friendly_name: 'Esszimmer', entity_picture: still('#f8fafc', '#d6d3d1', '<rect x="140" y="230" width="360" height="24" fill="#92400e"/><rect x="440" y="80" width="140" height="120" fill="#bae6fd"/>') }],
+    ],
+  },
+  {
+    id: 'dev-cam-flur', name: 'Flur', model: 'E1 Pro', area: 'flur', platform: 'reolink', entities: [
+      ['camera.flur', 'idle', { friendly_name: 'Flur', entity_picture: still('#e7e5e4', '#a8a29e', '<rect x="250" y="70" width="140" height="300" fill="#f5f5f4"/><rect x="40" y="0" width="60" height="400" fill="#d6d3d1"/>') }],
+      ['binary_sensor.flur_person', 'off', { friendly_name: 'Flur Person', ...MOTION }],
+    ],
+  },
   {
     id: 'dev-geschirrspuler', name: 'Geschirrspüler', model: 'SN53ES14VE', area: 'kuche', platform: 'home_connect', entities: [
       ['sensor.geschirrspuler_betriebszustand', 'run', { friendly_name: 'Geschirrspüler Betriebszustand', ...ENUM(['inactive', 'ready', 'delayedstart', 'run', 'pause', 'actionrequired', 'finished', 'error', 'aborting']) }],
@@ -141,6 +185,28 @@ const extras: HassEntity[] = [
   { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1' } },
   { entity_id: 'binary_sensor.warning_mulheim_2', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 2' } },
 ]
+
+/** Today's detections as the recorder keeps them: off, then on and off again for each one, minutes ago */
+function cameraHistory(since: number, ids: string[]) {
+  const seen: [entity: string, minutesAgo: number][] = [
+    ['binary_sensor.flur_person', 72], ['binary_sensor.einfahrt_person', 140], ['binary_sensor.einfahrt_fahrzeug', 141],
+    ['binary_sensor.terrasse_tier', 210], ['binary_sensor.haustur_bewegung', 330], ['binary_sensor.haustur_paket', 329],
+    ['binary_sensor.haustur_besucher', 331], ['binary_sensor.haustur_person', 420], ['binary_sensor.terrasse_person', 500],
+    ['binary_sensor.haustur_bewegung', 6],
+  ]
+  const now = Date.now()
+  const out: Record<string, { s: string; lu: number }[]> = {}
+  for (const id of ids) {
+    const rows = [{ s: 'off', lu: since / 1000 }]
+    for (const [, ago] of seen.filter(([e]) => e === id).sort((a, b) => b[1] - a[1])) {
+      const at = now - ago * 60_000
+      if (at < since) continue
+      rows.push({ s: 'on', lu: at / 1000 }, { s: 'off', lu: at / 1000 + 40 })
+    }
+    out[id] = rows
+  }
+  return out
+}
 
 export function createHass(dark: boolean): HomeAssistant {
   const states: Record<string, HassEntity> = {}
@@ -232,6 +298,7 @@ export function createHass(dark: boolean): HomeAssistant {
     },
     callWS: async <T,>(msg: Record<string, unknown>) => {
       if (String(msg.type).startsWith('calendar/event/')) return calendarCommand(msg) as T
+      if (msg.type === 'history/history_during_period') return cameraHistory(Date.parse(String(msg.start_time)), msg.entity_ids as string[]) as T
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [
           { type: 'grid', stat_rate: 'sensor.netz_leistung' },

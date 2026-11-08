@@ -8,6 +8,7 @@ import {
 import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
+import { findCameras } from './cameras'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
@@ -88,8 +89,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const cameras = all.filter(ofDomain('camera'))
   // HA's own cards for what it draws best: camera streams, editable to-do lists, statistics graphs
   // Under its room's heading a camera named like the room shows no caption, a "Garage Einfahrt" just "Einfahrt"
-  const cameraCard = (e: HassEntity, areaName?: string): Card => {
-    const name = entityName(e)
+  // One camera per device: a doorbell's sub stream, main stream and snapshots are one camera
+  const cameraInfos = findCameras(hass, cameras, hide)
+  const cameraCard = (e: HassEntity, areaName?: string, own?: string): Card => {
+    const name = own ?? entityName(e)
     const label = shortName(name, areaName)
     return {
       type: 'picture-entity', entity: e.entity_id, show_state: false, camera_view: 'auto', grid_options: { columns: 12 },
@@ -152,7 +155,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     },
     {
       path: 'cameras', icon: 'mdi:cctv', title: t(hass, 'cameras'),
-      pick: ofDomain('camera'), card: cameraCard,
+      pick: ofDomain('camera'),
+      // The pictures side by side and what they saw today, instead of one section per room
+      whole: (): Card[] => [{ type: 'custom:ad-cameras', cameras: cameraInfos, ...look }],
     },
   ]
     .filter(page => !rule?.hide_pages?.includes(page.path as PagePath))
@@ -217,7 +222,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     return [
       ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
-      ...cameras.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map((e): Section => ({ type: 'grid', cards: [cameraCard(e, area.name)] })),
+      ...cameraInfos.filter(c => c.area === area.area_id).map((c): Section => ({ type: 'grid', cards: [cameraCard(hass.states[c.entity]!, area.name, c.name)] })),
       ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }] })),
       ...(appliances.some(a => a.area === area.area_id) ? [{
         type: 'grid' as const,
@@ -353,7 +358,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           ...rooms.flatMap(({ area, entities }) => {
             if (page.roomCard) return [page.roomCard(area, entities)]
             const roomHeading = { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }
-            const tiles = (list: HassEntity[]) => list.map(e => page.card ? page.card(e, area.name) : tile(e, area.name))
+            const tiles = (list: HassEntity[]) => list.map(e => tile(e, area.name))
             const kinds = page.split ? [...new Set(entities.map(page.split))] : []
             if (kinds.length < 2) return [groupHeading(area.name, entities, roomHeading), ...tiles(entities)]
             // Several kinds in one room: the room heading only names it, each kind brings its own control
@@ -387,8 +392,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           ...(page.count_label ? { count_label: page.count_label } : {}),
           ...(page.action ? { action: page.action } : {}),
         }]),
-        ...floorSections,
-        ...(rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => page.card ? page.card(e) : tile(e))] }] : []),
+        ...(page.whole ? [fullWidth(page.whole())] : floorSections),
+        ...(!page.whole && rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => tile(e))] }] : []),
       ]),
     }
   })

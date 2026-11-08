@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateDashboard } from '../src/strategy'
+import { findCameras, detectionsFrom } from '../src/cameras'
 import { createHass } from '../dev/mock'
 
 describe('generateDashboard', () => {
@@ -238,9 +239,13 @@ describe('energy, maintenance, cameras and lists', () => {
     expect(home.find(c => c.type === 'picture-entity')).toBeUndefined()
     expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).toContain('cameras')
     const page = cards(views.find(v => v.path === 'cameras')!)
-    expect(page.find(c => c.type === 'picture-entity')).toMatchObject({ entity: 'camera.garage', name: 'Kamera' })
-    expect(page.find(c => c.type === 'custom:ad-group-heading')).toMatchObject({ title: 'Garage', path: 'area-garage' })
-    expect(cards(views.find(v => v.path === 'area-garage')!).some(c => c.type === 'picture-entity')).toBe(true)
+    const camerasCard = page.find(c => c.type === 'custom:ad-cameras')!
+    expect(camerasCard.cameras.map((c: { name: string }) => c.name)).toEqual(['Haustür', 'Terrasse', 'Einfahrt', 'Esszimmer', 'Flur'])
+    expect(page.find(c => c.type === 'picture-entity')).toBeUndefined()
+    // On the room page the doorbell is one camera, with its device's name
+    const door = cards(views.find(v => v.path === 'area-eingangstur')!).filter(c => c.type === 'picture-entity')
+    expect(door).toHaveLength(1)
+    expect(door[0]).toMatchObject({ entity: 'camera.haustur_standardauflosung' })
     const hass = createHass(true)
     const ruled = await generateDashboard({ type: 'custom:auto-dashboard', users: { [hass.user!.id]: { hide_pages: ['energy', 'maintenance', 'cameras'] } } }, hass)
     expect(ruled.views.map(v => v.path)).not.toContain('cameras')
@@ -470,5 +475,42 @@ describe('face', () => {
     const face = await navFace({ face: {} })
     expect(face.appliances.map((a: { kind: string }) => a.kind)).toContain('dishwasher')
     expect(await navFace({ face: {}, hide_domains: ['appliance'] })).not.toHaveProperty('appliances')
+  })
+})
+
+describe('cameras', () => {
+  const hass = createHass(true)
+  const cams = findCameras(hass, Object.values(hass.states).filter(e => e.entity_id.startsWith('camera.')))
+  const door = cams.find(c => c.name === 'Haustür')!
+
+  it('one camera per device, the sub stream rather than the main stream or the snapshots', () => {
+    expect(cams.filter(c => c.entity.startsWith('camera.haustur'))).toHaveLength(1)
+    expect(door.entity).toBe('camera.haustur_standardauflosung')
+    expect(door.area).toBe('eingangstur')
+  })
+
+  it('knows what each sensor of the device detects, and leaves out the sleep state', () => {
+    expect(Object.fromEntries(door.detections!.map(d => [d.entity, d.kind]))).toEqual({
+      'binary_sensor.haustur_person': 'person', 'binary_sensor.haustur_paket': 'package',
+      'binary_sensor.haustur_besucher': 'visitor', 'binary_sensor.haustur_bewegung': 'motion',
+    })
+    expect(cams.find(c => c.name === 'Esszimmer')!.detections).toBeUndefined()
+  })
+
+  it('takes the floodlight of the camera and the lights of its room', () => {
+    expect(door.lights).toEqual(['light.haustur'])
+    expect(cams.find(c => c.name === 'Terrasse')!.lights).toEqual(['light.terrasse_flutlicht'])
+  })
+
+  it('counts each switch to on once, and drops motion beside a detection that tells more', () => {
+    const since = Date.UTC(2026, 10, 8)
+    const at = (min: number) => since / 1000 + min * 60
+    const history = {
+      'binary_sensor.haustur_bewegung': [{ s: 'off', lu: at(0) }, { s: 'on', lu: at(600) }, { s: 'off', lu: at(601) }, { s: 'on', lu: at(700) }, { s: 'off', lu: at(701) }],
+      'binary_sensor.haustur_paket': [{ s: 'off', lu: at(0) }, { s: 'on', lu: at(600.5) }, { s: 'off', lu: at(602) }],
+      'binary_sensor.haustur_person': [{ s: 'on', lu: at(0) }, { s: 'off', lu: at(10) }, { s: 'on', lu: at(800) }, { s: 'off', lu: at(800.5) }, { s: 'on', lu: at(801) }],
+    }
+    const found = detectionsFrom(history, [door], since)
+    expect(found.map(d => [d.kind, (d.at / 1000 - since / 1000) / 60])).toEqual([['person', 800], ['motion', 700], ['package', 600.5]])
   })
 })
