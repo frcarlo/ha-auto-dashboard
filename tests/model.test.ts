@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, isOutlet, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -410,5 +410,18 @@ describe('HA theme from the accent', () => {
   it('turns the built-in HA cards to the same glass as ours', () => {
     expect(haGlassVars('#14b8a6', true)['--ha-card-background']).toBe(paletteVars('#14b8a6', true)!['--ad-glass-bg'])
     expect(haGlassVars(undefined, false)['--ha-card-backdrop-filter']).toMatch(/^blur\(/)
+  })
+})
+
+describe('favorite rooms', () => {
+  it('tells rooms from devices by the dot of entity ids', () => {
+    expect(isRoomFavorite('kuche')).toBe(true)
+    expect(isRoomFavorite('light.kuche')).toBe(false)
+  })
+
+  it('replaces one kind and keeps the other where it was', () => {
+    const list = ['light.a', 'kuche', 'switch.b', 'bad']
+    expect(replaceFavorites(list, true, ['bad', 'flur'])).toEqual(['light.a', 'bad', 'switch.b', 'flur'])
+    expect(replaceFavorites(list, false, ['switch.b'])).toEqual(['switch.b', 'kuche', 'bad'])
   })
 })

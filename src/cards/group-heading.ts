@@ -57,6 +57,10 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     .act:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     /* "All off" with sockets among them: asked once more, in the alarm red */
     .act.ask { background: rgb(var(--ad-error)); color: #fff; }
+    /* Switched and waiting for HA */
+    .count.busy { opacity: 1; color: rgb(var(--ad-primary)); animation: ad-wait 0.8s ease-in-out infinite alternate; }
+    .count.failed { opacity: 1; color: rgb(var(--ad-error)); font-weight: 500; }
+    @media (prefers-reduced-motion: reduce) { .count.busy { animation: none; } }
   `]
 
   getGridOptions() {
@@ -138,7 +142,9 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
   protected render() {
     const c = this.config!
     const entities = this.entities
-    const count = this.countText(entities)
+    const ids = entities.map(e => e.entity_id)
+    const progress = ids.some(id => this.waiting(id)) ? 'busy' : ids.some(id => this.noAnswer(id)) ? 'failed' : ''
+    const count = progress ? t(this.hass, progress === 'busy' ? 'wait.switching' : 'wait.failed') : this.countText(entities)
     return html`<div class="wrap ${c.sub ? 'sub' : ''} ${c.minor ? 'minor' : ''}">
       <span class="title" role=${c.path ? 'link' : nothing} tabindex=${c.path ? '0' : nothing}
         @click=${() => c.path && this.navigate(c.path)}
@@ -148,7 +154,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
         ${c.path ? html`<ha-icon class="chev" icon="mdi:chevron-right"></ha-icon>` : nothing}
       </span>
       <span class="fill"></span>
-      ${count ? html`<span class="count">${count}</span>` : nothing}
+      ${count ? html`<span class="count ${progress}" role=${progress ? 'status' : nothing}>${count}</span>` : nothing}
       ${this.renderControl(entities)}
     </div>`
   }

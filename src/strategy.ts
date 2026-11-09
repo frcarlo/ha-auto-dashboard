@@ -3,7 +3,7 @@ import { normalizeConfig } from './config'
 import { faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
 import { t, type Key } from './i18n'
 import {
-  SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
+  SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities, isRoomFavorite,
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, socketReadings, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
@@ -234,21 +234,29 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const side = (cards: Card[], options: { widths?: number[]; align?: 'center' } = {}): Card[] =>
     cards.length > 1 ? [{ type: 'custom:ad-row', cards, ...options, ...look }] : cards
 
-  const favoritesSection = (entities: HassEntity[], areaName?: string): Section[] => entities.length ? [{
+  const favoritesSection = (cards: Card[], inRoom = false): Section[] => cards.length ? [{
     type: 'grid',
-    column_span: areaName ? 1 : MAX_COLUMNS,
-    cards: [
-      { type: 'custom:ad-group-heading', title: t(hass, 'favorites'), icon: 'mdi:star-outline', entities: [], ...look },
-      ...entities.map(e => tile(e, areaName)),
-    ],
+    column_span: inRoom ? 1 : MAX_COLUMNS,
+    cards: [{ type: 'custom:ad-group-heading', title: t(hass, 'favorites'), icon: 'mdi:star-outline', entities: [], ...look }, ...cards],
   }] : []
+  const roomCard = (area: (typeof areas)[number]): Card =>
+    ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })
+  // On Home the favorites in the user's order: devices as tiles, rooms as room cards
+  const homeFavorites = (config.favorites ?? []).flatMap((id): Card[] => {
+    if (isRoomFavorite(id)) {
+      const area = areas.find(a => a.area_id === id)
+      return area ? [roomCard(area)] : []
+    }
+    const entity = favorites.find(e => e.entity_id === id)
+    return entity ? [tile(entity)] : []
+  })
   const roomSections = (area: (typeof areas)[number]): Section[] => {
     const room = config.rooms?.[area.area_id] ?? {}
     // Own cards are plain Lovelace configs, passed through untouched
     const own = (slot: CardSlot) => room.cards?.[slot] ?? []
     return [
       ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
-      ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id), area.name),
+      ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map(e => tile(e, area.name)), true),
       ...cameraInfos.filter(c => c.area === area.area_id).map((c): Section => ({ type: 'grid', cards: [cameraCard(hass.states[c.entity]!, area.name, c.name)] })),
       ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }] })),
       ...(appliances.some(a => a.area === area.area_id) ? [{
@@ -304,7 +312,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         // Each shows only while its appliance runs, waits to be emptied or needs someone
         ...appliances.map(a => applianceCard(a, true)),
       ]),
-      ...(singleRoom ? [] : favoritesSection(favorites)),
+      ...(singleRoom ? [] : favoritesSection(homeFavorites)),
       // One room: its content right on the home page instead of a single room card
       ...(singleRoom ? roomSections(singleRoom) : []),
       // Span 2: room cards (6 columns) sit 4-up on wide screens and 2-up on phones
@@ -313,7 +321,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         column_span: 2,
         cards: [
           heading(group.floor?.name ?? (floors.length > 1 ? t(hass, 'other_rooms') : t(hass, 'rooms'))),
-          ...group.areas.map(area => ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })),
+          ...group.areas.map(roomCard),
         ],
       })),
     ]),
@@ -354,6 +362,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       pages: navItems.filter(i => i.path !== 'home').map(({ path, icon, label }) => ({ path, icon, label })),
       ...(rule?.face === false ? { face_locked: true } : {}),
       ...(areaIds ? { areas: areaIds } : {}), ...hideOpts,
+      rooms: areas.map(a => a.area_id),
     }]),
   ])
 

@@ -64,6 +64,21 @@ export const tokens = css`
     :host([glass]) { --ad-glass-bg: var(--ad-surface); --ad-glass-blur: none; }
   }
 
+  /* Switched and waiting for HA: a short bar runs along the bottom edge until the new state arrives */
+  .sweep {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; height: 3px; overflow: hidden; pointer-events: none;
+    background: rgba(var(--ad-primary), 0.18);
+  }
+  .sweep::before {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; border-radius: 3px;
+    background: rgb(var(--ad-primary)); animation: ad-sweep 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  @keyframes ad-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  @keyframes ad-wait { to { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) {
+    .sweep::before { animation: none; width: 100%; opacity: 0.6; }
+  }
+
   ha-icon { --mdc-icon-size: 20px; display: inline-flex; }
 
   /* Round status button: tonal when idle, flat in its color when active */

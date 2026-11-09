@@ -71,6 +71,10 @@ const cards: any[] = []
 hass.callService = callService
 async function callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>) {
   toast(`${domain}.${service} → ${JSON.stringify(target?.entity_id)}`)
+  // ?slow=3000 answers after 3 s like a sluggish Zigbee device, ?slow=never not at all
+  const slow = params.get('slow')
+  if (slow === 'never') return
+  if (slow) await new Promise(resolve => setTimeout(resolve, Number(slow)))
   hass = { ...applyService(hass, domain, service, data, target), callService }
   for (const card of cards) card.hass = hass
 }

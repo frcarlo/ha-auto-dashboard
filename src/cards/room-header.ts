@@ -76,6 +76,11 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     .tile .label { font-size: 14px; font-weight: 600; }
     .tile .sub { font-size: 12px; opacity: 0.65; white-space: nowrap; }
     .tile .sub.ask { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
+    /* Switched and waiting for HA */
+    .tile .sub.busy { color: rgb(var(--ad-primary)); opacity: 1; }
+    .tile .sub.failed { color: rgb(var(--ad-error)); opacity: 1; font-weight: 500; }
+    .tile .pilot.busy { animation: ad-wait 0.8s ease-in-out infinite alternate; }
+    @media (prefers-reduced-motion: reduce) { .tile .pilot.busy { animation: none; } }
     .tile .btn { width: 30px; height: 30px; }
     .thermo { padding-bottom: 14px; }
     .thermo .now { font-size: 28px; font-weight: 200; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; cursor: pointer; }
@@ -192,7 +197,9 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     const sub = covers
       ? t(this.hass, awning ? 'n_out' : 'n_open', { n: active.length })
       : entities.length > 1 ? t(this.hass, 'n_of_on', { n: active.length, total: entities.length }) : (active.length ? t(this.hass, 'on') : t(this.hass, 'off'))
-    const text = html`<div class="text"><span class="label">${label}</span><span class="sub">${sub}</span></div>`
+    const progress = ids.some(id => this.waiting(id)) ? 'busy' : ids.some(id => this.noAnswer(id)) ? 'failed' : ''
+    const text = html`<div class="text"><span class="label">${label}</span><span class="sub ${progress}">${progress
+      ? t(this.hass, progress === 'busy' ? 'wait.switching' : 'wait.failed') : sub}</span></div>`
     const armedText = html`<div class="text"><span class="label">${label}</span><span class="sub ask">${t(this.hass, 'off.again')}</span></div>`
 
     if (covers) {
@@ -233,7 +240,8 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
       @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && toggle()}>
       ${key === 'light' && share ? html`<div class="light-fill" style="--level:${share}%" ?data-full=${share >= 100}></div>` : nothing}
       ${armed ? armedText : text}
-      <span class="pilot ${active.length ? 'on' : ''}" style="--pilot: ${key === 'light' ? 'var(--ad-warning)' : 'var(--ad-primary)'}"></span>
+      ${progress === 'busy' ? html`<span class="sweep"></span>` : nothing}
+      <span class="pilot ${active.length ? 'on' : ''} ${progress}" style="--pilot: ${key === 'light' ? 'var(--ad-warning)' : 'var(--ad-primary)'}"></span>
     </div>`
   }
 

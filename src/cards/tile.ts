@@ -110,6 +110,17 @@ export class AdTile extends BaseCard<TileConfig> {
     .light .state { font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .light.on .state { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
     @media (prefers-reduced-motion: reduce) { .light .rise, .light .bulb { transition: none; } }
+    /* Waiting for HA: a ring turns around the lamp button */
+    .light.busy .bulb::after {
+      content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid transparent;
+      border-top-color: rgb(var(--ad-primary)); animation: ad-turn 0.9s linear infinite;
+    }
+    @keyframes ad-turn { to { transform: rotate(1turn); } }
+    @media (prefers-reduced-motion: reduce) { .light.busy .bulb::after { animation: none; border-color: rgba(var(--ad-primary), 0.6); } }
+    /* No new state came back */
+    .failed .state, .light.on.failed .state, .failed .sub { color: rgb(var(--ad-error)); opacity: 1; font-weight: 500; }
+    /* A narrow light square: the message may take two lines */
+    .light.busy .state, .light.failed .state { white-space: normal; line-height: 1.2; }
 
     /* Thermostat */
     .mode { font-size: 12px; white-space: nowrap; opacity: 0.7; }
@@ -342,13 +353,21 @@ export class AdTile extends BaseCard<TileConfig> {
     this.call('light', 'turn_on', entity.entity_id, { brightness_pct: this.dragLevel })
   }
 
+  /** Switched and waiting for HA, or the switch got no answer */
+  private get progress(): 'busy' | 'failed' | '' {
+    const id = this.config!.entity
+    return this.waiting(id) ? 'busy' : this.noAnswer(id) ? 'failed' : ''
+  }
+
   private wrap(classes: string, content: unknown, extra: { style?: string; label?: string } = {}) {
-    return html`<div class="card ${classes}" role="button" tabindex="0" aria-label=${extra.label ?? this.label}
+    const progress = this.progress
+    return html`<div class="card ${classes} ${progress}" role="button" tabindex="0" aria-label=${extra.label ?? this.label}
+      aria-busy=${progress === 'busy' ? 'true' : nothing}
       style=${extra.style ?? ''}
       @pointerdown=${this.onDown} @pointermove=${this.onMove} @pointerup=${this.onUp}
       @pointerleave=${() => !this.drag?.active && this.tap.up()} @pointercancel=${this.onUp}
       @click=${this.onClick} @keydown=${this.onKey} @contextmenu=${(e: Event) => e.preventDefault()}
-    >${content}</div>`
+    >${content}${progress === 'busy' ? html`<span class="sweep"></span>` : nothing}</div>`
   }
 
   private stop = (e: Event) => e.stopPropagation()
@@ -380,7 +399,9 @@ export class AdTile extends BaseCard<TileConfig> {
     const dimmable = this.dimmable(entity)
     const level = this.dragLevel ?? (on ? (dimmable ? this.brightness(entity) : 100) : 0)
     const lit = level > 0
-    const state = !lit ? t(this.hass, 'off') : dimmable ? `${level} %` : t(this.hass, 'on')
+    const progress = this.progress
+    const state = progress ? t(this.hass, progress === 'busy' ? 'wait.switching' : 'wait.failed')
+      : !lit ? t(this.hass, 'off') : dimmable ? `${level} %` : t(this.hass, 'on')
     return this.wrap(`light ${lit ? 'on' : ''} ${this.drag?.active ? 'dragging' : ''} ${off}`, html`
       ${lit ? html`<div class="rise" ?data-full=${level >= 100}></div>` : nothing}
       <span class="bulb"><ha-icon icon=${entityIcon({ ...entity, state: lit ? 'on' : 'off' })}></ha-icon></span>
@@ -506,7 +527,7 @@ export class AdTile extends BaseCard<TileConfig> {
     const fresh = this.fresh === entity.state
     const deviceClass = (entity.attributes.device_class as string | undefined) ?? ''
     const cue = domain === 'binary_sensor' && active && fresh ? (RING.includes(deviceClass) ? 'ring' : POP.includes(deviceClass) ? 'pop' : '') : ''
-    const pending = lock && ['locking', 'unlocking', 'opening'].includes(entity.state) ? 'pending' : ''
+    const pending = (lock && ['locking', 'unlocking', 'opening'].includes(entity.state)) || this.progress === 'busy' ? 'pending' : ''
     const latch = lock && fresh && !pending ? (active ? 'latch' : 'unlatch') : ''
     // A socket only goes off after a second, deliberate tap on "Switch off"
     const asking = this.asking && entity.state === 'on'
@@ -515,6 +536,7 @@ export class AdTile extends BaseCard<TileConfig> {
       <div class="row-text">
         <span class="label">${this.label}</span>
         ${runnable ? nothing : html`<span class="sub">${asking ? t(this.hass, 'off.ask')
+          : this.progress ? t(this.hass, this.progress === 'busy' ? 'wait.switching' : 'wait.failed')
           : [this.hass!.formatEntityState?.(entity) ?? entity.state, this.reading(this.config!.energy)].filter(Boolean).join(' · ')}</span>`}
       </div>
       ${!asking && this.reading(this.config!.power) ? html`<span class="watts" @click=${(e: Event) => { e.stopPropagation(); this.moreInfo(this.config!.power!) }}

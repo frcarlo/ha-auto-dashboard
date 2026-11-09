@@ -3,6 +3,7 @@ import type { CardLook, HassEntity, HomeAssistant } from '../types'
 import { domainOf } from '../presentation'
 import { canControl, canOpen } from '../access'
 import { applyPalette, paletteVars } from '../styles/palette'
+import { hasFailed, isWaiting, settle, subscribe, track } from '../pending'
 
 export interface BaseConfig extends CardLook {
   type: string
@@ -34,8 +35,24 @@ export abstract class BaseCard<C extends BaseConfig = BaseConfig> extends LitEle
     return []
   }
 
+  private stopPending?: () => void
+
+  connectedCallback() {
+    super.connectedCallback()
+    // A switch started anywhere (a heading, a room) shows on every card watching that entity
+    this.stopPending = subscribe(ids => {
+      if (this.config && this.hass && ids.some(id => this.watched().includes(id))) this.requestUpdate()
+    })
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    this.stopPending?.()
+  }
+
   protected shouldUpdate(changed: PropertyValues<this>) {
     if (!this.config || !this.hass) return false
+    if (changed.has('hass')) settle(this.hass)
     if (changed.size > 1 || !changed.has('hass')) return true
     const old = changed.get('hass') as HomeAssistant | undefined
     if (!old || old.themes !== this.hass.themes || old.entities !== this.hass.entities || old.language !== this.hass.language) return true
@@ -80,8 +97,21 @@ export abstract class BaseCard<C extends BaseConfig = BaseConfig> extends LitEle
   }
 
   protected call(domain: string, service: string, entityId: string | string[], data: Record<string, unknown> = {}) {
-    if ([entityId].flat().some(id => !this.canControl(id))) return
-    return this.hass?.callService(domain, service, data, { entity_id: entityId })
+    const ids = [entityId].flat()
+    if (!this.hass || ids.some(id => !this.canControl(id))) return
+    const result = this.hass.callService(domain, service, data, { entity_id: entityId })
+    track(this.hass, domain, service, ids, data, result)
+    return result
+  }
+
+  /** The entity was switched and HA hasn't reported its new state yet. */
+  protected waiting(entityId: string) {
+    return isWaiting(entityId)
+  }
+
+  /** The last switch of the entity got no answer. */
+  protected noAnswer(entityId: string) {
+    return hasFailed(entityId)
   }
 
   protected toggle(entity: HassEntity) {

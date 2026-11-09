@@ -49,6 +49,8 @@ Using it: tap a room card to open the room page, double-tap to switch all lights
 
 **Tiles show the amount they control:** A light tile is a small square with a round lamp icon that glows amber while the light is on; warm light rises from the bottom as high as the lamp is bright. Dragging horizontally across the tile dims it (vertically the page keeps scrolling), and so do the arrow keys. Covers show their slats as far closed as they are. Thermostats have a cold-to-warm strip at the bottom with a dot (measured) and a line (target), percentages like humidity a fill bar. Switches and sensors are rows like a wall switch: the whole row switches, and the pilot light on the right shows the state.
 
+**While switching:** If a device takes longer than a moment to report its new state (Zigbee, Matter, a cloud), its tile says "Switching …", a bar runs along its bottom edge and a ring turns around the lamp. The same shows for everything a group heading, a room's quick tile or a double tap on a room card switched. As soon as HA reports the new state it goes away. If nothing comes back within 15 seconds, or HA refuses the command, the tile says "No response" for a few seconds.
+
 ## Installation
 
 Requires Home Assistant 2026.5 or newer.
@@ -100,7 +102,7 @@ strategy:
   hide_pages: [cameras]    # hide pages for everyone, admins included: lights | climate | covers | security | cameras | music | calendar | lists | energy | maintenance
   hide_domains: [fan, scene]
   hide_labels: [utility]   # label IDs, see below
-  favorites: [light.hallway, lock.front_door]  # on Home and at the top of their room
+  favorites: [light.hallway, kitchen, lock.front_door]  # devices on Home and at the top of their room; an area id (kitchen) puts that room card among them
   scenes: [scene.movie, script.good_night]     # row on Home
   todo_lists: [todo.shopping_list]             # only these lists on the "Lists" page, otherwise all (new ones too)
   outdoor_areas: [garden]  # don't count for indoor climate; without a weather card their average is "Outside"
@@ -183,7 +185,7 @@ strategy:
 
 ### Own settings
 
-Every user, including one without admin rights like a wall tablet's, opens the **Settings** page with the cog next to the clock on Home. There they choose, for themselves only, theme, accent color, frosted glass, the nav bar position, the face and when it appears, which pages are in their bar, and their favorites: search, add, reorder, remove. The starting point is what the dashboard has set; "Reset everything" goes back to it.
+Every user, including one without admin rights like a wall tablet's, opens the **Settings** page with the cog next to the clock on Home. There they choose, for themselves only, theme, accent color, frosted glass, the nav bar position, the face and when it appears, which pages are in their bar, and their favorites, devices and rooms: search, add, reorder, remove. The starting point is what the dashboard has set; "Reset everything" goes back to it.
 
 - Settings are stored in HA with the user (not in the browser), per dashboard, and only what differs from the dashboard. They apply on every device the user is signed in on and survive a cleared cache. If the admin later changes something the user hasn't touched, the change reaches them.
 - Rooms, rights and the pages the admin hid stay as the admin set them. If the admin set `face: false` for a user, that user can't switch the face on.

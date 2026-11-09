@@ -3,7 +3,7 @@
 import { css, html, nothing, type TemplateResult } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
-import { allEntities, entityAreaId, hideOf } from '../model'
+import { allEntities, entityAreaId, hideOf, isRoomFavorite } from '../model'
 import { entityIcon, entityName, shortName } from '../presentation'
 import { loadPersonal, personalDiff, savePersonal, type PersonalSettings } from '../personal'
 import { tokens } from '../styles/tokens'
@@ -19,6 +19,8 @@ interface SettingsConfig extends BaseConfig {
   /** The admin switched the face off for this user */
   face_locked?: boolean
   areas?: string[]
+  /** The rooms shown on this dashboard, in their order, for favorite rooms */
+  rooms?: string[]
   hide_domains?: string[]
   hide_labels?: string[]
   hide_entities?: string[]
@@ -222,21 +224,30 @@ export class AdSettings extends BaseCard<SettingsConfig> {
 
   private describe(id: string) {
     const hass = this.hass!
+    if (isRoomFavorite(id)) {
+      const room = hass.areas[id]
+      return { icon: room?.icon ?? 'mdi:texture-box', name: room?.name ?? id, area: this.l('set.room') }
+    }
     const e = hass.states[id]
     const area = hass.areas[entityAreaId(hass, id) ?? '']?.name
-    return { e, name: e ? shortName(entityName(e), area) : id, area }
+    return { icon: entityIcon(e), name: e ? shortName(entityName(e), area) : id, area }
   }
 
-  /** Entities the user can see on this dashboard and has not picked yet, matching the search by name, room or id */
+  /**
+   * Rooms and entities the user can see on this dashboard and has not picked yet, matching the search by name,
+   * room or id. Rooms come first: "Küche" finds the kitchen before everything in it.
+   */
   private get results() {
     const q = this.query.trim().toLowerCase()
     if (!q) return []
     const picked = new Set(this.draft?.favorites ?? [])
     const c = this.config!
-    return allEntities(this.hass!, hideOf(c), c.areas?.length ? c.areas : undefined)
-      .filter(e => !picked.has(e.entity_id))
-      .map(e => ({ id: e.entity_id, ...this.describe(e.entity_id) }))
-      .filter(r => `${r.name} ${r.area ?? ''} ${r.id}`.toLowerCase().includes(q))
+    const rooms = (c.rooms ?? []).filter(id => this.hass!.areas[id])
+    const entities = allEntities(this.hass!, hideOf(c), c.areas?.length ? c.areas : undefined).map(e => e.entity_id)
+    return [...rooms, ...entities]
+      .filter(id => !picked.has(id))
+      .map(id => ({ id, ...this.describe(id) }))
+      .filter(r => `${r.name} ${isRoomFavorite(r.id) ? '' : r.area ?? ''} ${r.id}`.toLowerCase().includes(q))
       .slice(0, MAX_RESULTS)
   }
 
@@ -255,7 +266,7 @@ export class AdSettings extends BaseCard<SettingsConfig> {
       ${list.length ? html`<ul class="favs">${list.map((id, i) => {
         const r = this.describe(id)
         return html`<li>
-          <ha-icon icon=${entityIcon(r.e)}></ha-icon>
+          <ha-icon icon=${r.icon}></ha-icon>
           <span class="name"><span>${r.name}</span>${r.area ? html`<span class="area">${r.area}</span>` : nothing}</span>
           <button class="icon-btn" aria-label=${this.l('set.up')} ?disabled=${i === 0} @click=${() => move(i, -1)}><ha-icon icon="mdi:chevron-up"></ha-icon></button>
           <button class="icon-btn" aria-label=${this.l('set.down')} ?disabled=${i === list.length - 1} @click=${() => move(i, 1)}><ha-icon icon="mdi:chevron-down"></ha-icon></button>
@@ -266,7 +277,7 @@ export class AdSettings extends BaseCard<SettingsConfig> {
         @input=${(e: Event) => { this.query = (e.target as HTMLInputElement).value }}>
       ${this.query.trim() ? html`<div class="results">${results.length ? results.map(r => html`
         <button class="result" @click=${() => { this.set({ favorites: [...list, r.id] }); this.query = '' }}>
-          <ha-icon icon=${entityIcon(r.e)}></ha-icon>
+          <ha-icon icon=${r.icon}></ha-icon>
           <span class="name"><span>${r.name}</span>${r.area ? html`<span class="area">${r.area}</span>` : nothing}</span>
           <ha-icon class="add" icon="mdi:plus-circle-outline"></ha-icon>
         </button>`) : html`<span class="empty">${this.l('set.no_match')}</span>`}</div>` : nothing}

@@ -2,7 +2,7 @@
 // Only admins can edit dashboards, so only admins reach it. Uses HA's theme variables to fit the dialog.
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
-import { HIDE_LABEL, hideOf } from './model'
+import { HIDE_LABEL, hideOf, isRoomFavorite, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
 import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
@@ -267,6 +267,16 @@ export class AdStrategyEditor extends LitElement {
       @change=${(e: Event) => onChange((e.target as HTMLInputElement).value.trim() || undefined)}>`
   }
 
+  /** Several areas, HA's picker when it is loaded, else one area id per line. */
+  private areasPicker(value: string[] | undefined, onChange: (v: string[]) => void) {
+    if (customElements.get('ha-selector')) {
+      return html`<ha-selector .hass=${this.hass} .value=${value ?? []} .selector=${{ area: { multiple: true } }}
+        @value-changed=${(e: CustomEvent) => onChange((e.detail.value as string[] | undefined) ?? [])}></ha-selector>`
+    }
+    return html`<textarea .value=${(value ?? []).join('\n')} placeholder="area_id"
+      @change=${(e: Event) => onChange((e.target as HTMLTextAreaElement).value.split(/[\s,]+/).filter(Boolean))}></textarea>`
+  }
+
   /** One area, HA's picker when it is loaded, else its id. */
   private areaPicker(value: string | undefined, onChange: (v: string | undefined) => void) {
     if (customElements.get('ha-selector')) {
@@ -387,7 +397,10 @@ export class AdStrategyEditor extends LitElement {
   private renderHome() {
     const c = this.config
     return html`
-        ${this.field(this.l('favorites'), this.entityPicker(c.favorites, undefined, favorites => this.change({ favorites })), this.l('ed.favorites_hint'))}
+        ${this.field(this.l('favorites'), this.entityPicker(c.favorites?.filter(id => !isRoomFavorite(id)), undefined,
+          next => this.change({ favorites: replaceFavorites(c.favorites ?? [], false, next) })), this.l('ed.favorites_hint'))}
+        ${this.field(this.l('ed.favorite_rooms'), this.areasPicker(c.favorites?.filter(isRoomFavorite),
+          next => this.change({ favorites: replaceFavorites(c.favorites ?? [], true, next) })), this.l('ed.favorite_rooms_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
         ${this.field(this.l('ed.calendars'), this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}

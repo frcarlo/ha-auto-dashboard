@@ -196,6 +196,14 @@ describe('room page, favorites and scenes', () => {
     expect(flur.filter(c => c.entity === 'light.flur')).toHaveLength(2)
   })
 
+  it('favorite rooms sit among the favorites on Home as room cards, in the given order', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', favorites: ['kuche', 'light.flur', 'gibts_nicht'] }, createHass(true))
+    const section = (views[0]!.sections as { cards: Record<string, any>[] }[]).find(s => s.cards[0]?.icon === 'mdi:star-outline')!
+    expect(section.cards.slice(1).map(c => [c.type, c.area ?? c.entity])).toEqual([['custom:ad-room-card', 'kuche'], ['custom:ad-tile', 'light.flur']])
+    // A room's own page doesn't list itself as a favorite
+    expect(cards(views.find(v => v.path === 'area-kuche')!).some(c => c.type === 'custom:ad-room-card')).toBe(false)
+  })
+
   it('picked scenes replace the automatic list', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', scenes: ['script.gute_nacht'] }, createHass(true))
     expect(cards(views[0]!).find(c => c.type === 'custom:ad-scenes')!.entities).toEqual(['script.gute_nacht'])

@@ -42,6 +42,9 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
     .chip ha-icon { --mdc-icon-size: 13px; opacity: 0.7; }
     /* Rooms with nothing to show still get their icon instead of an empty card */
     .area-icon { --mdc-icon-size: 26px; opacity: 0.35; }
+    /* Lights switched by a double tap, waiting for HA */
+    .dot.busy { animation: ad-wait 0.8s ease-in-out infinite alternate; }
+    @media (prefers-reduced-motion: reduce) { .dot.busy { animation: none; } }
     .room { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
     .lit .room { opacity: 0.9; }
     .temp-ctl { display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
@@ -78,8 +81,8 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
     this.call('light', anyOn ? 'turn_off' : 'turn_on', lights.map(l => l.entity_id))
   }
 
-  private dot(entity: HassEntity, icon: string, color: string, title: string) {
-    return html`<button class="dot ${color}" title=${title} aria-label=${title}
+  private dot(entity: HassEntity, icon: string, color: string, title: string, busy = false) {
+    return html`<button class="dot ${color} ${busy ? 'busy' : ''}" title=${title} aria-label=${title}
       @pointerdown=${(e: Event) => e.stopPropagation()}
       @click=${(e: Event) => { e.stopPropagation(); this.moreInfo(entity.entity_id) }}>
       <ha-icon icon=${icon}></ha-icon>
@@ -113,6 +116,7 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
     const step = (climate?.attributes.target_temp_step as number | undefined) ?? 0.5
     const climateOk = climate && !isUnavailable(climate) && target !== undefined
     const lightsOn = s.lights.filter(l => l.state === 'on').length
+    const busy = s.lights.some(l => this.waiting(l.entity_id))
 
     return html`<div class="card ${lit ? 'lit' : ''}" role="button" tabindex="0" aria-label=${area.name}
       @pointerdown=${this.tap.down} @pointerup=${this.tap.up} @pointerleave=${this.tap.up}
@@ -122,7 +126,7 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
         <div class="dots">
           ${!s.lights.length && !climate && !s.status.length ? html`<ha-icon class="area-icon" icon=${area.icon ?? 'mdi:texture-box'}></ha-icon>` : nothing}
           ${s.lights.length ? this.dot(s.lights[0]!, lit ? 'mdi:lightbulb' : 'mdi:lightbulb-outline', lit ? 'warning' : '',
-            s.lights.length > 1 ? `${lightsOn}/${s.lights.length}` : entityName(s.lights[0])) : nothing}
+            s.lights.length > 1 ? `${lightsOn}/${s.lights.length}` : entityName(s.lights[0]), busy) : nothing}
           ${climate ? this.dot(climate, HVAC_ICONS[climate.state] ?? 'mdi:thermostat', hvacColor(climate.state) === 'muted' ? '' : hvacColor(climate.state),
             this.hass!.formatEntityState?.(climate) ?? climate.state) : nothing}
           ${this.statusDots(s, climate).map(e => {
@@ -148,6 +152,7 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
           @click=${() => this.call('climate', 'set_temperature', climate.entity_id, { temperature: Math.round((target! - step) / step) * step })}>
           <ha-icon icon="mdi:minus"></ha-icon></button>
       </div>` : nothing}
+      ${busy ? html`<span class="sweep"></span>` : nothing}
     </div>`
   }
 }

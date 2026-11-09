@@ -432,8 +432,22 @@ export function quickGroups(entities: HassEntity[]): { key: QuickKey; entities: 
 }
 
 /** Picked favorites that exist and lie in the dashboard's rooms; favorites without a room always count. */
+/** A favorite naming a room instead of a device: entity ids always have a dot, area ids never. */
+export const isRoomFavorite = (id: string) => !id.includes('.')
+
+/**
+ * Replaces the rooms (or the devices) among the favorites with a new list, keeping the other kind where it was:
+ * an editor with one picker per kind still keeps the user's order.
+ */
+export function replaceFavorites(list: string[], rooms: boolean, next: string[]): string[] {
+  const queue = [...next]
+  const kept = list.flatMap(id => isRoomFavorite(id) !== rooms ? [id] : queue.length ? [queue.shift()!] : [])
+  return [...kept, ...queue]
+}
+
 export function favoriteEntities(hass: HomeAssistant, ids: string[] = [], areaIds?: string[]): HassEntity[] {
   return ids
+    .filter(id => !isRoomFavorite(id))
     .map(id => hass.states[id])
     .filter((e): e is HassEntity => !!e)
     .filter(e => {
