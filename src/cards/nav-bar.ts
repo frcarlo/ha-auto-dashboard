@@ -3,6 +3,7 @@
 import { css, html, render } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { tokens } from '../styles/tokens'
+import { t } from '../i18n'
 import type { NavPosition } from '../types'
 import { PALETTE_VARS, haGlassVars, haThemeVars } from '../styles/palette'
 import './face'
@@ -41,6 +42,16 @@ const barStyles = css`
   }
   a ha-icon { --mdc-icon-size: 22px; }
   a[aria-current=page] { color: rgb(var(--ad-primary)); background: rgba(var(--ad-primary), 0.12); }
+  /* On a phone the bar keeps five pages; the rest open above it from "More" */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+    padding: 8px; border-radius: 24px;
+    background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur, blur(30px) saturate(140%)); -webkit-backdrop-filter: var(--ad-glass-blur, blur(30px) saturate(140%));
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28), inset 0 1px 0 var(--ad-glass-hi);
+  }
+  :host([pos=top]) .sheet { bottom: auto; top: calc(100% + 8px); }
+  .sheet a { padding: 12px 0; font-size: 11px; }
+  a.more[aria-expanded=true] { color: rgb(var(--ad-on-surface)); background: rgba(var(--ad-on-surface), 0.1); }
 
   :host([pos=top]) { bottom: auto; top: calc(var(--header-height, 56px) + env(safe-area-inset-top) + 12px); }
   /* Side rails need room next to the cards; narrower screens keep the bottom bar */
@@ -56,6 +67,12 @@ const barStyles = css`
 
 let bar: HTMLElement | undefined
 let users = 0
+/** Whether the pages behind "More" are open */
+let moreOpen = false
+/** Below this width the bar is a phone's: five pages and "More" */
+const PHONE = 768
+/** Up to this many pages fit a phone's bar without "More" */
+const PHONE_SLOTS = 6
 /** The face, one for the whole dashboard like the bar, so switching pages keeps its wait running */
 let face: AdFace | undefined
 
@@ -138,8 +155,14 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     }
   `]
 
-  private onLocation = () => this.paint()
+  private onLocation = () => { moreOpen = false; this.paint() }
   private onResize = () => this.paint()
+  /** A tap anywhere outside the bar closes "More" */
+  private onPointer = (e: Event) => {
+    if (!moreOpen || (bar && e.composedPath().includes(bar))) return
+    moreOpen = false
+    this.paint()
+  }
 
   /** HA's sections view this card lives in, found across shadow roots. */
   private findView(): HTMLElement | undefined {
@@ -184,6 +207,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     window.addEventListener('location-changed', this.onLocation)
     window.addEventListener('popstate', this.onLocation)
     window.addEventListener('resize', this.onResize)
+    document.addEventListener('pointerdown', this.onPointer, true)
     // HA may move an unchanged card into a rebuilt view; nothing re-renders then, so place the rail again
     if (this.hasUpdated) this.paint()
   }
@@ -193,6 +217,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     window.removeEventListener('location-changed', this.onLocation)
     window.removeEventListener('popstate', this.onLocation)
     window.removeEventListener('resize', this.onResize)
+    document.removeEventListener('pointerdown', this.onPointer, true)
     // Defer, so switching views (old card leaves, new one joins) keeps the bar and the room in place
     users--
     setTimeout(() => {
@@ -245,14 +270,27 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     // A bare dashboard URL shows the first view
     const active = currentView() || this.config.items[0]?.path
     const dashboard = location.pathname.split('/')[1]
+    const items = this.config.items
+    // Side rails only stand at the side from 1024px on; below that every bar runs across
+    const phone = window.innerWidth < PHONE && items.length > PHONE_SLOTS
+    const shown = phone ? items.slice(0, PHONE_SLOTS - 1) : items
+    const rest = phone ? items.slice(PHONE_SLOTS - 1) : []
+    if (!phone) moreOpen = false
+    const link = (item: NavItem) => html`
+      <a href="/${dashboard}/${item.path}" aria-current=${active === item.path ? 'page' : 'false'}
+        @click=${(e: Event) => { e.preventDefault(); moreOpen = false; this.navigate(item.path); this.paint() }}>
+        <ha-icon icon=${item.icon}></ha-icon>${item.label}
+      </a>`
     render(html`
       <style>${tokens.cssText}${barStyles.cssText}</style>
+      ${moreOpen ? html`<div class="sheet">${rest.map(link)}</div>` : ''}
       <nav>
-        ${this.config.items.map(item => html`
-          <a href="/${dashboard}/${item.path}" aria-current=${active === item.path ? 'page' : 'false'}
-            @click=${(e: Event) => { e.preventDefault(); this.navigate(item.path) }}>
-            <ha-icon icon=${item.icon}></ha-icon>${item.label}
-          </a>`)}
+        ${shown.map(link)}
+        ${rest.length ? html`<a href="#" class="more" role="button" aria-expanded=${moreOpen}
+          aria-current=${rest.some(i => i.path === active) ? 'page' : 'false'}
+          @click=${(e: Event) => { e.preventDefault(); moreOpen = !moreOpen; this.paint() }}>
+          <ha-icon icon="mdi:dots-horizontal"></ha-icon>${t(this.hass, 'more')}
+        </a>` : ''}
       </nav>`, bar.shadowRoot)
   }
 

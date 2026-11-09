@@ -407,6 +407,14 @@ export function createHass(dark: boolean): HomeAssistant {
           media_content_type: 'music', thumbnail: c.image, can_play: true, can_expand: c.media_type !== 'track',
         })) } as T
       }
+      // A user's own settings, kept in the browser here; HA keeps them per user on the server
+      if (msg.type === 'frontend/get_user_data') {
+        try { return { value: JSON.parse(localStorage.getItem(`mock:${msg.key}`) ?? 'null') } as T } catch { return { value: null } as T }
+      }
+      if (msg.type === 'frontend/set_user_data') {
+        try { msg.value == null ? localStorage.removeItem(`mock:${msg.key}`) : localStorage.setItem(`mock:${msg.key}`, JSON.stringify(msg.value)) } catch { /* tests: no storage */ }
+        return null as T
+      }
       if (msg.type === 'history/history_during_period') return cameraHistory(Date.parse(String(msg.start_time)), msg.entity_ids as string[]) as T
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [

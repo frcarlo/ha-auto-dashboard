@@ -173,6 +173,16 @@ strategy:
 - `areas`, `floors` und `hide_pages` gelten zusätzlich zu den Filtern des Dashboards.
 - Was jemand nicht bedienen darf, erscheint ohne Schalter und Knöpfe. HAs Detail-Dialog öffnet sich dafür ebenfalls nicht, sonst ließe sich darüber schalten. Reine Anzeigen wie Sensoren öffnen weiter ihre Infos.
 
+### Eigene Einstellungen
+
+Jeder Nutzer, auch einer ohne Admin-Rechte wie der eines Wandtablets, öffnet über das Zahnrad neben der Uhr auf der Startseite die Seite **Einstellungen**. Dort wählt er nur für sich Farbschema, Akzentfarbe, Milchglas, die Position der Navigationsleiste, das Zifferblatt und wann es kommt, welche Seiten in seiner Leiste stehen, und seine Favoriten: suchen, hinzufügen, umsortieren, entfernen. Ausgangspunkt ist, was das Dashboard eingestellt hat; „Alles auf Standard“ geht dorthin zurück.
+
+- Gespeichert wird in HA beim Nutzer (nicht im Browser), je Dashboard, und nur, was vom Dashboard abweicht. Die Einstellungen gelten damit auf jedem Gerät, mit dem der Nutzer angemeldet ist, und bleiben nach einem geleerten Cache erhalten. Ändert der Admin später etwas, das der Nutzer nicht angefasst hat, kommt die Änderung bei ihm an.
+- Räume, Rechte und die vom Admin ausgeblendeten Seiten bleiben, wie der Admin sie festgelegt hat. Hat der Admin für einen Nutzer `face: false` gesetzt, kann der Nutzer das Zifferblatt nicht einschalten.
+- `settings: false` in der Nutzerregel (im Editor: Nutzer → „Eigene Einstellungen erlauben“) nimmt einem Nutzer die Seite; dann gilt das Dashboard, wie der Admin es eingestellt hat.
+
+Auf dem Handy zeigt die Navigationsleiste höchstens fünf Seiten und dahinter „Mehr“; die übrigen öffnen sich darüber.
+
 **Wichtig:** Das ist keine Sicherheitsfunktion. HA kennt keine Rechte pro Raum oder Gerät. Wer angemeldet ist, kann über andere Dashboards, die Einstellungen oder die API weiterhin alles schalten. Die Regeln eignen sich für Kinder-Tablets, Gäste und Wandpanels, nicht zum Schutz gegen jemanden, der es darauf anlegt. Wer nur dieses Dashboard sehen soll, bekommt in HA keine Admin-Rechte, und die anderen Dashboards werden über „Nur für Admins sichtbar“ ausgeblendet.
 
 **Ausblenden per Label:** Entities mit dem Label `ad_hide` erscheinen nie. Mit `hide_labels` kommen eigene Labels dazu. Dabei zählt das Label am Entity, am Gerät und am Bereich: Ein Gerät mit dem Label verschwindet mit allen seinen Entities, ein Bereich mit allen Geräten darin. Die Label-ID steht unter Einstellungen → Bereiche, Labels & Zonen → Labels; im Editor wählt man die Labels einfach an.

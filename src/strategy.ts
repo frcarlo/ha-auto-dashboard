@@ -1,5 +1,6 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { normalizeConfig } from './config'
+import { faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
 import { t, type Key } from './i18n'
 import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
@@ -44,11 +45,16 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   // HA runs the strategy in each browser with that browser's user, so every user gets their own dashboard.
   const rule = ruleFor(baseConfig.users, hass.user)
   const access = accessOf(rule)
-  const config: StrategyConfig = {
+  // The user's own settings (look, face, pages, favorites) on top, unless the admin keeps this user to the rule
+  const allowPersonal = personalAllowed(rule)
+  const personal = allowPersonal ? await loadPersonal(hass, dashboardPath()) : undefined
+  const config: StrategyConfig = withPersonal({
     ...baseConfig,
     areas: intersect(baseConfig.areas, rule?.areas),
     floors: intersect(baseConfig.floors, rule?.floors),
-  }
+  }, personal)
+  // Pages the user chose not to see: left out of the nav bar and the views, still offered on the settings page
+  const ownHidden = new Set<string>(personal?.hide_pages ?? [])
   const look = {
     ...(config.theme ? { theme: config.theme } : {}),
     ...(config.glass ? { glass: true } : {}),
@@ -195,7 +201,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(hasLists ? [{ path: 'lists', icon: 'mdi:clipboard-list-outline', label: t(hass, 'todos') }] : []),
   ]
   // The face sits with the nav bar, which is on every page; a user's own face wins over the dashboard's
-  const faceConfig = rule?.face === false ? undefined : rule?.face || config.face ? { ...config.face, ...(rule?.face || {}) } : undefined
+  const faceConfig = faceFor(config, rule, personal)
   const face: FaceSettings | undefined = faceConfig ? {
     after: Math.max(0, Number(faceConfig.after ?? 120) || 0),
     style: faceConfig.style ?? 'clock',
@@ -206,10 +212,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     // Washer, dryer, dishwasher: the face shows them while they run or wait to be emptied
     ...(appliances.length ? { appliances } : {}),
   } : undefined
-  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems, position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...(face ? { face } : {}), ...look }])
+  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems.filter(i => !ownHidden.has(i.path)), position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...(face ? { face } : {}), ...look }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
-  const has = (path: string) => domainPages.some(p => p.path === path) ? path : undefined
+  const has = (path: string) => domainPages.some(p => p.path === path) && !ownHidden.has(path) ? path : undefined
   const scopeOpts = { ...hideOpts, ...(areaIds ? { areas: areaIds } : {}), ...look }
   const subview = (path: string, title: string, icon: string, sections: Section[]): View => ({
     type: 'sections', title, path, icon, subview: true, back_path: `/${dashboardPath()}/home`, max_columns: MAX_COLUMNS,
@@ -261,7 +267,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     max_columns: MAX_COLUMNS,
     sections: withNav([
       fullWidth([
-        { type: 'custom:ad-header', variant: 'home', ...(weather ? { weather: false } : {}), ...look },
+        { type: 'custom:ad-header', variant: 'home', ...(weather ? { weather: false } : {}), ...(allowPersonal ? { settings: 'settings' } : {}), ...look },
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
           links: {
@@ -326,6 +332,20 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       type: 'custom:ad-music', players: musicPlayers, nav_position: position, ...look,
       // A Sonos or Cast speaker lists every Spotify account in its media browser, even while nothing plays
       ...(musicPlayers.some(p => p.spotify) ? { spotify_browsers: findSpotifyBrowsers(hass) } : {}),
+    }]),
+  ])
+
+  // The user's own settings: what the dashboard has set is the starting point, and what "reset" goes back to
+  const settingsView = subview('settings', t(hass, 'settings'), 'mdi:cog-outline', [
+    fullWidth([{
+      type: 'custom:ad-settings', dashboard: dashboardPath(), ...look,
+      base: {
+        theme: baseConfig.theme ?? 'auto', glass: !!baseConfig.glass, primary_color: isHexColor(baseConfig.primary_color) ? baseConfig.primary_color : undefined,
+        nav_position: baseConfig.nav_position ?? 'bottom', face: faceFor(baseConfig, rule) ?? false, favorites: baseConfig.favorites ?? [],
+      },
+      pages: navItems.filter(i => i.path !== 'home').map(({ path, icon, label }) => ({ path, icon, label })),
+      ...(rule?.face === false ? { face_locked: true } : {}),
+      ...(areaIds ? { areas: areaIds } : {}), ...hideOpts,
     }]),
   ])
 
@@ -438,7 +458,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const background = config.background_image?.trim() ? imageBackground(config.background_image, config.theme)
     : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
-  const views = [home, ...domainViews, ...(hasMusic ? [musicView] : []), ...(calendars.length ? [calendarView] : []), ...(hasLists ? [listsView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...roomViews]
+  const views = [home, ...domainViews, ...(hasMusic ? [musicView] : []), ...(calendars.length ? [calendarView] : []), ...(hasLists ? [listsView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...(allowPersonal ? [settingsView] : []), ...roomViews]
+    .filter(view => !ownHidden.has(String(view.path)))
   return {
     title: config.title ?? t(hass, 'home'),
     views: background ? views.map((view): View => ({ ...view, background })) : views,

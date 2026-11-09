@@ -503,6 +503,8 @@ export class AdStrategyEditor extends LitElement {
         PAGES.map(p => ({ id: p, label: this.l(p) })),
         rule.hide_pages, hide_pages => this.changeRule(key, { hide_pages: hide_pages as PagePath[] })))}
       ${this.field(this.l('ed.face'), this.faceFields(rule.face, face => this.changeRule(key, { face }), true))}
+      ${this.toggle(this.l('ed.settings_allowed'), rule.settings !== false, on => this.changeRule(key, { settings: on ? undefined : false }))}
+      <span class="hint">${this.l('ed.settings_allowed_hint')}</span>
       ${this.field(this.l('ed.rule_rooms'), house({
         hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel,
         marks: id => rule.areas?.includes(id) ? ['only'] : [],

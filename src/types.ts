@@ -126,6 +126,8 @@ export interface UserRule {
   hide_pages?: PagePath[]
   /** full (default), no_critical: no locks, alarm panels or bulk actions like "all off", read_only: nothing can be switched */
   access?: Access
+  /** false: the user can't change their own look, face, pages and favorites on the settings page */
+  settings?: boolean
 }
 
 export type NavPosition = 'bottom' | 'top' | 'left' | 'right'

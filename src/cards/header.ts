@@ -19,6 +19,8 @@ interface HeaderConfig extends BaseConfig {
   action?: HeaderAction
   /** Weather next to the clock: an entity, or false while the weather card shows it */
   weather?: string | false
+  /** Home: the path of the user's own settings page, opened by the cog beside the clock */
+  settings?: string
 }
 
 export class AdHeader extends BaseCard<HeaderConfig> {
@@ -36,6 +38,11 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     .weather { display: flex; align-items: center; gap: 6px; font-size: 13px; opacity: 0.75; }
     .weather ha-icon { --mdc-icon-size: 22px; }
     .right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .clockrow { display: flex; align-items: center; gap: 8px; }
+    .gear { all: unset; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; opacity: 0.55; transition: opacity 0.2s ease, background 0.2s ease; }
+    .gear:hover { opacity: 1; background: rgba(var(--ad-on-surface), 0.08); }
+    .gear:focus-visible { outline: 2px solid rgb(var(--ad-primary)); opacity: 1; }
+    .gear ha-icon { --mdc-icon-size: 20px; }
     .action {
       all: unset; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; cursor: pointer;
       border-radius: 999px; background: var(--ad-surface); box-shadow: var(--ad-shadow); font-size: 13px;
@@ -100,7 +107,11 @@ export class AdHeader extends BaseCard<HeaderConfig> {
         <h1>${this.greeting(now.getHours())}${name ? `, ${name}` : ''}</h1>
       </div>
       <div class="right">
-        <span class="clock">${now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}</span>
+        <div class="clockrow">
+          <span class="clock">${now.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}</span>
+          ${this.config!.settings ? html`<button class="gear" aria-label=${t(this.hass, 'settings')} title=${t(this.hass, 'settings')}
+            @click=${() => this.navigate(this.config!.settings!)}><ha-icon icon="mdi:cog-outline"></ha-icon></button>` : nothing}
+        </div>
         ${weather ? html`<span class="weather" role="button" tabindex="0" @click=${() => this.moreInfo(weather.entity_id)}>
           <ha-state-icon .hass=${this.hass} .stateObj=${weather}></ha-state-icon>
           ${this.number(weather.attributes.temperature, 0)}${weather.attributes.temperature_unit ?? '°'}

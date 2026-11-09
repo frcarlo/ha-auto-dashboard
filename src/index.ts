@@ -3,6 +3,7 @@ import { AdTile } from './cards/tile'
 import { AdRoomCard } from './cards/room-card'
 import { AdStatusBar } from './cards/status-bar'
 import { AdActivity } from './cards/activity'
+import { AdSettings } from './cards/settings'
 import { AdHeader } from './cards/header'
 import { AdNavBar } from './cards/nav-bar'
 import { AdGroupHeading } from './cards/group-heading'
@@ -79,6 +80,7 @@ define('ad-calendar', AdCalendar)
 define('ad-lists', AdLists)
 define('ad-cameras', AdCameras)
 define('ad-activity', AdActivity)
+define('ad-settings', AdSettings)
 define('ad-music', AdMusic)
 define('ad-strategy-editor', AdStrategyEditor)
 define('ad-room-settings', AdRoomSettings)
