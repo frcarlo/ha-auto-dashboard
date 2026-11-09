@@ -10,6 +10,7 @@ import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { findCameras } from './cameras'
+import { findSchools, schoolIds, type School } from './school'
 import { resolvePopups } from './popups'
 import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
@@ -117,7 +118,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   // Appliances and TVs get their own cards; what those cards show leaves the room page's groups
   const appliances = findAppliances(hass, config.appliances, hide, areaIds)
   const tvs = findTvs(hass, hide, areaIds)
+  // Pupils with a WebUntis timetable: a card on Home and in their room, their many sensors in it instead of as tiles
+  const schools = findSchools(hass, hide, areaIds)
   const claimed = new Set([
+    ...schoolIds(schools),
     ...appliances.flatMap(a => applianceEntities(hass, a)),
     ...[...sockets.values()].flatMap(s => s.readings),
     ...tvs.flatMap(tv => [tv.entity, ...(tv.remote ? [tv.remote] : []), ...tv.others]),
@@ -190,7 +194,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   // Calendars rarely belong to a room, so the page takes them from the whole house
   const calendars = config.hide_domains?.includes('calendar') || !pageAllowed('calendar') ? []
     : config.calendars?.length ? favoriteEntities(hass, config.calendars).filter(ofDomain('calendar'))
-    : allEntities(hass, hide).filter(ofDomain('calendar'))
+    // A school timetable has a card of its own; on the household's calendar its lessons would bury everything else
+    : allEntities(hass, hide).filter(e => ofDomain('calendar')(e) && !claimed.has(e.entity_id))
   // Lists, like calendars, belong to the household: picked ones in their order, else every visible one.
   // Admins get the page without lists too, to add the first one.
   const listsPage = !config.hide_domains?.includes('todo') && pageAllowed('lists')
@@ -245,6 +250,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     column_span: inRoom ? 1 : MAX_COLUMNS,
     cards: [{ type: 'custom:ad-group-heading', title: t(hass, 'favorites'), icon: 'mdi:star-outline', entities: [], ...look }, ...cards],
   }] : []
+  const schoolCard = (school: School, full = false): Card => ({
+    type: 'custom:ad-school', school, ...(full ? { full: true } : school.area ? { path: areaPath(school.area) } : {}), ...look,
+  })
   const roomCard = (area: (typeof areas)[number]): Card =>
     ({ type: 'custom:ad-room-card', area: area.area_id, path: areaPath(area.area_id), ...hideOpts, ...look })
   // On Home the favorites in the user's order: devices as tiles, rooms as room cards
@@ -263,6 +271,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     return [
       ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map(e => tile(e, area.name)), true),
+      // A pupil's day: every lesson, cancelled and changed ones marked
+      ...schools.filter(s => s.area === area.area_id).map((s): Section => ({ type: 'grid', cards: [schoolCard(s, true)] })),
       ...cameraInfos.filter(c => c.area === area.area_id).map((c): Section => ({ type: 'grid', cards: [cameraCard(hass.states[c.entity]!, area.name, c.name)] })),
       ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }] })),
       ...(appliances.some(a => a.area === area.area_id) ? [{
@@ -292,6 +302,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         { type: 'custom:ad-header', variant: 'home', ...(weather ? { weather: false } : {}), ...(allowPersonal ? { settings: 'settings' } : {}), ...look },
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
+          // Cancelled and changed lessons as chips of their own
+          ...(schools.length ? { schools } : {}),
           links: {
             lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate'),
             battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
@@ -317,6 +329,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         ], { align: 'center' }),
         // Each shows only while its appliance runs, waits to be emptied or needs someone
         ...appliances.map(a => applianceCard(a, true)),
+        // The children's school day side by side: what's on now, or when school starts next time
+        ...side(schools.map(s => schoolCard(s))),
       ]),
       ...(singleRoom ? [] : favoritesSection(homeFavorites)),
       // One room: its content right on the home page instead of a single room card
@@ -406,7 +420,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         fullWidth([
           { type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look },
           // The home page's chips, counted for this room only
-          { type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look },
+          {
+            type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look,
+            ...(schools.some(s => s.area === area.area_id) ? { schools: schools.filter(s => s.area === area.area_id) } : {}),
+          },
         ]),
         ...roomSections(area),
       ]),

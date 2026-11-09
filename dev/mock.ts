@@ -66,7 +66,67 @@ const defs: Def[] = [
   ['binary_sensor.garage_rauch', 'off', { friendly_name: 'Garage Rauchmelder', device_class: 'smoke' }, 'garage'],
 ]
 
-type DeviceDef = { id: string; name: string; model?: string; area: string; platform?: string; entities: [entityId: string, state: string, attributes: Record<string, unknown>, platform?: string][] }
+type DeviceDef = { id: string; name: string; model?: string; area: string; platform?: string; entities: [entityId: string, state: string, attributes: Record<string, unknown>, platform?: string, translationKey?: string][] }
+
+// WebUntis: a pupil's timetable today and tomorrow, as lessons relative to the real clock
+interface MockLesson { start: Date; minutes: number; subject: string; short: string; room: string; teacher: string; cancelled?: boolean; roomChanged?: boolean; text?: string }
+const at = (offset: number, h: number, m: number) => { const d = new Date(); d.setDate(d.getDate() + offset); d.setHours(h, m, 0, 0); return d }
+const SLOTS: Array<[number, number]> = [[8, 0], [8, 45], [9, 55], [10, 40], [11, 45], [12, 30], [13, 35], [14, 20]]
+const day = (offset: number, plan: Array<[string, string, string, string, Partial<MockLesson>?]>, slots = SLOTS.map(([h, m]) => at(offset, h, m))): MockLesson[] =>
+  plan.map(([subject, short, room, teacher, extra], i) => ({ start: slots[i]!, minutes: 45, subject, short, room, teacher, ...extra }))
+const untisLessons: Record<string, MockLesson[]> = {
+  // School's out for today; tomorrow the last three lessons are cancelled, like the real Untis shows it
+  leni: [
+    ...day(0, [['Mathematik', 'M', 'K204', 'BER'], ['Mathematik', 'M', 'K204', 'BER'], ['Englisch', 'E', 'K108', 'SMI'], ['Biologie', 'BI', 'BI1', 'KRA'], ['Sport', 'SP', 'TH1', 'WEB'], ['Sport', 'SP', 'TH1', 'WEB']]),
+    ...day(1, [['Psychologie', 'PS', 'K206', 'KOS'], ['Musik', 'MU', 'MU2', 'HAR'], ['Physik', 'PH', 'PH4', 'DRE'], ['Physik', 'PH', 'PH4', 'DRE'], ['Deutsch', 'D', 'K310', 'MÖS'],
+      ['Deutsch', 'D', 'K310', 'MÖS', { cancelled: true }], ['Sozialwissenschaften', 'SW', 'K306', 'AKC', { cancelled: true }], ['Sozialwissenschaften', 'SW', 'K306', 'AKC', { cancelled: true }]]),
+  ],
+  // In the middle of the day: lessons around now, one in another room
+  tom: [
+    ...day(0, [['Deutsch', 'D', 'R12', 'LAN'], ['Kunst', 'KU', 'KU1', 'FEL'], ['Mathematik', 'M', 'R12', 'OTT', { roomChanged: true, text: 'Raumtausch' }], ['Erdkunde', 'EK', 'R14', 'HAH'], ['Englisch', 'E', 'R12', 'SMI']],
+      [-100, -55, -10, 35, 80].map(min => { const d = new Date(Date.now() + min * 60_000); d.setMinutes(Math.floor(d.getMinutes() / 5) * 5, 0, 0); return d })),
+    ...day(1, [['Englisch', 'E', 'R12', 'SMI'], ['Sachunterricht', 'SU', 'R12', 'LAN'], ['Musik', 'MU', 'MU1', 'HAR'], ['Religion', 'RE', 'R03', 'PAU'], ['Sport', 'SP', 'TH2', 'WEB']]),
+  ],
+}
+const end = (l: MockLesson) => new Date(l.start.getTime() + l.minutes * 60_000)
+const sameDate = (a: Date, offset: number) => a.toDateString() === at(offset, 12, 0).toDateString()
+const lessonAttrs = (l: MockLesson, code?: string) => ({
+  subject: l.short, subject_long: l.subject, start: l.start.toISOString(), end: end(l).toISOString(), room: l.room, room_changed: !!l.roomChanged,
+  teacher: l.teacher, teacher_changed: false, ...(code !== undefined ? { code } : { status: null }), text: l.text ?? null,
+})
+function untisDevice(key: string, name: string): DeviceDef {
+  const all = untisLessons[key]!
+  const held = (offset: number) => all.filter(l => sameDate(l.start, offset) && !l.cancelled)
+  const now = Date.now()
+  const current = all.find(l => !l.cancelled && l.start.getTime() <= now && end(l).getTime() > now)
+  const next = all.find(l => !l.cancelled && l.start.getTime() > now)
+  const iso = (d?: Date) => d?.toISOString() ?? 'unknown'
+  const list = (offset: number, pick: (l: MockLesson) => boolean, code: string) => {
+    const lessons = all.filter(l => sameDate(l.start, offset) && pick(l)).map(l => lessonAttrs(l, code))
+    return [String(lessons.length), { lessons, unit_of_measurement: 'lessons', state_class: 'measurement' }] as const
+  }
+  const id = (suffix: string) => `${suffix.split('.')[0]}.${key}_${suffix.split('.')[1]}`
+  return {
+    id: `dev-untis-${key}`, name, model: 'WebUntis', area: 'kinderzimmer', platform: 'untis', entities: [
+      [id('calendar.stundenplan'), 'off', { friendly_name: `${name} Stundenplan`, message: next?.subject }, 'untis', 'timetable'],
+      [id('sensor.aktuelle_stunde'), current?.subject ?? 'unknown', current ? lessonAttrs(current) : {}, 'untis', 'current_lesson'],
+      [id('sensor.nachste_stunde'), next?.subject ?? 'unknown', next ? lessonAttrs(next) : {}, 'untis', 'next_lesson'],
+      [id('sensor.schulbeginn_heute'), iso(held(0)[0]?.start), { device_class: 'timestamp' }, 'untis', 'today_start'],
+      [id('sensor.schulende_heute'), iso(held(0).length ? end(held(0).at(-1)!) : undefined), { device_class: 'timestamp' }, 'untis', 'today_end'],
+      [id('sensor.schulbeginn_morgen'), iso(held(1)[0]?.start), { device_class: 'timestamp' }, 'untis', 'tomorrow_start'],
+      [id('sensor.schulende_morgen'), iso(held(1).length ? end(held(1).at(-1)!) : undefined), { device_class: 'timestamp' }, 'untis', 'tomorrow_end'],
+      [id('sensor.ausfalle_heute'), ...list(0, l => !!l.cancelled, 'cancelled'), 'untis', 'cancelled_today'],
+      [id('sensor.ausfalle_morgen'), ...list(1, l => !!l.cancelled, 'cancelled'), 'untis', 'cancelled_tomorrow'],
+      [id('sensor.anderungen_heute'), ...list(0, l => !l.cancelled && (!!l.roomChanged || !!l.text), 'irregular'), 'untis', 'changed_today'],
+      [id('sensor.anderungen_morgen'), ...list(1, l => !l.cancelled && (!!l.roomChanged || !!l.text), 'irregular'), 'untis', 'changed_tomorrow'],
+    ],
+  }
+}
+/** The pupils' timetables as HA's calendar API returns them, cancelled lessons marked like the integration does */
+const untisEvents = (key: string) => (untisLessons[key] ?? []).map((l, i) => ({
+  uid: `untis-${key}-${i}`, summary: l.cancelled ? `❌ ${l.subject} (entfällt)` : l.subject, location: l.room, description: `Lehrer: ${l.teacher}`,
+  start: { dateTime: l.start.toISOString() }, end: { dateTime: end(l).toISOString() },
+}))
 
 const PROGRAMS = ['dishcare_dishwasher_program_eco_50', 'dishcare_dishwasher_program_auto_2', 'dishcare_dishwasher_program_quick_45']
 const ENUM = (options: string[]) => ({ device_class: 'enum', options })
@@ -150,6 +210,8 @@ export const musicDefs: Def[] = [
 ]
 
 const deviceDefs: DeviceDef[] = [
+  untisDevice('leni', 'Leni Carlo'),
+  untisDevice('tom', 'Tom Carlo'),
   // A Reolink doorbell: three streams, of which the page shows one, and its detections
   {
     id: 'dev-cam-haustur', name: 'Haustür', model: 'Reolink Video Doorbell', area: 'eingangstur', platform: 'reolink', entities: [
@@ -328,9 +390,9 @@ export function createHass(dark: boolean): HomeAssistant {
   const devices: HomeAssistant['devices'] = {}
   for (const d of deviceDefs) {
     devices[d.id] = { id: d.id, name: d.name, model: d.model ?? null, area_id: d.area }
-    for (const [entity_id, state, attributes, platform] of d.entities) {
+    for (const [entity_id, state, attributes, platform, translationKey] of d.entities) {
       states[entity_id] = { entity_id, state, attributes, last_changed: new Date(Date.now() - 20 * 60_000).toISOString() }
-      entities[entity_id] = { entity_id, device_id: d.id, platform: platform ?? d.platform, labels: [] }
+      entities[entity_id] = { entity_id, device_id: d.id, platform: platform ?? d.platform, labels: [], ...(translationKey ? { translation_key: translationKey } : {}) }
     }
   }
   for (const e of extras) {
@@ -356,6 +418,7 @@ export function createHass(dark: boolean): HomeAssistant {
       garage: { area_id: 'garage', name: 'Garage', icon: 'mdi:garage' },
       garten: { area_id: 'garten', name: 'Garten', icon: 'mdi:flower' },
       waschkeller: { area_id: 'waschkeller', name: 'Waschkeller', icon: 'mdi:washing-machine', floor_id: 'keller' },
+      kinderzimmer: { area_id: 'kinderzimmer', name: 'Kinderzimmer', icon: 'mdi:teddy-bear', floor_id: 'og' },
     },
     floors: {
       keller: { floor_id: 'keller', name: 'Keller', level: -1, icon: 'mdi:home-floor-b' },
@@ -581,6 +644,8 @@ function calendarStore() {
     ],
     'calendar.abfall': [allDay('Restmüll', 1), allDay('Papier', 8), allDay('Gelbe Tonne', 4), allDay('Bio', 11), allDay('Restmüll', 15)],
     'calendar.feiertage': [allDay('Martinstag', 5)],
+    'calendar.leni_stundenplan': untisEvents('leni'),
+    'calendar.tom_stundenplan': untisEvents('tom'),
   }
   return calendars
 }

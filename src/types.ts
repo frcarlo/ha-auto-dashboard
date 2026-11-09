@@ -19,6 +19,8 @@ export interface EntityRegistryEntry {
   display_precision?: number
   /** Integration that provides the entity, e.g. androidtv_remote */
   platform?: string
+  /** The integration's own key for what the entity is, the same in every language (e.g. untis' next_lesson) */
+  translation_key?: string | null
 }
 
 export interface DeviceRegistryEntry {

@@ -67,10 +67,10 @@ describe('filters and nav position', () => {
 
   it('floors limits rooms, pages and the status bar to those floors', async () => {
     const { title, views } = await generateDashboard({ type: 'custom:auto-dashboard', floors: ['og'] }, createHass(true))
-    expect(views.filter(v => String(v.path).startsWith('area-')).map(v => v.path)).toEqual(['area-bad', 'area-schlafzimmer'])
+    expect(views.filter(v => String(v.path).startsWith('area-')).map(v => v.path)).toEqual(['area-bad', 'area-kinderzimmer', 'area-schlafzimmer'])
     expect(title).toBe('Zuhause')
     const home = cards(views[0]!)
-    expect(home.find(c => c.type === 'custom:ad-status-bar')!.areas).toEqual(['bad', 'schlafzimmer'])
+    expect(home.find(c => c.type === 'custom:ad-status-bar')!.areas).toEqual(['bad', 'kinderzimmer', 'schlafzimmer'])
     // The header greets without listing rooms
     expect(home.find(c => c.type === 'custom:ad-header')!.scope).toBeUndefined()
     const lights = views.find(v => v.path === 'lights')!
@@ -235,6 +235,7 @@ describe('groups by function and now playing', () => {
     expect(rows.map(r => [r.cards.map((c: Record<string, unknown>) => c.type), r.widths, r.align])).toEqual([
       [['custom:ad-weather', 'custom:ad-house-info'], [2, 1], undefined],
       [['custom:ad-now-playing', 'custom:ad-scenes'], undefined, 'center'],
+      [['custom:ad-school', 'custom:ad-school'], undefined, undefined],
     ])
     // Without scenes now playing stands alone
     const none = await generateDashboard({ type: 'custom:auto-dashboard', hide_domains: ['scene'] }, createHass(true))
@@ -473,6 +474,20 @@ describe('calendar page', () => {
     const page = views.find(v => v.path === 'calendar')!
     expect(cardsOf(page).find(c => c.type === 'custom:ad-calendar')!.entities).toEqual(['calendar.familie', 'calendar.abfall', 'calendar.feiertage'])
     expect(cardsOf(views[0]!).find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: { path: string }) => i.path)).toContain('calendar')
+  })
+
+  it('gives each pupil a school card on Home and in their room, and keeps the timetables off the calendar page', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const home = cardsOf(views[0]!)
+    const row = home.find(c => c.type === 'custom:ad-row' && c.cards.some((k: { type: string }) => k.type === 'custom:ad-school'))!
+    expect(row.cards.map((c: { school: { name: string }; path: string }) => [c.school.name, c.path])).toEqual([['Leni', 'area-kinderzimmer'], ['Tom', 'area-kinderzimmer']])
+    expect(home.find(c => c.type === 'custom:ad-status-bar')!.schools.map((s: { name: string }) => s.name)).toEqual(['Leni', 'Tom'])
+    const room = cardsOf(views.find(v => v.path === 'area-kinderzimmer')!)
+    expect(room.filter(c => c.type === 'custom:ad-school').map(c => [c.school.name, c.full])).toEqual([['Leni', true], ['Tom', true]])
+    // The sensors are in the card, not tiles of their own
+    expect(room.some(c => c.type === 'custom:ad-tile' && String(c.entity).includes('stunde'))).toBe(false)
+    const calendar = cardsOf(views.find(v => v.path === 'calendar')!).find(c => c.type === 'custom:ad-calendar')!
+    expect(calendar.entities).not.toContain('calendar.leni_stundenplan')
   })
 
   it('takes the picked calendars, and drops the page with hide_domains or a user rule', async () => {
