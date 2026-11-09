@@ -26,8 +26,12 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
       background: radial-gradient(ellipse 120% 90% at 0% 0%, rgba(var(--ad-warning), 0.28) 0%, transparent 70%);
     }
     .main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
-    .dots { display: flex; gap: 4px; overflow: hidden; }
-    .values { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+    /*
+     * Circles and readings that don't fit wrap onto a second line, which the fixed height hides: each one is
+     * either whole or gone, never cut off under the ± column.
+     */
+    .dots { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px 4px; height: 28px; overflow: hidden; }
+    .values { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 12px 6px; height: 26px; min-width: 0; overflow: hidden; }
     .values > * { flex-shrink: 0; }
     .values > ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
     .temp { font-size: 1.2rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
