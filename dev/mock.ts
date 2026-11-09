@@ -220,6 +220,15 @@ const deviceDefs: DeviceDef[] = [
       ['remote.tv_wohnzimmer', 'on', { friendly_name: 'TV-Wohnzimmer Remote' }],
     ],
   },
+  // A measuring plug: its power and energy belong on its tile, not under the room's sensors
+  {
+    id: 'dev-plug', name: 'Steckdose Kaffeemaschine', model: 'GRILLPLATS Plug', area: 'kuche', platform: 'matter', entities: [
+      ['switch.steckdose_kaffeemaschine', 'on', { friendly_name: 'Steckdose Kaffeemaschine', device_class: 'outlet' }],
+      ['sensor.steckdose_kaffeemaschine_leistung', '1240.5', { friendly_name: 'Steckdose Kaffeemaschine Leistung', device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' }],
+      ['sensor.steckdose_kaffeemaschine_energie', '12.48', { friendly_name: 'Steckdose Kaffeemaschine Energie', device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' }],
+      ['sensor.steckdose_kaffeemaschine_spannung', '231', { friendly_name: 'Steckdose Kaffeemaschine Spannung', device_class: 'voltage', unit_of_measurement: 'V' }],
+    ],
+  },
   // The same TV over ADB, which the dashboard leaves out
   {
     id: 'dev-tv-adb', name: 'TV-Wohnzimmer (ADB)', area: 'wohnzimmer', platform: 'androidtv', entities: [

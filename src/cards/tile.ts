@@ -6,7 +6,7 @@ import { css, html, nothing } from 'lit'
 import { keyed } from 'lit/directives/keyed.js'
 import { BaseCard, gestures, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { isAwning } from '../model'
+import { isAwning, isOutlet } from '../model'
 import { domainOf, entityIcon, entityName, hvacColor, isActive, isUnavailable, shortName, stateColor } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
@@ -16,6 +16,9 @@ interface TileConfig extends BaseConfig {
   entity: string
   /** Area name, stripped from the entity name when shown inside that area */
   area_name?: string
+  /** A socket's own power and energy sensors, shown on its row */
+  power?: string
+  energy?: string
 }
 
 const LARGE = ['light', 'climate', 'cover', 'media_player', 'sensor']
@@ -40,7 +43,10 @@ const POP = ['door', 'window', 'garage_door', 'opening']
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 export class AdTile extends BaseCard<TileConfig> {
-  static properties = { ...BaseCard.properties, dragLevel: { state: true }, shown: { state: true } }
+  static properties = { ...BaseCard.properties, dragLevel: { state: true }, shown: { state: true }, asking: { state: true } }
+  /** A socket that is on was tapped: the row asks before it switches off */
+  asking = false
+  private askTimer?: number
   /** Brightness while dragging, and until HA reports the new value */
   dragLevel?: number
   /** Cover position on screen while it counts toward the one HA reports */
@@ -136,6 +142,15 @@ export class AdTile extends BaseCard<TileConfig> {
     .row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .label { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sub { font-size: 12px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* A socket asking before it goes off: the question in amber, the button in the alarm red */
+    .row.asking .sub { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
+    /* A socket's current power, tappable for its history */
+    .watts { position: relative; z-index: 1; flex: none; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; opacity: 0.85; }
+    .off-btn {
+      all: unset; position: relative; z-index: 1; flex: none; cursor: pointer; padding: 7px 14px; border-radius: 999px;
+      background: rgb(var(--ad-error)); color: #fff; font-size: 13px; font-weight: 600;
+    }
+    .off-btn:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
 
     /* A change while on screen is marked once: presence sends a ring out of the pilot, an opening pops it,
        a lock's icon drops in or lifts. A lock still moving blinks until HA reports it done. */
@@ -179,7 +194,16 @@ export class AdTile extends BaseCard<TileConfig> {
   }
 
   protected watched() {
-    return [this.config!.entity]
+    const c = this.config!
+    return [c.entity, ...(c.power ? [c.power] : []), ...(c.energy ? [c.energy] : [])]
+  }
+
+  /** A reading formatted with its unit, or nothing while the sensor has no number */
+  private reading(id?: string) {
+    const e = id ? this.hass!.states[id] : undefined
+    if (!e || isUnavailable(e) || !Number.isFinite(Number(e.state))) return undefined
+    const { value, unit } = this.value(e)
+    return `${value} ${unit}`.trim()
   }
 
   protected willUpdate() {
@@ -200,6 +224,8 @@ export class AdTile extends BaseCard<TileConfig> {
     if (this.counting) cancelAnimationFrame(this.counting)
     this.counting = undefined
     this.shown = this.countTarget
+    window.clearTimeout(this.askTimer)
+    this.asking = false
   }
 
   private position(entity: HassEntity) {
@@ -240,6 +266,14 @@ export class AdTile extends BaseCard<TileConfig> {
   private onTap() {
     const entity = this.entity
     if (!entity || isUnavailable(entity)) return this.moreInfo(this.config!.entity)
+    // A tap while the row asks takes the question back
+    if (this.asking) return this.endAsk()
+    if (this.controllable && isOutlet(entity, this.hass) && entity.state === 'on') {
+      this.asking = true
+      window.clearTimeout(this.askTimer)
+      this.askTimer = window.setTimeout(() => this.endAsk(), 6000)
+      return
+    }
     const domain = domainOf(entity.entity_id)
     if (this.controllable && [...TOGGLES, 'scene', 'script'].includes(domain)) this.toggle(entity)
     else this.moreInfo(entity.entity_id)
@@ -318,6 +352,11 @@ export class AdTile extends BaseCard<TileConfig> {
   }
 
   private stop = (e: Event) => e.stopPropagation()
+
+  private endAsk() {
+    window.clearTimeout(this.askTimer)
+    this.asking = false
+  }
 
   protected render() {
     const entity = this.entity
@@ -469,12 +508,19 @@ export class AdTile extends BaseCard<TileConfig> {
     const cue = domain === 'binary_sensor' && active && fresh ? (RING.includes(deviceClass) ? 'ring' : POP.includes(deviceClass) ? 'pop' : '') : ''
     const pending = lock && ['locking', 'unlocking', 'opening'].includes(entity.state) ? 'pending' : ''
     const latch = lock && fresh && !pending ? (active ? 'latch' : 'unlatch') : ''
-    return this.wrap(`row ${lit ? 'on' : ''} ${off}`, html`
+    // A socket only goes off after a second, deliberate tap on "Switch off"
+    const asking = this.asking && entity.state === 'on'
+    return this.wrap(`row ${lit ? 'on' : ''} ${asking ? 'asking' : ''} ${off}`, html`
       ${keyed(entity.state, html`<ha-icon class=${latch} icon=${this.hass!.entities[entity.entity_id]?.icon ?? entityIcon(entity, active)}></ha-icon>`)}
       <div class="row-text">
         <span class="label">${this.label}</span>
-        ${runnable ? nothing : html`<span class="sub">${this.hass!.formatEntityState?.(entity) ?? entity.state}</span>`}
+        ${runnable ? nothing : html`<span class="sub">${asking ? t(this.hass, 'off.ask')
+          : [this.hass!.formatEntityState?.(entity) ?? entity.state, this.reading(this.config!.energy)].filter(Boolean).join(' · ')}</span>`}
       </div>
+      ${!asking && this.reading(this.config!.power) ? html`<span class="watts" @click=${(e: Event) => { e.stopPropagation(); this.moreInfo(this.config!.power!) }}
+        @pointerdown=${this.stop}>${this.reading(this.config!.power)}</span>` : nothing}
+      ${asking ? html`<button class="off-btn" @pointerdown=${this.stop}
+        @click=${(e: Event) => { e.stopPropagation(); this.endAsk(); this.call('switch', 'turn_off', entity.entity_id) }}>${t(this.hass, 'off.do')}</button>` : nothing}
       ${lock && this.controllable ? html`<button class="btn" aria-label=${t(this.hass, active ? 'do_unlock' : 'do_lock')} title=${t(this.hass, active ? 'do_unlock' : 'do_lock')}
         @pointerdown=${this.stop} @click=${(e: Event) => { e.stopPropagation(); this.toggle(entity) }}>
         <ha-icon icon=${active ? 'mdi:lock-open-variant-outline' : 'mdi:lock'}></ha-icon></button>` : nothing}

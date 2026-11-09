@@ -6,7 +6,7 @@ import { t } from '../i18n'
 import { canBulk } from '../access'
 import { isActive, isUnavailable } from '../presentation'
 import { tokens } from '../styles/tokens'
-import type { GroupControl } from '../model'
+import { isOutlet, type GroupControl } from '../model'
 import type { HassEntity } from '../types'
 
 interface GroupHeadingConfig extends BaseConfig {
@@ -23,6 +23,11 @@ interface GroupHeadingConfig extends BaseConfig {
 }
 
 export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
+  static properties = { ...BaseCard.properties, armed: { state: true } }
+  /** "All off" waiting for a second tap because sockets would go off */
+  armed = false
+  private armTimer?: number
+
   static styles = [tokens, css`
     :host { display: block; }
     .wrap { display: flex; align-items: baseline; gap: 10px; min-height: 40px; padding: 10px 4px 2px; }
@@ -50,6 +55,8 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     }
     .act:hover { background: rgba(var(--ad-on-surface), 0.12); }
     .act:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+    /* "All off" with sockets among them: asked once more, in the alarm red */
+    .act.ask { background: rgb(var(--ad-error)); color: #fff; }
   `]
 
   getGridOptions() {
@@ -74,8 +81,20 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     this.call('lock', 'unlock', locks.map(e => e.entity_id))
   }
 
-  private act(label: string, onClick: () => void) {
-    return html`<button class="act" @click=${onClick}>${label}</button>`
+  private act(label: string, onClick: () => void, ask = false) {
+    return html`<button class="act ${ask ? 'ask' : ''}" @click=${onClick}>${label}</button>`
+  }
+
+  /** Sockets among the lights or switches going off: the button asks once more before it acts */
+  private allOff(on: HassEntity[]) {
+    if (on.some(e => isOutlet(e, this.hass)) && !this.armed) {
+      this.armed = true
+      window.clearTimeout(this.armTimer)
+      this.armTimer = window.setTimeout(() => (this.armed = false), 4000)
+      return
+    }
+    this.armed = false
+    this.call('homeassistant', 'turn_off', on.map(e => e.entity_id))
   }
 
   private renderControl(entities: HassEntity[]) {
@@ -86,7 +105,7 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
         const on = entities.filter(e => e.state === 'on')
         // Something on: switch those off. All off: switch everything on.
         return html`<div class="ctl">${on.length
-          ? this.act(t(this.hass, 'all_off'), () => this.call('homeassistant', 'turn_off', on.map(e => e.entity_id)))
+          ? this.act(t(this.hass, this.armed ? 'off.all_ask' : 'all_off'), () => this.allOff(on), this.armed)
           : this.act(t(this.hass, 'all_on'), () => this.call('homeassistant', 'turn_on', ids))}</div>`
       }
       case 'cover':

@@ -28,7 +28,7 @@ export type { GroupKey } from './types'
 
 /** Order in which groups appear on a room page. */
 export const GROUP_ORDER: GroupKey[] = [
-  'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene',
+  'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene',
 ]
 
 /** Groups the security page collects. */
@@ -79,6 +79,8 @@ export function groupOf(entity: HassEntity): GroupKey | undefined {
   const domain = domainOf(entity.entity_id)
   if (domain === 'binary_sensor') return BINARY_GROUPS[deviceClassOf(entity) ?? '']
   if (domain === 'cover') return coverKind(entity)
+  // Sockets are devices of their own on a room page, apart from switches that are device settings
+  if (isOutlet(entity)) return 'outlet'
   if (domain === 'sensor') {
     // Plain text sensors and battery levels are noise on a room page
     if (deviceClassOf(entity) === 'battery') return undefined
@@ -348,12 +350,68 @@ export type QuickKey = 'light' | 'switch' | 'shading' | 'awning' | 'opening' | '
 const isDomain = (...domains: string[]) => (e: HassEntity) => domains.includes(domainOf(e.entity_id))
 
 /**
+ * A socket: a switch with the device class outlet, or one named like a socket or plug. Whatever hangs on it
+ * (a fridge, a computer, a router) must not lose power by a stray tap, so switching one off asks first.
+ */
+export function isOutlet(e: HassEntity, hass?: HomeAssistant) {
+  if (domainOf(e.entity_id) !== 'switch') return false
+  // A plug's settings are switches too: child lock, overheat alert, cloud connection, its LED
+  if (hass?.entities[e.entity_id]?.entity_category) return false
+  if (deviceClassOf(e) === 'outlet') return true
+  const words = `${e.entity_id} ${e.attributes.friendly_name ?? ''}`
+  if (PLUG_SETTING.test(words)) return false
+  return /steckdose|zwischenstecker|socket|outlet|plug/i.test(words)
+}
+
+/** Switches on a plug that set it up rather than switch the power */
+const PLUG_SETTING = /kindersicherung|child[_ ]?lock|overheat|overtemp|[ _]internet|cloud|[ _]led\b|indicator|restart|reboot/i
+
+/**
  * What may be switched together: lights, fans and sockets. Other switches are often device settings
  * (child lock, eco mode of a dishwasher) that must not flip with "all off".
  */
 export function bulkSwitchable(e: HassEntity) {
   const domain = domainOf(e.entity_id)
-  return domain === 'light' || domain === 'fan' || (domain === 'switch' && deviceClassOf(e) === 'outlet')
+  return domain === 'light' || domain === 'fan' || isOutlet(e)
+}
+
+/** What a measuring socket reports about the power through it */
+const SOCKET_READINGS = ['power', 'energy', 'voltage', 'current', 'frequency', 'power_factor', 'apparent_power', 'reactive_power']
+
+export interface SocketReading {
+  /** Current power in watts */
+  power?: string
+  /** Energy counter */
+  energy?: string
+  /** All the socket's own measurements, shown with the socket instead of under Sensors */
+  readings: string[]
+}
+
+/**
+ * Sockets with their own measurements, by switch: a plug reports power, energy, voltage and current as sensors
+ * of its device. The tile shows the power, and the room page leaves the single readings out. A power strip
+ * with several switches on one device keeps its readings apart, as they belong to the whole strip.
+ */
+export function socketReadings(hass: HomeAssistant): Map<string, SocketReading> {
+  const byDevice = new Map<string, string[]>()
+  for (const entry of Object.values(hass.entities)) {
+    if (entry.device_id) byDevice.set(entry.device_id, [...(byDevice.get(entry.device_id) ?? []), entry.entity_id])
+  }
+  const out = new Map<string, SocketReading>()
+  for (const ids of byDevice.values()) {
+    const states = ids.map(id => hass.states[id]).filter((e): e is HassEntity => !!e)
+    const outlets = states.filter(e => isOutlet(e, hass))
+    if (outlets.length !== 1) continue
+    const sensors = states.filter(e => domainOf(e.entity_id) === 'sensor' && SOCKET_READINGS.includes(deviceClassOf(e) ?? ''))
+    if (!sensors.length) continue
+    const ofClass = (c: string) => sensors.find(e => deviceClassOf(e) === c)?.entity_id
+    out.set(outlets[0]!.entity_id, {
+      ...(ofClass('power') ? { power: ofClass('power') } : {}),
+      ...(ofClass('energy') ? { energy: ofClass('energy') } : {}),
+      readings: sensors.map(e => e.entity_id),
+    })
+  }
+  return out
 }
 const isCover = (kind: ReturnType<typeof coverKind>) => (e: HassEntity) => domainOf(e.entity_id) === 'cover' && coverKind(e) === kind
 

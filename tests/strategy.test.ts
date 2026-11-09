@@ -169,6 +169,16 @@ describe('room page, favorites and scenes', () => {
     expect(cards(views.find(v => v.path === 'climate')!).some(c => c.type === 'custom:ad-activity')).toBe(false)
   })
 
+  it('sockets are a group of their own, each with its power and energy, and their readings leave the sensors', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const room = cards(views.find(v => v.path === 'area-kuche')!)
+    expect(room.find(c => c.type === 'custom:ad-group-heading' && c.title === 'Steckdosen')).toBeTruthy()
+    expect(room.find(c => c.entity === 'switch.steckdose_kaffeemaschine')).toMatchObject({
+      power: 'sensor.steckdose_kaffeemaschine_leistung', energy: 'sensor.steckdose_kaffeemaschine_energie',
+    })
+    expect(room.some(c => c.entity === 'sensor.steckdose_kaffeemaschine_spannung' || c.entity === 'sensor.steckdose_kaffeemaschine_leistung')).toBe(false)
+  })
+
   it('domain pages get one heading per room linking to the room', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const lights = cards(views.find(v => v.path === 'lights')!).filter(c => c.type === 'custom:ad-group-heading')

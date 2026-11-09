@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, floorsWithAreas, groupEntities, homeStatus, isOutlet, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -114,6 +114,20 @@ describe('roomSummary', () => {
     // The thermostat measures the room; it comes before loose sensors
     expect(summary.temperature).toMatchObject({ value: 21.4, entity: { entity_id: 'climate.wz' } })
     expect(summary.status.map(e => e.entity_id)).toEqual(['binary_sensor.wz_fenster'])
+  })
+})
+
+describe('isOutlet', () => {
+  it('knows sockets by device class or name, not other switches', () => {
+    expect(isOutlet(st('switch.kuehlschrank', 'on', { device_class: 'outlet' }))).toBe(true)
+    expect(isOutlet(st('switch.steckdose_am_lichtschalter', 'on', {}))).toBe(true)
+    expect(isOutlet(st('switch.x', 'on', { friendly_name: 'Shelly Plug S' }))).toBe(true)
+    expect(isOutlet(st('switch.kindersicherung', 'on', {}))).toBe(false)
+    expect(isOutlet(st('light.steckdose', 'on', {}))).toBe(false)
+    // A plug's own settings are no sockets
+    expect(isOutlet(st('switch.waschmaschine_child_lock', 'on', { friendly_name: 'Steckdose Waschmaschine Kindersicherung' }))).toBe(false)
+    expect(isOutlet(st('switch.shellyplug_s_internet', 'on', { friendly_name: 'shellyplug-s Internet' }))).toBe(false)
+    expect(isOutlet(st('switch.smart_switch_config_overtemp_enable', 'on', { friendly_name: 'Smart Plug Overheat alert' }))).toBe(false)
   })
 })
 

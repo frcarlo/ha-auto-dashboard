@@ -4,7 +4,7 @@ import { faceFor, loadPersonal, personalAllowed, withPersonal } from './personal
 import { t, type Key } from './i18n'
 import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities,
-  floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, type EnergyPrefs,
+  floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, socketReadings, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
@@ -80,8 +80,15 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const all = allEntities(hass, hide, areaIds)
   const position = config.nav_position ?? 'bottom'
 
-  const tile = (entity: HassEntity, areaName?: string): Card =>
-    ({ type: 'custom:ad-tile', entity: entity.entity_id, ...(areaName ? { area_name: areaName } : {}), ...look })
+  // A socket shows its power and energy on its tile; its single readings leave the room's sensors
+  const sockets = socketReadings(hass)
+  const tile = (entity: HassEntity, areaName?: string): Card => {
+    const socket = sockets.get(entity.entity_id)
+    return {
+      type: 'custom:ad-tile', entity: entity.entity_id, ...(areaName ? { area_name: areaName } : {}),
+      ...(socket?.power ? { power: socket.power } : {}), ...(socket?.energy ? { energy: socket.energy } : {}), ...look,
+    }
+  }
   // Heading with one control for the whole group (all lights of a room, all covers, ...)
   const groupHeading = (title: string, entities: HassEntity[], extra: Card = {}): Card => {
     const bulk = bulkControl(entities)
@@ -111,6 +118,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const tvs = findTvs(hass, hide, areaIds)
   const claimed = new Set([
     ...appliances.flatMap(a => applianceEntities(hass, a)),
+    ...[...sockets.values()].flatMap(s => s.readings),
     ...tvs.flatMap(tv => [tv.entity, ...(tv.remote ? [tv.remote] : []), ...tv.others]),
   ])
   const applianceCard = (appliance: (typeof appliances)[number], home = false): Card =>

@@ -4,7 +4,7 @@ import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { canBulk } from '../access'
-import { areaEntities, entityIndex, hideOf, quickGroups, roomSummary, type QuickKey, type Reading } from '../model'
+import { areaEntities, entityIndex, hideOf, isOutlet, quickGroups, roomSummary, type QuickKey, type Reading } from '../model'
 import { domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
@@ -23,7 +23,10 @@ const HVAC_ACTIONS = ['heating', 'cooling', 'drying', 'fan', 'idle', 'off']
 const SEND_DELAY = 700
 
 export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
-  static properties = { ...BaseCard.properties, pending: { state: true } }
+  static properties = { ...BaseCard.properties, pending: { state: true }, armed: { state: true } }
+  /** Quick tile waiting for a second tap before it switches sockets off */
+  armed?: QuickKey
+  private armTimer?: number
   /** Target temperature tapped in but not yet confirmed by HA */
   pending?: number
   private sendTimer?: number
@@ -72,6 +75,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     .tile .text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
     .tile .label { font-size: 14px; font-weight: 600; }
     .tile .sub { font-size: 12px; opacity: 0.65; white-space: nowrap; }
+    .tile .sub.ask { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
     .tile .btn { width: 30px; height: 30px; }
     .thermo { padding-bottom: 14px; }
     .thermo .now { font-size: 28px; font-weight: 200; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; cursor: pointer; }
@@ -189,6 +193,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
       ? t(this.hass, awning ? 'n_out' : 'n_open', { n: active.length })
       : entities.length > 1 ? t(this.hass, 'n_of_on', { n: active.length, total: entities.length }) : (active.length ? t(this.hass, 'on') : t(this.hass, 'off'))
     const text = html`<div class="text"><span class="label">${label}</span><span class="sub">${sub}</span></div>`
+    const armedText = html`<div class="text"><span class="label">${label}</span><span class="sub ask">${t(this.hass, 'off.again')}</span></div>`
 
     if (covers) {
       // The slats show how far the covers are closed on average, the awning fabric how far they are out
@@ -210,12 +215,24 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     // Lights fill the tile by the share that is on; sockets show a pilot light
     const share = entities.length ? Math.round((active.length / entities.length) * 100) : 0
     // Something on: switch those off. All off: switch everything on.
-    const toggle = () => allowed && this.call('homeassistant', active.length ? 'turn_off' : 'turn_on', active.length ? active.map(e => e.entity_id) : ids)
+    const toggle = () => {
+      if (!allowed) return
+      // Sockets going off take a second tap, so a fridge or router doesn't lose power by accident
+      if (active.some(e => isOutlet(e, this.hass)) && this.armed !== key) {
+        this.armed = key
+        window.clearTimeout(this.armTimer)
+        this.armTimer = window.setTimeout(() => (this.armed = undefined), 4000)
+        return
+      }
+      this.armed = undefined
+      this.call('homeassistant', active.length ? 'turn_off' : 'turn_on', active.length ? active.map(e => e.entity_id) : ids)
+    }
+    const armed = this.armed === key && active.length > 0
     return html`<div class="tile ${allowed ? '' : 'static'}" role=${allowed ? 'button' : nothing}
       tabindex=${allowed ? '0' : nothing} aria-pressed=${active.length > 0} aria-label="${label}: ${sub}" @click=${toggle}
       @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && toggle()}>
       ${key === 'light' && share ? html`<div class="light-fill" style="--level:${share}%" ?data-full=${share >= 100}></div>` : nothing}
-      ${text}
+      ${armed ? armedText : text}
       <span class="pilot ${active.length ? 'on' : ''}" style="--pilot: ${key === 'light' ? 'var(--ad-warning)' : 'var(--ad-primary)'}"></span>
     </div>`
   }
