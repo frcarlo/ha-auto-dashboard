@@ -2,65 +2,70 @@
 
 # HA Auto Dashboard
 
-Lovelace-Dashboard-Strategy, die das Dashboard aus Areas, Floors, Devices und Entities erzeugt. Idee wie bei Dwains Dashboard, aber ohne Blueprints, Wandtablet-Modus und Zusatzkarten. Die Optik kommt aus HArmony: Slate-Palette, Indigo-Akzent, Amber-Glow bei Licht, runde Status-Buttons.
+A Lovelace dashboard strategy that builds the whole dashboard from your areas, floors, devices and entities. The idea is the same as Dwains Dashboard, without blueprints and add-on cards. The look comes from HArmony: a slate palette, an indigo accent, an amber glow for lights and round status buttons.
 
-Ein ES-Modul (~140 KB, ~39 KB gzip), einzige Abhängigkeit ist Lit. Keine anderen Custom Cards nötig.
+One ES module (about 400 KB, 110 KB gzipped); its only dependency is Lit. No other custom cards are needed.
 
-## Was erzeugt wird
+The dashboard speaks German and English and follows the language set in Home Assistant.
 
-- **Zuhause**: Begrüßung, Uhrzeit, Wetter, Personen (zu Hause oder unterwegs) und Alarmanlage, Status-Chips (Licht an, offen, unverriegelt, heizt, spielt, Batterie < 20 %, nicht erreichbar; ein Tipp klappt die Liste auf), Innen- und Außenklima und aktueller Stromverbrauch, „Läuft gerade“, eine Zeile mit Szenen und Skripten, Favoriten, darunter eine Raumkarte pro Area, gruppiert nach Etage. Ab etwa 720 px Breite (Tablet, Desktop) stehen das Wetter und Innen/Strom nebeneinander, ebenso „Läuft gerade“ und die Szenen, die Personen sitzen vorne in der Reihe der Status-Chips; so beginnen die Räume schon auf dem ersten Bildschirm. Auf dem Handy steht alles untereinander.
-- **Raumseiten** (`area-<area_id>`, Subview): oben Temperatur, Luftfeuchte und, wenn der Raum genau ein Thermostat hat, Ist- und Solltemperatur mit −/+. Daneben Schnellkacheln „Licht 2 von 5 an“, „Steckdosen“ und je eine pro Rollo-Art, die alles im Raum auf einmal schalten. Darunter die Favoriten des Raums und die Gruppen Licht, Klima, Beschattung, Markisen, Fenster & Türen, Tore, Schlösser, Medien, Schalter, Auswahl, Bewegung & Anwesenheit, Sicherheit & Alarm, Sensoren, Szenen. Gruppen mit mehreren Lichtern, Steckdosen, Rollos oder Schlössern haben einen Sammelschalter in der Überschrift. Gemeinsam geschaltet werden nur Lichter, Ventilatoren und Schalter mit der Geräteklasse `outlet`; andere Schalter sind oft Geräteeinstellungen (Kindersicherung, Eco-Modus) und bleiben außen vor.
-- **Domain-Seiten**: Licht (mit „Alle aus“), Klima, Rollos (mit „Alle zu“, Beschattung und Markisen; hat ein Raum beides, bekommt jede Art ihre eigene Überschrift mit Hoch/Runter bzw. Ausfahren/Einfahren), Sicherheit (Fenster, Türen, Tore, Schlösser, Bewegung, Rauch- und Wassermelder). Nach Raum gruppiert, nur wenn es passende Entities gibt. Jede Raum-Überschrift führt zur Raumseite und hat einen Schalter mit „2/5“, bei Rollos auf/zu, bei Schlössern verriegeln/entriegeln. Entriegeln fragt immer erst nach.
-- **Kameras** (`cameras`, mit Eintrag in der Navigationsleiste): ein Standbild jeder Kamera, alle zehn Sekunden neu, darunter Name und letzte Erkennung („10:03 · Paket“, sonst „Ruhig“). Rechts daneben (auf schmalen Bildschirmen darunter) steht „Erkannt heute“: was die Kameras seit Mitternacht bemerkt haben, die neueste Erkennung groß. Die Erkennungen kommen aus den Sensoren der Kamera selbst (Person, Fahrzeug, Tier, Paket, Besucher/Klingel, Bewegung, etwa von Reolink). Bewegung direkt neben einer genaueren Erkennung zählt nicht extra, und wer eine Weile vor der Tür steht, zählt einmal. Ein Tipp auf eine Kamera oder eine Erkennung öffnet die Kamera groß und live, daneben ihre letzten Erkennungen, die Lichter am Gerät und im selben Raum zum Schalten und „Kamera öffnen“ für HAs eigenen Dialog. Unten wechseln Reiter zu den anderen Kameras. Eine Kamera mit mehreren Streams (Standard, Hochauflösung, Schnappschüsse) erscheint nur einmal, mit dem Standard-Stream. Die Kameras eines Raums stehen zusätzlich oben auf seiner Raumseite.
-- **Musik** (`music`, mit Eintrag in der Navigationsleiste, nur mit Music Assistant): aufgebaut wie die Musikseite in HArmony. Links Start, Suche, Radio und Lautsprecher, darunter die Playlists der Bibliothek; auf dem Handy werden daraus Reiter. „Start“ zeigt die zuletzt gespielten Playlists als Schnellauswahl, darunter zuletzt gespielte Alben und Playlists, Lieblingskünstler, Lieblingstitel und Sender. Ein Tipp auf eine Playlist, ein Album oder einen Künstler öffnet die Titel; ein Tipp auf einen Titel spielt die Playlist ab dort, das Menü daneben spielt als Nächstes, hängt an die Warteschlange an oder startet ein Radio dazu. „Suche“ findet Titel, Künstler, Alben, Playlists und Sender bei allen Diensten von Music Assistant. „Lautsprecher“ zeigt jeden Player mit dem, was er spielt, und seiner Lautstärke; ein Tipp wählt ihn, „Dazu“ und „Trennen“ gruppieren ihn mit dem gewählten. Unten liegt die Leiste mit Cover, Zufall, Zurück, Play/Pause, Weiter, Wiederholen, Fortschritt zum Springen, der Warteschlange (was läuft, was danach kommt), „Woanders weiterspielen“ und der Lautstärke. Welcher Lautsprecher gewählt ist, merkt sich jedes Gerät; ohne Wahl ist es der, der gerade spielt. Ein Tipp auf das Cover in der Leiste (oder auf das Mikrofon daneben) öffnet den großen Player: das Cover groß, Titel, Künstler und Album, daneben der Liedtext, der beim Abspielen mitläuft. Die gesungene Zeile steht hell in der Mitte, ein Tipp auf eine Zeile springt dorthin; wer selbst scrollt, hat ein paar Sekunden Ruhe. Die Liedtexte kommen wie in HArmony von LRCLIB (lrclib.net), direkt aus dem Browser. Dafür gehen Titel, Künstler, Album und Länge dorthin, aber nur, solange der große Player offen ist. Ein weiterer Tipp aufs Cover führt zurück. Music Assistant legt für Cast-Displays und Fernseher zusätzlich eine Dashboard-Entität an, die nichts abspielen kann; sie erscheint weder unter Lautsprecher noch als Fernseher. Oben auf „Start“ wählt man das Spotify-Konto, wie in HArmony; jedes Gerät merkt sich die Wahl. Dann stehen dessen Playlists in der Schnellauswahl und links in der Bibliothek, darüber „Zuletzt gehört“, Künstler, Alben, Lieblingssongs und Top-Künstler, darunter, was aus Music Assistant kommt. Durchgeblättert wird über einen Sonos- oder Cast-Lautsprecher, denn HAs eigene Spotify-Player zeigen ihre Bibliothek nur, solange auf ihnen etwas läuft; ohne einen solchen Lautsprecher gibt es keine Kontowahl. Abgespielt wird auf dem gewählten Lautsprecher über Music Assistant, Spotify-Playlists Titel für Titel (bis 100), so laufen auch private Playlists der anderen Konten und Listen wie „Lieblingssongs“. Die Spotify-Konten selbst stehen unter Lautsprecher und lassen sich dort steuern. Alles läuft über die Dienste von Music Assistant in HA, ohne eigenen Server; Das Bearbeiten von Warteschlange und Playlists aus HArmony gibt es deshalb nicht. `hide_pages: [music]` blendet die Seite aus, für alle oder unter `users` für einzelne Nutzer; `hide_domains: [media_player]` nimmt mit der Seite auch alle Mediaplayer aus den Räumen.
-- **Kalender** (`calendar`, mit Eintrag in der Navigationsleiste): alle Kalender als Monat, Woche oder Tag, oben umschaltbar, dazu Zurück, Heute und Weiter. Im Monat stehen die ersten Termine jedes Tages, ein Tipp auf den Tag öffnet ihn. Woche und Tag zeigen die Stunden wie ein Planer, mit einer Linie für jetzt. Monat und Stunden passen sich der Bildschirmhöhe an, damit alles ohne Scrollen sichtbar ist; die Stunden reichen von 7 bis 21 Uhr oder so weit, wie die Termine es verlangen; auf dem Handy wird die Woche zur Liste und der Monat zeigt Punkte. Jeder Kalender hat eine Farbe; die gewählte Ansicht merkt sich jedes Gerät. Ein Tipp auf einen Termin zeigt Zeit, Kalender, Ort und Beschreibung. Wo der Kalender es erlaubt, lassen sich Termine anlegen (das „+“ oben oder ein Tipp auf eine freie Stunde bzw. die Ganztägig-Zeile), bearbeiten und löschen; bei Serienterminen fragt die Karte, ob nur dieser oder auch alle folgenden gemeint sind. Was erlaubt ist, entscheidet die Integration: der lokale Kalender kann alles, Google anlegen und löschen, aber nicht bearbeiten, Feiertags- oder Abfallkalender aus dem Netz nichts. `calendar_edit: false` schaltet das ab, etwa für ein Wandtablet. Welche Kalender, legt nur `calendars` fest (im Editor unter Startseite › „Kalender“), sonst alle; `hide_domains: [calendar]` blendet die Seite aus.
-- **Listen** (`lists`, mit Eintrag in der Navigationsleiste): die To-do-Listen, etwa die Einkaufsliste, mit HAs eigener Karte; Einträge lassen sich abhaken, hinzufügen und umbenennen. Mehrere Listen stehen auf Tablet und Desktop nebeneinander. Ein Tipp auf den Namen klappt eine Liste zu, oben bleibt dann nur, wie viel noch offen ist; das merkt sich jedes Gerät. Admins legen mit „Neue Liste“ eine Liste an (über HAs Integration „Lokale To-do-Liste“) und löschen solche Listen mit dem Papierkorb, nach einer Rückfrage. Die Einkaufsliste der Integration „Einkaufsliste“ lässt sich nicht einzeln löschen. Listen gehören dem ganzen Haushalt, deshalb erscheinen sie auch auf Dashboards, die auf einzelne Räume beschränkt sind. Ohne `todo_lists` stehen alle Listen da, auch neu angelegte; mit `todo_lists` nur die gewählten, dann gibt es auch kein „Neue Liste“. `hide_domains: [todo]` blendet die Seite aus.
-- **Energie** (`energy`, nur mit Leistungssensoren): das ganze Haus mit dem Raum, der am meisten verbraucht, und dessen drei größten Verbrauchern. Darunter jeder Raum mit seinen Leistungssensoren und ihrem Anteil, darunter ein Verlauf der letzten 24 Stunden (HAs Verlaufsgraph). Erreichbar über die Kachel „Strom“ auf der Startseite.
-- **Wartung** (`maintenance`): alle Batterien, schwächste zuerst, nicht erreichbare Geräte und, nur für Admins, ausstehende Updates. Erreichbar über die Chips „Batterie“ und „Nicht erreichbar“ → „Alle anzeigen“.
-- **Zifferblatt** (`face`, für Wandtablets): Wenn eine Weile niemand den Bildschirm berührt (Standard zwei Minuten), legt sich eine ruhige Vollbildansicht über die Seite, gut lesbar aus der Entfernung. Ein Tipp blendet sie aus, die Seite darunter bleibt, wie sie war. Vier Stile: `clock` (große Uhr, Datum, Wetter, nächster Termin heute oder morgen), `analog` (Zeigeruhr mit denselben Angaben), `photo` (das Hintergrundbild des Dashboards mit Uhrzeit, Wetter und nächstem Termin; ohne Bild die Uhr) und `calendar` (Uhr links, die nächsten Termine der Woche rechts). Unten steht klein, was gerade läuft: Spülmaschine, Waschmaschine oder Trockner mit der Uhrzeit, zu der sie fertig sind, und einem Fortschrittsstrich, danach „Fertig“, dazu spielende Musik. Damit sich nichts ins Display einbrennt, wandert der Inhalt jede Minute ein paar Pixel. Am besten nur für den Nutzer des Tablets einschalten (`users: … face:`); `after: 0` zeigt das Zifferblatt gleich beim Öffnen, etwa auf einem Display, das sonst nur die Uhr zeigen soll; nach einer Berührung wartet es dann eine Minute. Im Bearbeitungsmodus von HA erscheint es nie.
-- **Navigation**: schwebende Leiste unten auf allen Geräten. Licht, Klima, Rollos, Sicherheit, Kameras, Musik, Kalender, Listen und die Räume sind Unteransichten, deshalb blendet HA seine eigene Tab-Leiste aus.
+## What it builds
 
-**Rollos nach Zweck:** Rollläden, Jalousien und Rollos ohne Geräteklasse zählen als Beschattung. Markisen (Klasse `awning`, oder „Markise“/„Awning“ im Namen, weil z. B. Shelly sie als Rollladen anlegt) sind eine eigene Gruppe: Ihr Stoff fährt in der Kachel aus, die Knöpfe heißen Ausfahren und Einfahren. Rollos mit der Klasse `window` oder `door` gehören zu Fenster & Türen, `garage` und `gate` zu Tore. Jede Art hat ihre eigene Schnellkachel und ihren eigenen Sammelschalter, „Alle zu“ für die Beschattung fährt also nie das Garagentor. Die Geräteklasse lässt sich in HA in den Einstellungen des Entities unter „Anzeigen als“ ändern.
+- **Home**: greeting, clock, weather, people (home or away) and the alarm panel, status chips (lights on, open, unlocked, heating, playing, battery below 20 %, unavailable; a tap opens the list), indoor and outdoor climate and current power use, "Now playing", a row of scenes and scripts, favorites, and below them one room card per area, grouped by floor. From about 720 px wide (tablet, desktop) the weather sits next to indoor climate and power, and "Now playing" next to the scenes; the people sit at the front of the status chips. That way the rooms start on the first screen. On a phone everything is stacked. The cog next to the clock opens the user's own settings.
+- **Room pages** (`area-<area_id>`, subview): at the top the temperature, humidity and, if the room has exactly one thermostat, current and target temperature with −/+. Next to it quick tiles like "Lights 2 of 5 on", "Sockets" and one per kind of cover, each switching everything in the room at once. Below them the same status chips as on Home, counted for this room only, plus "Motion detected" while a motion or presence sensor in the room is on. Then the room's favorites and the groups Lights, Climate, Shading, Awnings, Windows & doors, Gates, Locks, Media, Switches, Selectors, Motion & presence, Safety & alarms, Sensors, Scenes. Groups with several lights, sockets, covers or locks get a group switch in their heading. Only lights, fans and switches with device class `outlet` are switched together; other switches are often device settings (child lock, eco mode) and stay out of it.
+- **Domain pages**: Lights (with "All off"), Climate, Covers (with "Close all", shading and awnings; a room with both gets a heading per kind with up/down or extend/retract), Security (windows, doors, gates, locks, motion, smoke and water sensors). Grouped by room, and only built when there are matching entities. Each room heading leads to the room page and has a switch showing "2/5", up/down for covers, lock/unlock for locks. Unlocking always asks first. Lights, Covers and Security also list everything that happened today next to the tiles (see "Today" below).
+- **Cameras** (`cameras`, with an entry in the nav bar): a still of every camera, refreshed every ten seconds, with its name and last detection below ("10:03 · Package", otherwise "Quiet"). To the right (below on narrow screens) is "Detected today": what the cameras noticed since midnight, the newest one large. Detections come from the camera's own sensors (person, vehicle, animal, package, visitor/doorbell, motion, e.g. from Reolink). The device name is ignored when reading what a sensor detects, so the motion sensor of a doorbell named "Doorbell" is not a ring. Motion right next to a more precise detection doesn't count twice, and someone standing at the door for a while counts once. The list is at most one screen high and scrolls on its own. A tap on a camera or a detection opens the camera large and live, with its latest detections, the lights on the device and in the same room to switch, and "Open camera" for HA's own dialog. Tabs at the bottom switch to the other cameras. A camera with several streams (standard, high resolution, snapshots) appears once, with the standard stream. A room's cameras also appear at the top of its room page.
+- **Music** (`music`, with an entry in the nav bar, only with Music Assistant): laid out like the music page in HArmony. On the left Home, Search, Radio and Speakers, with the library's playlists below; on a phone these become tabs. "Home" shows recently played playlists as quick picks, then recently played albums and playlists, favorite artists, favorite tracks and stations. A tap on a playlist, album or artist opens its tracks; a tap on a track plays the playlist from there, and the menu next to it plays next, adds to the queue or starts a radio from it. "Search" finds tracks, artists, albums, playlists and stations across all Music Assistant providers. "Speakers" shows every player with what it plays and its volume; a tap selects it, "Join" and "Leave" group it with the selected one. The bar at the bottom has the cover, shuffle, previous, play/pause, next, repeat, a progress bar to seek, the queue (what's playing and what comes next), "Play elsewhere" and the volume. Each device remembers the selected speaker; without a choice it's the one currently playing. A tap on the cover in the bar (or the microphone next to it) opens the large player: the cover, title, artist and album, and next to them the lyrics, running along with the music. The line being sung sits bright in the middle, a tap on a line jumps there; scrolling yourself gives you a few seconds of peace. As in HArmony, lyrics come from LRCLIB (lrclib.net), straight from the browser. Title, artist, album and duration are sent there, but only while the large player is open. Another tap on the cover goes back. Music Assistant also creates a dashboard entity for Cast displays and TVs that can't play anything; it shows neither under Speakers nor as a TV. At the top of "Home" you pick the Spotify account, as in HArmony; each device remembers the choice. Its playlists then appear in the quick picks and in the library on the left, above them "Recently played", artists, albums, liked songs and top artists, and below them what comes from Music Assistant. Browsing goes through a Sonos or Cast speaker, because HA's own Spotify players only show their library while something plays on them; without such a speaker there is no account choice. Playback runs on the selected speaker through Music Assistant, Spotify playlists track by track (up to 100), so private playlists of the other accounts and lists like "Liked songs" play too. The Spotify accounts themselves appear under Speakers and can be controlled there. Everything runs through Music Assistant's services in HA, without a server of its own; editing the queue and playlists as in HArmony is therefore not available. `hide_pages: [music]` hides the page, for everyone or for single users under `users`; `hide_domains: [media_player]` removes the page and all media players from the rooms.
+- **Calendar** (`calendar`, with an entry in the nav bar): all calendars as month, week or day, switchable at the top, with previous, today and next. The month shows each day's first events, a tap on a day opens it. Week and day show the hours like a planner, with a line for now. Month and hours fit the screen height so everything is visible without scrolling; the hours run from 7 to 21 or as far as the events need. On a phone the week becomes a list and the month shows dots. Each calendar has a color; each device remembers the chosen view. A tap on an event shows time, calendar, location and description. Where the calendar allows it, events can be created (the "+" at the top, or a tap on a free hour or the all-day row), edited and deleted; for recurring events the card asks whether you mean only this one or all following ones. The integration decides what is allowed: the local calendar can do everything, Google can create and delete but not edit, holiday or waste calendars from the web nothing. `calendar_edit: false` turns editing off, e.g. for a wall tablet. Which calendars appear is set by `calendars` only (in the editor under Home page › "Calendars"), otherwise all; `hide_domains: [calendar]` hides the page.
+- **Lists** (`lists`, with an entry in the nav bar): the to-do lists, e.g. the shopping list, with HA's own card; items can be checked off, added and renamed. Several lists sit side by side on tablet and desktop. A tap on the name folds a list, leaving only how many items are open; each device remembers that. Admins create a list with "New list" (through HA's "Local to-do" integration) and delete such lists with the bin, after a confirmation. The shopping list of the "Shopping list" integration can't be deleted on its own. Lists belong to the whole household, so they also appear on dashboards limited to single rooms. Without `todo_lists` all lists appear, including new ones; with `todo_lists` only the chosen ones, and there is no "New list". `hide_domains: [todo]` hides the page.
+- **Energy** (`energy`, only with power sensors): the whole house with the room using the most and its three biggest consumers. Below, every room with its power sensors and their share, and a history of the last 24 hours (HA's history graph). Reached through the "Power" tile on Home.
+- **Maintenance** (`maintenance`): all batteries, weakest first, unavailable devices and, for admins only, pending updates. Reached through the "Battery" and "Unavailable" chips → "Show all".
+- **Settings** (`settings`): every user's own look, face, pages and favorites (see "Own settings" below).
+- **Face** (`face`, for wall tablets): after a while without a touch (two minutes by default), a calm full-screen view covers the page, easy to read from across the room. A tap hides it, and the page below stays as it was. Four styles: `clock` (large clock, date, weather, next event today or tomorrow), `analog` (a clock with hands and the same details), `photo` (the dashboard's background picture with time, weather and next event; without a picture the clock) and `calendar` (clock on the left, the week's next events on the right). At the bottom it shows small what is running: dishwasher, washer or dryer with the time they finish and a progress line, then "Done", plus music that is playing. To avoid burn-in, the content moves a few pixels every minute. Best switched on only for the tablet's user (`users: … face:`); `after: 0` shows the face right on opening, e.g. on a display meant to show only the clock; after a touch it then waits one minute. It never appears in HA's edit mode.
+- **Navigation**: a floating bar at the bottom on all devices. Lights, Climate, Covers, Security, Cameras, Music, Calendar, Lists and the rooms are subviews, so HA hides its own tab bar. On a phone the bar shows at most five pages plus "More"; the others open above it.
 
-**Haushaltsgeräte:** Spülmaschine, Waschmaschine, Trockner und Ofen findet das Dashboard an ihrem Betriebszustand, einem Sensor wie `sensor.geschirrspuler_betriebszustand` (Home Connect) oder `sensor.washing_machine_state` (WashData). Was das Gerät sonst noch meldet, nimmt die Karte mit: Fortschritt, Endzeit oder Restzeit, das laufende Programm, Tür und Hinweise wie „Salz fast leer“. Während ein Programm läuft, füllt sich ein Ring mit der Restzeit in der Mitte, darunter stehen Start und Ende. „Fertig“ ist grün und bleibt stehen, bis das Gerät wieder „Bereit“ meldet, bei Home Connect also bis jemand die Tür öffnet. Jedes Gerät steht auf seiner Raumseite unter „Geräte“, seine einzelnen Sensoren erscheinen dort nicht noch einmal. Auf der Startseite erscheint es nur, solange es läuft, fertig ist oder etwas braucht. Geräte ohne eigenen Betriebszustand, etwa ein Trockner an einer smarten Steckdose, kommen über `appliances` dazu: Als Zustand reicht eine Leistung (ab 5 W läuft es), ein Schalter oder ein eigener Status-Sensor. `hide_domains: [appliance]` schaltet die Karten ab.
+**Today:** On Lights, Covers and Security a list next to the tiles shows every change of the day from HA's history: lights switched on and off, covers opened or closed (without the travel in between), windows, doors and locks both ways, motion and smoke only when they trigger and once per two minutes. The latest change is large at the top; below it the list scrolls on its own and reaches at most to just above the nav bar. On a phone it sits below the tiles, one screen high. A tap opens the device.
 
-**Fernseher:** Ein Mediaplayer mit der Klasse `tv` bekommt auf seiner Raumseite eine Karte wie eine Fernbedienung: Ein/Aus, die laufende App, ein rundes Steuerkreuz mit OK, Lauter, Leiser und Stumm, Zurück und Start. Das Steuerkreuz geht über die Remote-Entity desselben Geräts (Android TV Remote oder Android Debug Bridge). Bringen beide Integrationen denselben Fernseher mit, erscheint er nur einmal, mit der Android-TV-Remote-Fernbedienung. Darunter starten Knöpfe eine App direkt, die laufende ist hervorgehoben. Welche, legt `tv_apps` fest (im Editor „Apps am Fernseher“): `netflix`, `prime`, `youtube`, `magenta`, `disney`, `spotify`, `plex`, `kodi`, ohne Angabe Netflix, YouTube und Prime Video. Statt Paketnamen wie `de.telekom.magentatv.tv` zeigt die Karte den App-Namen, beim Launcher „Startseite“.
+**Covers by purpose:** Roller shutters, blinds and covers without a device class count as shading. Awnings (class `awning`, or "Markise"/"Awning" in the name, because e.g. Shelly creates them as shutters) are a group of their own: their fabric extends in the tile, and the buttons say extend and retract. Covers with class `window` or `door` belong to Windows & doors, `garage` and `gate` to Gates. Each kind has its own quick tile and group switch, so "Close all" for shading never moves the garage door. You can change the device class in HA in the entity's settings under "Show as".
 
-**Läuft gerade:** erscheint, sobald ein Player spielt, mit Cover, Titel, Raum, Play/Pause und Weiter. Bei mehreren Playern schaltet „+N“ weiter. Ein pausierter Player bleibt fünf Minuten stehen. Mit `hide_domains: [media_player]` verschwindet die Leiste.
+**Appliances:** The dashboard finds dishwasher, washer, dryer and oven by their operation state, a sensor like `sensor.geschirrspuler_betriebszustand` (Home Connect) or `sensor.washing_machine_state` (WashData). Whatever else the appliance reports goes on the card: progress, end time or remaining time, the running program, the door and notices like "Salt almost empty". While a program runs, a ring fills up with the remaining time in the middle, with start and end below. "Done" is green and stays until the appliance reports "Ready" again, with Home Connect until someone opens the door. Each appliance appears on its room page under "Appliances", and its single sensors don't show there again. On Home it only appears while it runs, is done or needs something. Appliances without an operation state of their own, e.g. a dryer on a smart plug, are added with `appliances`: a power sensor is enough as state (from 5 W it runs), or a switch or a status sensor of its own. `hide_domains: [appliance]` turns the cards off.
 
-**Wetter:** Auf der Startseite steht eine Wetterkarte mit Temperatur, Zustand, Luftfeuchte, Wind, Luftdruck und Sicht, darunter die nächsten Tage mit Temperaturbalken. Mit `weather_sensors` ersetzen Sensoren am Haus die Werte vom Wetterdienst: Temperatur, Luftfeuchte, Luftdruck, Wind, Windrichtung, Regen und Helligkeit. Neben einer gemessenen Temperatur steht zum Vergleich die des Wetterdienstes, so fällt ein Sensor in der Sonne oder im Haus auf. Ein Tipp auf einen gemessenen Wert öffnet seinen Verlauf. Mit `weather_warnings` erscheinen Unwetterwarnungen: NINA legt pro Region mehrere `binary_sensor.warning_…` an, die Karte zeigt jede aktive mit Überschrift und Ende, sonst „Keine Warnungen“. Der DWD-Warnsensor geht ebenso. Die Wetterkarte ersetzt die Kachel „Außen“; „Innen“ und „Strom“ stehen darunter. Gibt es keine Wetter-Entity oder ist `weather` unter `hide_domains`, erscheint „Außen“ wieder als Kachel.
+**TVs:** A media player with class `tv` gets a card like a remote on its room page: power, the running app, a round d-pad with OK, volume up, volume down and mute, back and home. The d-pad goes through the remote entity of the same device (Android TV Remote or Android Debug Bridge). If both integrations bring the same TV, it appears once, with the Android TV Remote. Below, buttons start an app directly, and the running one is highlighted. Which ones is set by `tv_apps` (in the editor "Apps on the TV"): `netflix`, `prime`, `youtube`, `magenta`, `disney`, `spotify`, `plex`, `kodi`, by default Netflix, YouTube and Prime Video. Instead of package names like `de.telekom.magentatv.tv` the card shows the app name, "Home" for the launcher.
 
-**Innen, Außen, Strom:** „Innen“ ist der Durchschnitt aller Räume, „Außen“ der Durchschnitt der Bereiche in `outdoor_areas`. Außenbereiche zählen innen nicht mit. „Strom“ kommt aus HAs Energieeinstellungen, wenn sie eindeutig sind: ein Hausverbrauch-Sensor, sonst genau eine Netzquelle mit Leistungssensor (plus Solar und Akku). Mehrere Netzquellen mit Leistungssensor sind meist einzelne Steckdosen und werden ignoriert. Die Energieseite zeigt die drei dann einzeln. Ohne diese Angaben (oder für Nutzer ohne Zugriff darauf) ist „Strom“ die Summe aller Leistungssensoren (`device_class: power`) in den Räumen; ein Gesamtzähler in einem Raum zählt dann doppelt und lässt sich per Label ausblenden.
+**Now playing:** appears as soon as a player plays, with cover, title, room, play/pause and next. With several players "+N" switches between them. A paused player stays for five minutes. `hide_domains: [media_player]` removes the bar.
 
-**Personen und Alarm:** Alle sichtbaren `person`-Entities als Avatar, unterwegs ausgegraut, dazu die erste Alarmanlage als Chip (ausgelöst rot und blinkend, scharf blau, unscharf grün). Ausblenden mit `hide_domains: [person]` bzw. `[alarm_control_panel]` oder dem Label `ad_hide`.
+**Weather:** Home has a weather card with temperature, condition, humidity, wind, pressure and visibility, and below it the next days with temperature bars. With `weather_sensors`, sensors at the house replace the forecast service's values: temperature, humidity, pressure, wind, wind direction, rain and illuminance. Next to a measured temperature the forecast service's value appears for comparison, so a sensor in the sun or inside stands out. A tap on a measured value opens its history. With `weather_warnings` severe weather warnings appear: NINA creates several `binary_sensor.warning_…` per region, and the card shows each active one with headline and end, otherwise "No warnings". The DWD warning sensor works too. The weather card replaces the "Outside" tile; "Inside" and "Power" sit next to it. If there is no weather entity or `weather` is in `hide_domains`, "Outside" appears as a tile again.
 
-Temperatur und Luftfeuchte eines Raums kommen aus den Sensoren, die in HA beim Bereich eingetragen sind (Einstellungen → Bereiche → Bereich öffnen). Ohne diese Angabe nimmt das Dashboard, was das Thermostat misst, und erst danach den ersten funktionierenden Sensor im Raum. Steht im Raum ein Kühlschrank- oder Außenthermometer, trägt man den richtigen Sensor deshalb am besten beim Bereich ein.
+**Inside, outside, power:** "Inside" is the average of all rooms, "Outside" the average of the areas in `outdoor_areas`. Outdoor areas don't count inside. "Power" comes from HA's energy settings when they are unambiguous: a house consumption sensor, otherwise exactly one grid source with a power sensor (plus solar and battery). Several grid sources with power sensors are usually single plugs and are ignored. The energy page then shows the three separately. Without these settings (or for users without access to them) "Power" is the sum of all power sensors (`device_class: power`) in the rooms; a main meter in a room then counts twice and can be hidden with a label.
 
-Mehrere Tipps auf −/+ am Thermostat werden gesammelt und nach einer kurzen Pause als ein Befehl geschickt.
+**People and alarm:** All visible `person` entities as avatars, greyed out when away, plus the first alarm panel as a chip (triggered red and blinking, armed blue, disarmed green). Hide them with `hide_domains: [person]` or `[alarm_control_panel]`, or the label `ad_hide`.
 
-Bedienung: Raumkarte antippen öffnet die Raumseite, Doppeltipp schaltet alle Lichter im Raum, ein Tipp auf einen Status-Kreis öffnet den More-Info-Dialog. Kacheln: Tippen schaltet Licht, Schalter und Szenen, alles andere öffnet More-Info. Lange drücken öffnet immer More-Info.
+A room's temperature and humidity come from the sensors set on the area in HA (Settings → Areas → open the area). Without them the dashboard takes what the thermostat measures, and only then the first working sensor in the room. If a fridge or outdoor thermometer sits in the room, it's best to set the right sensor on the area.
 
-**Kacheln zeigen die Menge, die sie steuern:** Eine Lichtkachel ist ein kleines Quadrat mit rundem Lampensymbol, das bei eingeschaltetem Licht bernsteinfarben leuchtet; warmes Licht steigt von unten so hoch, wie die Lampe hell ist. Waagerecht über die Kachel ziehen dimmt (senkrecht scrollt die Seite weiter), die Pfeiltasten auch. Rollos zeigen ihre Lamellen so weit geschlossen, wie sie es sind. Thermostate haben unten einen Streifen von kalt nach warm mit Punkt (gemessen) und Strich (Soll), Prozentwerte wie Luftfeuchte einen Füllstreifen. Schalter und Sensoren sind Zeilen wie ein Wandschalter: die ganze Zeile schaltet, die Kontrolllampe rechts zeigt den Zustand.
+Several taps on −/+ at a thermostat are collected and sent as one command after a short pause.
+
+Using it: tap a room card to open the room page, double-tap to switch all lights in the room, tap a status circle for the more-info dialog. Tiles: a tap switches lights, switches and scenes, everything else opens more-info. A long press always opens more-info.
+
+**Tiles show the amount they control:** A light tile is a small square with a round lamp icon that glows amber while the light is on; warm light rises from the bottom as high as the lamp is bright. Dragging horizontally across the tile dims it (vertically the page keeps scrolling), and so do the arrow keys. Covers show their slats as far closed as they are. Thermostats have a cold-to-warm strip at the bottom with a dot (measured) and a line (target), percentages like humidity a fill bar. Switches and sensors are rows like a wall switch: the whole row switches, and the pilot light on the right shows the state.
 
 ## Installation
 
-Voraussetzung: Home Assistant 2026.5 oder neuer.
+Requires Home Assistant 2026.5 or newer.
 
-### Über HACS (empfohlen)
+### Through HACS (recommended)
 
-1. HACS öffnen → Menü oben rechts → **Benutzerdefinierte Repositories**.
-2. `https://github.com/frcarlo/ha-auto-dashboard` eintragen, Typ **Dashboard**, hinzufügen.
-3. **Auto Dashboard** suchen und herunterladen. HACS trägt die Ressource selbst ein.
-4. Browser neu laden (Strg+Shift+R) bzw. in der Companion-App den Frontend-Cache zurücksetzen.
-5. **Einstellungen → Dashboards → Dashboard hinzufügen**. Unter **Community-Dashboards** steht jetzt **Auto Dashboard**. Auswählen, Namen vergeben, fertig.
+1. Open HACS → menu at the top right → **Custom repositories**.
+2. Enter `https://github.com/frcarlo/ha-auto-dashboard`, type **Dashboard**, add.
+3. Search for **Auto Dashboard** and download it. HACS adds the resource itself.
+4. Reload the browser (Ctrl+Shift+R), or reset the frontend cache in the companion app.
+5. **Settings → Dashboards → Add dashboard**. **Auto Dashboard** now appears under **Community dashboards**. Pick it, give it a name, done.
 
-Updates kommen danach wie bei jedem HACS-Plugin.
+Updates then arrive like for any HACS plugin.
 
-### Manuell
+### Manual
 
-1. `auto-dashboard.js` aus dem [neuesten Release](https://github.com/frcarlo/ha-auto-dashboard/releases/latest) nach `/config/www/auto-dashboard/` kopieren.
-2. **Einstellungen → Dashboards → Ressourcen** → `/local/auto-dashboard/auto-dashboard.js?v=0.1.0`, Typ **JavaScript-Modul**. Bei jedem Update die Versionsnummer hochzählen, sonst bleibt die alte Datei bis zu 31 Tage im Cache.
-3. Browser neu laden, dann wie oben über **Dashboard hinzufügen** anlegen. Alternativ ein leeres Dashboard anlegen und in der Rohkonfiguration eintragen:
+1. Copy `auto-dashboard.js` from the [latest release](https://github.com/frcarlo/ha-auto-dashboard/releases/latest) to `/config/www/auto-dashboard/`.
+2. **Settings → Dashboards → Resources** → `/local/auto-dashboard/auto-dashboard.js?v=0.1.0`, type **JavaScript module**. Raise the version number with every update, otherwise the old file stays cached for up to 31 days.
+3. Reload the browser, then create the dashboard through **Add dashboard** as above. Alternatively create an empty dashboard and put this in its raw configuration:
    ```yaml
    strategy:
      type: custom:auto-dashboard
@@ -68,147 +73,147 @@ Updates kommen danach wie bei jedem HACS-Plugin.
 
 ### Theme (optional)
 
-`themes/harmony.yaml` nach `/config/themes/` legen (`frontend: themes: !include_dir_merge_named themes`) und im Profil **HArmony** wählen. Dann passen Hintergrund, Kopfzeile und Seitenleiste zu den Karten.
+Put `themes/harmony.yaml` in `/config/themes/` (`frontend: themes: !include_dir_merge_named themes`) and pick **HArmony** in your profile. Background, header and sidebar then match the cards.
 
-## Optionen
+## Options
 
-Am einfachsten über den Editor: Dashboard öffnen → Stift oben rechts → **Dashboard bearbeiten**. Der Editor hat die Reiter Darstellung, Startseite, Haus, Raumseiten und Nutzer. Unter „Haus“ ist das Haus als Querschnitt gezeichnet: Etagen übereinander, Räume darin, Räume ohne Etage draußen. Oben wählst du, was ein Tipp auf einen Raum bewirkt (ausblenden, Außenbereich, nur diesen zeigen), und jeder Raum zeigt seine Rolle direkt in der Zeichnung; ein Tipp auf eine Etage zeigt nur diese Etage. Dieselbe Zeichnung wählt unter „Raumseiten“ den Raum zum Anpassen und in den Nutzerregeln die Räume, die jemand sieht. Den Editor sehen nur Admins, weil nur sie Dashboards bearbeiten dürfen. Gespeichert wird dieselbe YAML-Konfiguration wie unten, ohne Standardwerte. Nutzerregeln aus dem Editor sind an die User-ID gebunden, eine Umbenennung bricht sie deshalb nicht.
+The easiest way is the editor: open the dashboard → pencil at the top right → **Edit dashboard**. The editor has the tabs Appearance, Home page, House, Room pages and Users. "House" draws the house as a cross-section: floors stacked, rooms inside them, rooms without a floor outside. At the top you choose what a tap on a room does (hide, outdoor area, show only this one), and each room shows its role right in the drawing; a tap on a floor shows only that floor. The same drawing picks the room to customize under "Room pages", and the rooms someone sees in the user rules. Only admins see the editor, because only they may edit dashboards. It saves the same YAML configuration as below, without defaults. User rules from the editor are bound to the user ID, so renaming a user doesn't break them.
 
-Alle Optionen, alle optional:
+All options, all optional:
 
 ```yaml
 strategy:
   type: custom:auto-dashboard
-  title: Zuhause
-  theme: auto              # auto | dark | light, auto folgt dem HA-Dunkelmodus
-  glass: false             # Milchglas-Karten, dahinter ein weiches Licht in der gedämpften Akzentfarbe
-  background_image: /local/garten.jpg   # Foto hinter den Karten, mit Schleier in der Seitenfarbe; ersetzt das Glas-Licht
-  primary_color: "#14b8a6" # Akzentfarbe, alles andere wird daraus abgeleitet
-  ha_colors: true          # mit primary_color auch HA-Kopfzeile, Seitenleiste und Dialoge färben
+  title: Home
+  theme: auto              # auto | dark | light, auto follows HA's dark mode
+  glass: false             # frosted-glass cards, with a soft light in the muted accent color behind them
+  background_image: /local/garden.jpg   # photo behind the cards, veiled in the page color; replaces the glass light
+  primary_color: "#14b8a6" # accent color, everything else is derived from it
+  ha_colors: true          # with primary_color, also color HA's header, sidebar and dialogs
   nav_position: bottom     # bottom | top | left | right
-  areas: [wohnzimmer]      # nur diese Räume
-  floors: [obergeschoss]   # nur Räume auf diesen Etagen
-  hide_areas: [abstellraum]
-  area_order: [wohnzimmer, kueche]   # sonst alphabetisch je Etage
-  hide_pages: [cameras]    # Seiten für alle ausblenden, auch für Admins: lights | climate | covers | security | cameras | music | calendar | lists | energy | maintenance
+  areas: [living_room]     # only these rooms
+  floors: [upstairs]       # only rooms on these floors
+  hide_areas: [storage]
+  area_order: [living_room, kitchen]   # otherwise alphabetical per floor
+  hide_pages: [cameras]    # hide pages for everyone, admins included: lights | climate | covers | security | cameras | music | calendar | lists | energy | maintenance
   hide_domains: [fan, scene]
-  hide_labels: [technik]   # Label-IDs, siehe unten
-  favorites: [light.flur, lock.haustuer]       # Startseite und oben im jeweiligen Raum
-  scenes: [scene.kino, script.gute_nacht]      # Zeile auf der Startseite
-  todo_lists: [todo.einkaufsliste]             # nur diese Listen auf der Seite „Listen“, sonst alle (auch neue)
-  outdoor_areas: [garten]  # zählen nicht zum Innenklima; ohne Wetterkarte ihr Durchschnitt als „Außen“
-  weather_entity: weather.forecast_home        # sonst die erste Wetter-Entity mit Tagesvorhersage
-  weather_warnings: [binary_sensor.warning_muelheim_1]   # NINA-Sensoren oder der DWD-Warnsensor
-  weather_sensors:         # eigene Messwerte statt Wetterdienst, alle optional
-    temperature: sensor.aussen_temperatur
-    humidity: sensor.aussen_luftfeuchte
-    pressure: sensor.aussen_luftdruck
+  hide_labels: [utility]   # label IDs, see below
+  favorites: [light.hallway, lock.front_door]  # on Home and at the top of their room
+  scenes: [scene.movie, script.good_night]     # row on Home
+  todo_lists: [todo.shopping_list]             # only these lists on the "Lists" page, otherwise all (new ones too)
+  outdoor_areas: [garden]  # don't count for indoor climate; without a weather card their average is "Outside"
+  weather_entity: weather.forecast_home        # otherwise the first weather entity with a daily forecast
+  weather_warnings: [binary_sensor.warning_muelheim_1]   # NINA sensors or the DWD warning sensor
+  weather_sensors:         # own readings instead of the forecast service, all optional
+    temperature: sensor.outdoor_temperature
+    humidity: sensor.outdoor_humidity
+    pressure: sensor.outdoor_pressure
     wind_speed: sensor.wind
-    wind_bearing: sensor.windrichtung
-    rain: sensor.regen
-    illuminance: sensor.aussen_helligkeit
-  forecast_days: 3         # 0 = keine Vorhersage
-  calendars: [calendar.familie, calendar.abfall_2026]   # Kalenderseite, sonst alle
-  calendar_edit: false     # Kalenderseite nur zum Ansehen
-  face:                    # Zifferblatt nach einer Weile ohne Berührung
-    after: 120             # Sekunden, 0 = gleich beim Öffnen (nach einer Berührung dann 1 Minute)
+    wind_bearing: sensor.wind_direction
+    rain: sensor.rain
+    illuminance: sensor.outdoor_illuminance
+  forecast_days: 3         # 0 = no forecast
+  calendars: [calendar.family, calendar.waste_2026]   # calendar page, otherwise all
+  calendar_edit: false     # calendar page for viewing only
+  face:                    # face after a while without a touch
+    after: 120             # seconds, 0 = right on opening (after a touch then 1 minute)
     style: clock           # clock | analog | photo | calendar
-  tv_apps: [magenta, netflix, prime]   # App-Knöpfe auf der TV-Karte
-  appliances:              # Geräte ohne eigenen Betriebszustand; die anderen findet das Dashboard selbst
-    - status: sensor.trockner_leistung   # Zustand: Leistung, Schalter, Binärsensor oder Status-Sensor
-      name: Trockner
-      area: keller                       # sonst der Raum des Zustands-Sensors
-      progress: sensor.trockner_fortschritt   # optional, ebenso remaining, end, program, door, power
-  hide_entities: [light.deko]   # einzelne Geräte überall ausblenden
-  rooms:                   # Einstellungen pro Raumseite, siehe unten
-    wohnzimmer:
+  tv_apps: [magenta, netflix, prime]   # app buttons on the TV card
+  appliances:              # appliances without an operation state of their own; the dashboard finds the others
+    - status: sensor.dryer_power   # state: power, switch, binary sensor or status sensor
+      name: Dryer
+      area: basement               # otherwise the area of the state sensor
+      progress: sensor.dryer_progress   # optional, as are remaining, end, program, door, power
+  hide_entities: [light.decoration]   # hide single entities everywhere
+  rooms:                   # settings per room page, see below
+    living_room:
       hide_groups: [sensor]
       group_order: [media, light]
-      order: [light.decke, light.stehlampe]
+      order: [light.ceiling, light.floor_lamp]
       cards:
         top:
           - type: markdown
-            content: Willkommen
-        light: []          # am Ende einer Gruppe
+            content: Welcome
+        light: []          # at the end of a group
         bottom: []
 ```
 
-Wo eine Liste steht, reicht für einen einzelnen Eintrag auch der Wert allein, etwa `hide_areas: keller` oder `calendars: calendar.familie`.
+Wherever a list is expected, a single value also works, e.g. `hide_areas: basement` or `calendars: calendar.family`.
 
-**Raumseiten anpassen:** Am einfachsten im Editor unter „Raumseiten“. Raum wählen, dann Gruppen und Geräte mit den Pfeilen sortieren und mit dem Auge ausblenden. Ausgeblendete Geräte (`hide_entities`) verschwinden überall im Dashboard, ausgeblendete Gruppen (`hide_groups`) nur auf dieser Raumseite. Eigene Karten sind normale Lovelace-Karten und landen oben (`top`), unten (`bottom`) oder am Ende einer Gruppe (Gruppenname wie `light`, `climate`, `shading`, `awning`, `opening`, `gate`, `lock`, `media`, `switch`, `select`, `motion`, `safety`, `sensor`, `scene`). „Raum zurücksetzen“ macht die Seite wieder automatisch.
+**Customizing room pages:** Easiest in the editor under "Room pages". Pick a room, then sort groups and devices with the arrows and hide them with the eye. Hidden devices (`hide_entities`) disappear everywhere in the dashboard, hidden groups (`hide_groups`) only on that room page. Own cards are ordinary Lovelace cards and go at the top (`top`), the bottom (`bottom`) or the end of a group (group name like `light`, `climate`, `shading`, `awning`, `opening`, `gate`, `lock`, `media`, `switch`, `select`, `motion`, `safety`, `sensor`, `scene`). "Reset room" makes the page automatic again.
 
-**Raumbild:** Hat ein Bereich in HA ein Bild (Einstellungen → Bereiche → Bereich bearbeiten), steht der Raumname auf diesem Bild.
+**Room picture:** If an area has a picture in HA (Settings → Areas → edit the area), the room header shows it whole, in its own proportions, on the right, with a blurred copy of it behind the room name. On a phone the picture sits small in the top right corner and the name below it.
 
-**Szenen und Skripte:** Ohne `scenes` zeigt die Startseite alle sichtbaren Szenen, alphabetisch. Skripte erscheinen nur, wenn sie in `scenes` stehen. Mit `hide_domains: [scene]` verschwindet die Zeile.
+**Scenes and scripts:** Without `scenes`, Home shows all visible scenes, alphabetically. Scripts only appear when listed in `scenes`. `hide_domains: [scene]` removes the row.
 
-**Akzentfarbe:** `primary_color` nimmt eine Hex-Farbe. Daraus entstehen für hell und dunkel der Seitenhintergrund, die Kartenflächen, die Schrift, der Akzent (aktive Navigation, Play-Knopf, Status-Punkte) und das Info-Blau. Die Flächen bekommen einen leichten Stich des Farbtons, wie das Schiefergrau beim voreingestellten Indigo; ein Grau als Akzent ergibt neutrale Grautöne. Bei hellen Akzenten wird die Schrift darauf dunkel. Gelb für Licht und Heizen, Rot für Alarm und Grün für „in Ordnung“ bleiben gleich, damit man sie auf einen Blick erkennt. Solange das Dashboard offen ist, übernehmen auch HAs Kopfzeile, Seitenleiste und Dialoge (z. B. der Detail-Dialog) die Farben; beim Verlassen kommt das HA-Theme zurück. Mit `ha_colors: false` bleibt HA, wie es ist. Ohne die Option bleibt die HArmony-Palette und der Seitenhintergrund kommt aus dem HA-Theme. Im Editor gibt es dafür Farbvorschläge und einen Farbwähler.
+**Accent color:** `primary_color` takes a hex color. From it come, for light and dark, the page background, the card surfaces, the text, the accent (active navigation, play button, status dots) and the info blue. The surfaces get a slight tint of the hue, like the slate grey with the default indigo; a grey accent gives neutral greys. With light accents the text on them turns dark. Amber for lights and heating, red for alarms and green for "all good" stay the same, so you recognize them at a glance. While the dashboard is open, HA's header, sidebar and dialogs (e.g. the more-info dialog) take on the colors too; when you leave, the HA theme comes back. With `ha_colors: false` HA stays as it is. Without the option the HArmony palette stays and the page background comes from the HA theme. The editor offers color suggestions and a color picker.
 
-**Navigationsleiste:** `left` und `right` sind eine senkrechte Leiste am Rand, ab 1024 px Breite. Der Inhalt rückt dafür ein. Auf schmaleren Bildschirmen sitzt die Leiste unten. `top` setzt sie unter die HA-Kopfzeile.
+**Nav bar:** `left` and `right` are a vertical bar at the edge, from 1024 px wide. The content moves over to make room. On narrower screens the bar sits at the bottom. `top` puts it below HA's header.
 
-**Nur ein Raum oder eine Etage:** `areas` und `floors` beschränken das ganze Dashboard, also Startseite, Status-Chips, Übersichten und Raumseiten. Beide zusammen ergeben die Schnittmenge. Mit genau einem Raum zeigt die Startseite gleich dessen Inhalt, praktisch für ein Wandtablet. Die IDs stehen unter Einstellungen → Bereiche, Etagen & Zonen in der URL des Bereichs bzw. der Etage.
+**One room or one floor only:** `areas` and `floors` limit the whole dashboard: Home, status chips, overviews and room pages. Both together give the intersection. With exactly one room, Home shows that room's content right away, handy for a wall tablet. The IDs are in the URL of the area or floor under Settings → Areas, floors & zones.
 
-### Nutzer
+### Users
 
-Pro HA-Nutzer lässt sich festlegen, was er sieht und bedienen darf:
+For each HA user you can set what they see and may operate:
 
 ```yaml
 strategy:
   type: custom:auto-dashboard
   users:
-    leni:                          # Vorname, voller Name oder User-ID
-      areas: [zimmer_leni, wohnzimmer]
-      floors: [obergeschoss]
-      hide_pages: [security]       # zusätzlich zu hide_pages des Dashboards
-      access: no_critical          # keine Schlösser, Alarmanlage, „Alle aus/zu“
-    gast:
-      access: read_only            # nur ansehen
-    wandtablet:
-      face: { style: calendar }    # Zifferblatt nur auf diesem Gerät; face: false schaltet es für einen Nutzer ab
-    default:                       # alle übrigen Nicht-Admins
+    leni:                          # first name, full name or user ID
+      areas: [leni_room, living_room]
+      floors: [upstairs]
+      hide_pages: [security]       # on top of the dashboard's hide_pages
+      access: no_critical          # no locks, alarm panel, "All off/close all"
+    guest:
+      access: read_only            # view only
+    wall_tablet:
+      face: { style: calendar }    # face on this device only; face: false switches it off for a user
+      settings: false              # no settings page for this user
+    default:                       # all other non-admins
       access: no_critical
 ```
 
-- Admins ohne eigenen Eintrag sehen und bedienen alles. Mit einem eigenen Eintrag gilt auch für sie die Regel.
-- `access` ist `full` (Standard), `no_critical` oder `read_only`. Die früheren Schalter `read_only: true` und `control_critical: false` funktionieren weiter.
-- `areas`, `floors` und `hide_pages` gelten zusätzlich zu den Filtern des Dashboards.
-- Was jemand nicht bedienen darf, erscheint ohne Schalter und Knöpfe. HAs Detail-Dialog öffnet sich dafür ebenfalls nicht, sonst ließe sich darüber schalten. Reine Anzeigen wie Sensoren öffnen weiter ihre Infos.
+- Admins without an entry of their own see and operate everything. With an entry of their own the rule applies to them too.
+- `access` is `full` (default), `no_critical` or `read_only`. The former switches `read_only: true` and `control_critical: false` still work.
+- `areas`, `floors` and `hide_pages` apply on top of the dashboard's filters.
+- What someone may not operate appears without switches and buttons. HA's more-info dialog doesn't open for it either, since it could be used to switch. Display-only entities like sensors still open their info.
 
-### Eigene Einstellungen
+### Own settings
 
-Jeder Nutzer, auch einer ohne Admin-Rechte wie der eines Wandtablets, öffnet über das Zahnrad neben der Uhr auf der Startseite die Seite **Einstellungen**. Dort wählt er nur für sich Farbschema, Akzentfarbe, Milchglas, die Position der Navigationsleiste, das Zifferblatt und wann es kommt, welche Seiten in seiner Leiste stehen, und seine Favoriten: suchen, hinzufügen, umsortieren, entfernen. Ausgangspunkt ist, was das Dashboard eingestellt hat; „Alles auf Standard“ geht dorthin zurück.
+Every user, including one without admin rights like a wall tablet's, opens the **Settings** page with the cog next to the clock on Home. There they choose, for themselves only, theme, accent color, frosted glass, the nav bar position, the face and when it appears, which pages are in their bar, and their favorites: search, add, reorder, remove. The starting point is what the dashboard has set; "Reset everything" goes back to it.
 
-- Gespeichert wird in HA beim Nutzer (nicht im Browser), je Dashboard, und nur, was vom Dashboard abweicht. Die Einstellungen gelten damit auf jedem Gerät, mit dem der Nutzer angemeldet ist, und bleiben nach einem geleerten Cache erhalten. Ändert der Admin später etwas, das der Nutzer nicht angefasst hat, kommt die Änderung bei ihm an.
-- Räume, Rechte und die vom Admin ausgeblendeten Seiten bleiben, wie der Admin sie festgelegt hat. Hat der Admin für einen Nutzer `face: false` gesetzt, kann der Nutzer das Zifferblatt nicht einschalten.
-- `settings: false` in der Nutzerregel (im Editor: Nutzer → „Eigene Einstellungen erlauben“) nimmt einem Nutzer die Seite; dann gilt das Dashboard, wie der Admin es eingestellt hat.
+- Settings are stored in HA with the user (not in the browser), per dashboard, and only what differs from the dashboard. They apply on every device the user is signed in on and survive a cleared cache. If the admin later changes something the user hasn't touched, the change reaches them.
+- Rooms, rights and the pages the admin hid stay as the admin set them. If the admin set `face: false` for a user, that user can't switch the face on.
+- `settings: false` in the user rule (in the editor: Users → "Allow own settings") takes the page away from a user; the dashboard then stays as the admin set it.
 
-Auf dem Handy zeigt die Navigationsleiste höchstens fünf Seiten und dahinter „Mehr“; die übrigen öffnen sich darüber.
+**Important:** This is not a security feature. HA has no rights per room or device. Anyone signed in can still switch everything through other dashboards, the settings or the API. The rules suit kids' tablets, guests and wall panels, not protection against someone determined. If someone should only see this dashboard, don't give them admin rights in HA, and hide the other dashboards with "Visible to admins only".
 
-**Wichtig:** Das ist keine Sicherheitsfunktion. HA kennt keine Rechte pro Raum oder Gerät. Wer angemeldet ist, kann über andere Dashboards, die Einstellungen oder die API weiterhin alles schalten. Die Regeln eignen sich für Kinder-Tablets, Gäste und Wandpanels, nicht zum Schutz gegen jemanden, der es darauf anlegt. Wer nur dieses Dashboard sehen soll, bekommt in HA keine Admin-Rechte, und die anderen Dashboards werden über „Nur für Admins sichtbar“ ausgeblendet.
+**Hiding by label:** Entities with the label `ad_hide` never appear. `hide_labels` adds your own labels. The label counts on the entity, the device and the area: a device with the label disappears with all its entities, an area with all the devices in it. The label ID is under Settings → Areas, labels & zones → Labels; in the editor you just pick the labels.
 
-**Ausblenden per Label:** Entities mit dem Label `ad_hide` erscheinen nie. Mit `hide_labels` kommen eigene Labels dazu. Dabei zählt das Label am Entity, am Gerät und am Bereich: Ein Gerät mit dem Label verschwindet mit allen seinen Entities, ein Bereich mit allen Geräten darin. Die Label-ID steht unter Einstellungen → Bereiche, Labels & Zonen → Labels; im Editor wählt man die Labels einfach an.
+Hidden entities and diagnostic or configuration entities never appear anyway. An entity's area is its own or its device's.
 
-Versteckte Entities und Diagnose-/Konfigurations-Entities erscheinen ohnehin nicht. Die Area eines Entities ist seine eigene oder die seines Geräts.
-
-## Entwicklung
+## Development
 
 ```bash
-npx vite        # Testseite mit Mock-Daten: http://localhost:5173/dev/index.html
-npm run dev     # Build im Watch-Modus
-npm test        # Vitest für Modell, Darstellung und Strategy
-npm run deploy  # Bundle nach HA_WWW_TARGET kopieren (Samba-Mount oder scp)
-npm run push    # Bundle als Inline-Resource per WebSocket (HA_URL/HA_TOKEN in .env)
+npx vite        # test page with mock data: http://localhost:5173/dev/index.html
+npm run dev     # build in watch mode
+npm test        # Vitest for model, presentation and strategy
+npm run deploy  # copy the bundle to HA_WWW_TARGET (Samba mount or scp)
+npm run push    # push the bundle as an inline resource over WebSocket (HA_URL/HA_TOKEN in .env)
 ```
 
-Die Testseite (`dev/`) rendert die generierten Views ungefähr so wie HAs Sections-View, mit Fake-States aus `dev/mock.ts`. Service-Aufrufe ändern die Fake-States, More-Info erscheint als Toast. `?theme=light` und `?glass` schalten die Optik um.
+The test page (`dev/`) renders the generated views roughly like HA's sections view, with fake states from `dev/mock.ts`. Service calls change the fake states, more-info appears as a toast. `?theme=light` and `?glass` switch the look, `?nav=left` moves the nav bar, `?editor` shows the config editor.
 
-| Datei | Inhalt |
+| File | Contents |
 |---|---|
-| `src/strategy.ts` | erzeugt Views und Sections |
-| `src/model.ts` | Areas, Etagen, Gruppen, Status-Zähler (reine Funktionen) |
-| `src/presentation.ts` | Icons, aktiv/inaktiv, Farben (Port aus HArmony) |
-| `src/styles/tokens.ts` | Farben, Kartenform, Glas |
-| `src/cards/*` | `ad-tile`, `ad-room-card`, `ad-status-bar`, `ad-header`, `ad-nav-bar` |
+| `src/strategy.ts` | builds views and sections |
+| `src/model.ts` | areas, floors, groups, status counts (pure functions) |
+| `src/presentation.ts` | icons, active/inactive, colors (ported from HArmony) |
+| `src/personal.ts` | users' own settings |
+| `src/styles/tokens.ts` | colors, card shape, glass |
+| `src/cards/*` | `ad-tile`, `ad-room-card`, `ad-status-bar`, `ad-header`, `ad-nav-bar` and the page cards |
 
 ## Release
 
-Ein GitHub-Release mit Tag `vX.Y.Z` veröffentlichen. Der Workflow `release.yml` setzt die Version, baut und hängt `auto-dashboard.js` an das Release. Von dort lädt HACS die Datei.
+Publish a GitHub release with tag `vX.Y.Z`. The `release.yml` workflow sets the version, builds and attaches `auto-dashboard.js` to the release. HACS downloads the file from there.
