@@ -56,6 +56,8 @@ const config: StrategyConfig = {
   face: params.has('face') ? { after: Number(params.get('after') ?? 3), style: (params.get('face') || 'clock') as NonNullable<StrategyConfig['face']>['style'] } : undefined,
   // ?as=leni&users={"leni":{"access":"read_only"}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,
+  // ?popup adds the doorbell popup; "Klingeln" in the bar (or ?ring=3, after three seconds) rings like the Reolink: on for 4 s
+  popups: params.has('popup') ? [{ trigger: 'binary_sensor.haustur_besucher', ...(params.get('popup') ? { close_after: Number(params.get('popup')) } : {}) }] : undefined,
 }
 let hass: HomeAssistant = createHass(dark)
 if (params.get('warn') === 'on') {
@@ -112,6 +114,20 @@ hass.callWS = async <T,>(msg: Record<string, unknown>) => {
   }
   return baseWS<T>(msg)
 }
+
+/** Sets one entity's state and hands the new states to every card, like HA does */
+function setState(id: string, state: string) {
+  const before = hass.states[id]!
+  hass = { ...hass, states: { ...hass.states, [id]: { ...before, state, last_changed: new Date().toISOString() } } }
+  for (const card of cards) card.hass = hass
+}
+
+function ring() {
+  setState('binary_sensor.haustur_besucher', 'on')
+  setTimeout(() => setState('binary_sensor.haustur_besucher', 'off'), 4000)
+}
+;(window as any).ring = ring
+if (params.has('ring')) setTimeout(ring, Number(params.get('ring') || 0) * 1000)
 
 function toast(text: string) {
   const el = document.getElementById('toast')!
@@ -181,6 +197,12 @@ function render() {
     tabs.append(b)
   }
   tabs.append(Object.assign(document.createElement('span'), { className: 'spacer' }))
+  if (config.popups) {
+    const bell = document.createElement('button')
+    bell.textContent = 'Klingeln'
+    bell.onclick = ring
+    tabs.append(bell)
+  }
   const themeBtn = document.createElement('button')
   themeBtn.textContent = dark ? 'Hell' : 'Dunkel'
   themeBtn.onclick = () => { dark = !dark; hass = { ...hass, themes: { darkMode: dark } }; document.body.classList.toggle('light', !dark); render() }

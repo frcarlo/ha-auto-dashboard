@@ -20,6 +20,7 @@ describe('waiting for a switch', () => {
     expect(expected(hass, 'light', 'turn_on', ['light.a'], { brightness_pct: 40 })).toEqual({ ids: ['light.a'], flip: false })
     expect(expected(hass, 'cover', 'open_cover', ['cover.d']).ids).toEqual([])
     expect(expected(hass, 'cover', 'stop_cover', ['cover.d']).ids).toEqual([])
+    expect(expected(hassOf(st('button.b', 'unknown')), 'button', 'press', ['button.b'])).toEqual({ ids: ['button.b'], flip: false })
   })
 
   it('shows only after a moment and ends when the new state arrives', () => {

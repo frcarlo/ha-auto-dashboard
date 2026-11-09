@@ -10,6 +10,7 @@ import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { findCameras } from './cameras'
+import { resolvePopups } from './popups'
 import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
@@ -220,7 +221,12 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     // Washer, dryer, dishwasher: the face shows them while they run or wait to be emptied
     ...(appliances.length ? { appliances } : {}),
   } : undefined
-  const nav = fullWidth([{ type: 'custom:ad-nav-bar', items: navItems.filter(i => !ownHidden.has(i.path)), position, ...(config.ha_colors === false ? { ha_colors: false } : {}), ...(face ? { face } : {}), ...look }])
+  // Popups (the doorbell's camera and the door's buttons) open on every page, so the nav bar carries them like the face
+  const popups = resolvePopups(hass, config.popups)
+  const nav = fullWidth([{
+    type: 'custom:ad-nav-bar', items: navItems.filter(i => !ownHidden.has(i.path)), position, ...(config.ha_colors === false ? { ha_colors: false } : {}),
+    ...(face ? { face } : {}), ...(popups.length ? { popups } : {}), ...look,
+  }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
   const has = (path: string) => domainPages.some(p => p.path === path) && !ownHidden.has(path) ? path : undefined

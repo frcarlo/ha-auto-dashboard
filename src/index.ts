@@ -22,6 +22,7 @@ import { AdCalendar } from './cards/calendar'
 import { AdLists } from './cards/lists'
 import { AdCameras } from './cards/cameras'
 import { AdMusic } from './cards/music'
+import { AdPopup } from './cards/popup'
 import { AdStrategyEditor } from './editor'
 import { AdRoomSettings } from './editor-rooms'
 import type { HomeAssistant, StrategyConfig } from './types'
@@ -82,6 +83,7 @@ define('ad-cameras', AdCameras)
 define('ad-activity', AdActivity)
 define('ad-settings', AdSettings)
 define('ad-music', AdMusic)
+define('ad-popup', AdPopup)
 define('ad-strategy-editor', AdStrategyEditor)
 define('ad-room-settings', AdRoomSettings)
 

@@ -1,4 +1,5 @@
-// Row of scene and script buttons on Home. A tap runs it and shows a short check, or a cross when HA refused.
+// Row of scene and script buttons on Home. The first tap asks, the second runs it and shows a short check,
+// or a cross when HA refused.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
@@ -13,9 +14,12 @@ interface ScenesConfig extends BaseConfig {
 type Feedback = 'ok' | 'error'
 
 export class AdScenes extends BaseCard<ScenesConfig> {
-  static properties = { ...BaseCard.properties, feedback: { state: true } }
+  static properties = { ...BaseCard.properties, feedback: { state: true }, armed: { state: true } }
   feedback: Record<string, Feedback> = {}
+  /** The scene waiting for its second tap */
+  armed?: string
   private timer?: number
+  private armTimer?: number
 
   static styles = [tokens, css`
     :host { display: block; }
@@ -35,6 +39,9 @@ export class AdScenes extends BaseCard<ScenesConfig> {
     .pulse { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--ad-primary)); animation: pulse 1.2s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.3; } }
     @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+    /* Waiting for the second tap */
+    button.armed { box-shadow: inset 0 0 0 2px rgb(var(--ad-primary)); }
+    button.armed .sub { color: rgb(var(--ad-primary)); opacity: 1; font-weight: 500; }
   `]
 
   getGridOptions() {
@@ -48,6 +55,19 @@ export class AdScenes extends BaseCard<ScenesConfig> {
   disconnectedCallback() {
     super.disconnectedCallback()
     window.clearTimeout(this.timer)
+    window.clearTimeout(this.armTimer)
+    this.armed = undefined
+  }
+
+  /** A scene can change half the house, so it runs on the second tap */
+  private tap(entity: HassEntity) {
+    window.clearTimeout(this.armTimer)
+    if (this.armed === entity.entity_id) {
+      this.armed = undefined
+      return this.run(entity)
+    }
+    this.armed = entity.entity_id
+    this.armTimer = window.setTimeout(() => { this.armed = undefined }, 4000)
   }
 
   protected watched() {
@@ -93,10 +113,11 @@ export class AdScenes extends BaseCard<ScenesConfig> {
         const icon = feedback === 'ok' ? 'mdi:check' : feedback === 'error' ? 'mdi:alert-circle-outline'
           : this.hass!.entities[entity.entity_id]?.icon ?? entity.attributes.icon ?? entityIcon(entity)
         const color = feedback === 'ok' ? 'success' : feedback === 'error' ? 'error' : ''
-        return html`<button ?disabled=${isUnavailable(entity) || !this.canControl(entity.entity_id)}
-          @click=${() => this.run(entity)}>
+        const armed = this.armed === entity.entity_id
+        return html`<button class=${armed ? 'armed' : ''} ?disabled=${isUnavailable(entity) || !this.canControl(entity.entity_id)}
+          @click=${() => this.tap(entity)}>
           <span class="dot ${color}"><ha-icon icon=${icon}></ha-icon></span>
-          <span class="text"><span class="name">${entityName(entity)}</span><span class="sub">${this.sub(entity)}</span></span>
+          <span class="text"><span class="name">${entityName(entity)}</span><span class="sub">${armed ? t(this.hass, 'run.again_long') : this.sub(entity)}</span></span>
         </button>`
       })}
     </div>`

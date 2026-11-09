@@ -23,6 +23,10 @@ interface TileConfig extends BaseConfig {
 
 const LARGE = ['light', 'climate', 'cover', 'media_player', 'sensor']
 const TOGGLES = ['light', 'switch', 'fan', 'input_boolean']
+/** Run once on a tap: scenes, scripts and buttons. They are small tiles and take a second tap. */
+const RUNNABLE = ['scene', 'script', 'button', 'input_button']
+/** How long a tile waits for the second tap. */
+const ASK_MS = { run: 4000, off: 6000 }
 
 /** Pilot light color for a state color, as the r, g, b variable the materials use. */
 const PILOT: Record<string, string> = {
@@ -155,6 +159,17 @@ export class AdTile extends BaseCard<TileConfig> {
     .sub { font-size: 12px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* A socket asking before it goes off: the question in amber, the button in the alarm red */
     .row.asking .sub { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
+    /* Scenes, scripts and buttons are half-width tiles: the name takes two lines, one while a line below says something */
+    .row.run { gap: 10px; padding: 0 12px; }
+    .row.run .label {
+      white-space: normal; font-size: 13px; line-height: 1.2;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .row.run:has(.sub) .label { -webkit-line-clamp: 1; }
+    /* A scene, script or button waiting for its second tap */
+    .row.armed { box-shadow: inset 0 0 0 2px rgb(var(--ad-primary)); }
+    .row.armed .sub { color: rgb(var(--ad-primary)); opacity: 1; font-weight: 500; }
+    .row.armed > ha-icon { color: rgb(var(--ad-primary)); opacity: 1; }
     /* A socket's current power, tappable for its history */
     .watts { position: relative; z-index: 1; flex: none; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; opacity: 0.85; }
     .off-btn {
@@ -195,6 +210,8 @@ export class AdTile extends BaseCard<TileConfig> {
     const domain = domainOf(this.config?.entity ?? '')
     // A light is a small square: three to a row in a room, more where the section is wider
     if (domain === 'light') return { columns: 4, rows: 2, min_columns: 3, min_rows: 2 }
+    // Scenes, scripts and buttons are small: two to a row
+    if (RUNNABLE.includes(domain)) return { columns: 6, rows: 1, min_columns: 4 }
     const large = LARGE.includes(domain)
     // Rows take the full section width, so names have room
     return { columns: large ? 6 : 12, rows: large ? 2 : 1, min_rows: large ? 2 : 1 }
@@ -277,16 +294,21 @@ export class AdTile extends BaseCard<TileConfig> {
   private onTap() {
     const entity = this.entity
     if (!entity || isUnavailable(entity)) return this.moreInfo(this.config!.entity)
-    // A tap while the row asks takes the question back
-    if (this.asking) return this.endAsk()
-    if (this.controllable && isOutlet(entity, this.hass) && entity.state === 'on') {
-      this.asking = true
-      window.clearTimeout(this.askTimer)
-      this.askTimer = window.setTimeout(() => this.endAsk(), 6000)
+    const domain = domainOf(entity.entity_id)
+    const runnable = RUNNABLE.includes(domain)
+    // A scene, script or button runs on the second tap; a tap while a socket asks takes the question back
+    if (this.asking) {
+      this.endAsk()
+      if (runnable && this.controllable) this.toggle(entity)
       return
     }
-    const domain = domainOf(entity.entity_id)
-    if (this.controllable && [...TOGGLES, 'scene', 'script'].includes(domain)) this.toggle(entity)
+    if (this.controllable && (runnable || (isOutlet(entity, this.hass) && entity.state === 'on'))) {
+      this.asking = true
+      window.clearTimeout(this.askTimer)
+      this.askTimer = window.setTimeout(() => this.endAsk(), runnable ? ASK_MS.run : ASK_MS.off)
+      return
+    }
+    if (this.controllable && TOGGLES.includes(domain)) this.toggle(entity)
     else this.moreInfo(entity.entity_id)
   }
 
@@ -522,20 +544,24 @@ export class AdTile extends BaseCard<TileConfig> {
     // A lock always shows its pilot: green when locked, amber when open
     const color = lock ? (active ? 'success' : 'warning') : stateColor(entity, active)
     const lit = lock || active
-    const runnable = domain === 'scene' || domain === 'script'
+    const runnable = RUNNABLE.includes(domain)
     // Cues for a change seen on screen; keyed by state, so each change gets fresh elements and plays once
     const fresh = this.fresh === entity.state
     const deviceClass = (entity.attributes.device_class as string | undefined) ?? ''
     const cue = domain === 'binary_sensor' && active && fresh ? (RING.includes(deviceClass) ? 'ring' : POP.includes(deviceClass) ? 'pop' : '') : ''
     const pending = (lock && ['locking', 'unlocking', 'opening'].includes(entity.state)) || this.progress === 'busy' ? 'pending' : ''
     const latch = lock && fresh && !pending ? (active ? 'latch' : 'unlatch') : ''
-    // A socket only goes off after a second, deliberate tap on "Switch off"
-    const asking = this.asking && entity.state === 'on'
-    return this.wrap(`row ${lit ? 'on' : ''} ${asking ? 'asking' : ''} ${off}`, html`
+    // A socket only goes off after a second, deliberate tap on "Switch off"; a scene, script or button runs
+    // on a second tap anywhere on the tile
+    const asking = this.asking && entity.state === 'on' && !runnable
+    const armed = this.asking && runnable
+    const progress = this.progress
+    const runSub = armed ? t(this.hass, 'run.again') : progress ? t(this.hass, progress === 'busy' ? 'wait.running' : 'wait.failed') : ''
+    return this.wrap(`row ${runnable ? 'run' : ''} ${lit ? 'on' : ''} ${asking ? 'asking' : ''} ${armed ? 'armed' : ''} ${off}`, html`
       ${keyed(entity.state, html`<ha-icon class=${latch} icon=${this.hass!.entities[entity.entity_id]?.icon ?? entityIcon(entity, active)}></ha-icon>`)}
       <div class="row-text">
         <span class="label">${this.label}</span>
-        ${runnable ? nothing : html`<span class="sub">${asking ? t(this.hass, 'off.ask')
+        ${runnable ? (runSub ? html`<span class="sub">${runSub}</span>` : nothing) : html`<span class="sub">${asking ? t(this.hass, 'off.ask')
           : this.progress ? t(this.hass, this.progress === 'busy' ? 'wait.switching' : 'wait.failed')
           : [this.hass!.formatEntityState?.(entity) ?? entity.state, this.reading(this.config!.energy)].filter(Boolean).join(' · ')}</span>`}
       </div>

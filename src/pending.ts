@@ -42,7 +42,9 @@ const GONE = ['unavailable', 'unknown']
  * nothing (stop a cover, a target temperature, a remote key) aren't tracked.
  */
 export function expected(hass: HomeAssistant, domain: string, service: string, ids: string[], data: Record<string, unknown> = {}) {
-  const states = ids.map(id => hass.states[id]).filter((e): e is HassEntity => !!e && !GONE.includes(e.state))
+  // A button never pressed is "unknown" and still works
+  const gone = service === 'press' ? ['unavailable'] : GONE
+  const states = ids.map(id => hass.states[id]).filter((e): e is HassEntity => !!e && !gone.includes(e.state))
   const unless = (state: string) => states.filter(e => e.state !== state).map(e => e.entity_id)
   const all = states.map(e => e.entity_id)
   const scene = domain === 'scene' || domain === 'script'
@@ -55,7 +57,7 @@ export function expected(hass: HomeAssistant, domain: string, service: string, i
     case 'unlock': return { ids: unless('unlocked'), flip: true }
     case 'open_cover': return { ids: unless('open'), flip: true }
     case 'close_cover': return { ids: unless('closed'), flip: true }
-    case 'open': case 'start': case 'return_to_base': return { ids: all, flip: false }
+    case 'open': case 'start': case 'return_to_base': case 'press': return { ids: all, flip: false }
     default: return { ids: [] as string[], flip: false }
   }
 }

@@ -1,5 +1,5 @@
 // Keeps the saved strategy config as small as hand-written YAML: no defaults, no empty lists.
-import type { RoomSettings, StrategyConfig, UserRule } from './types'
+import type { PopupRule, RoomSettings, StrategyConfig, UserRule } from './types'
 
 const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', ha_colors: true, forecast_days: 3 }
 const RULE_DEFAULTS: Partial<Record<string, unknown>> = { access: 'full', settings: true }
@@ -73,10 +73,22 @@ function unalias<T extends object>(obj: T, aliases: Record<string, Alias>): T {
   return out as T
 }
 
+/**
+ * Popups as YAML allows them: one rule instead of a list, a bare trigger id for a rule, one action instead of a list.
+ */
+function normalizePopups(popups: unknown): PopupRule[] {
+  const list = Array.isArray(popups) ? popups : [popups]
+  return list
+    .map(rule => typeof rule === 'string' ? { trigger: rule.trim() } : rule as PopupRule | null)
+    .filter((rule): rule is PopupRule => !!rule && typeof rule === 'object')
+    .map(rule => listify(rule, ['actions']))
+}
+
 /** Hand-written YAML tolerated: old key names, and single values for lists, in the dashboard, user rules and room settings. */
 export function normalizeConfig(config: StrategyConfig): StrategyConfig {
   const out = listify(unalias(config, ALIASES), LIST_KEYS)
   if (out.users) out.users = Object.fromEntries(Object.entries(out.users).map(([k, rule]) => [k, listify(unalias(rule ?? {}, RULE_ALIASES), RULE_LIST_KEYS)]))
   if (out.rooms) out.rooms = Object.fromEntries(Object.entries(out.rooms).map(([k, room]) => [k, listify(room ?? {}, ROOM_LIST_KEYS)]))
+  if (out.popups) out.popups = normalizePopups(out.popups)
   return out
 }

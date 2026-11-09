@@ -84,7 +84,11 @@ export function hvacColor(mode: string): StateColor {
 
 export const domainOf = (entityId: string) => entityId.split('.')[0] ?? ''
 export const deviceClassOf = (entity?: MinimalEntity) => entity?.attributes?.device_class as string | undefined
-export const isUnavailable = (entity?: MinimalEntity) => !entity || entity.state === 'unavailable' || entity.state === 'unknown'
+/** Their state is the last time they ran, so "unknown" only means never yet */
+const STATELESS = ['button', 'input_button', 'scene']
+
+export const isUnavailable = (entity?: MinimalEntity) => !entity || entity.state === 'unavailable'
+  || (entity.state === 'unknown' && !STATELESS.includes(entity.entity_id.split('.')[0]!))
 
 export function isActive(entity: MinimalEntity | undefined, activeState?: string) {
   if (!entity) return false

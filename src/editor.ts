@@ -4,6 +4,8 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
 import { HIDE_LABEL, hideOf, isRoomFavorite, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
+import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
+import { entityName } from './presentation'
 import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
 import { WEATHER_SENSORS } from './weather'
@@ -11,7 +13,7 @@ import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import { accessOf } from './access'
-import type { Access, ApplianceConfig, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
+import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
 interface HaUser {
   id: string
@@ -44,7 +46,7 @@ const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
-  'lock', 'alarm_control_panel', 'scene', 'script', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
+  'lock', 'alarm_control_panel', 'scene', 'script', 'button', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
 ] as const
 
 export class AdStrategyEditor extends LitElement {
@@ -316,6 +318,49 @@ export class AdStrategyEditor extends LitElement {
     found.length ? this.l('ed.appliances_found', { names: found.join(', ') }) : this.l('ed.appliances_none'))
   }
 
+  /**
+   * Popups: when a trigger fires, a window with the camera and the door's buttons. Doorbells found in the house are
+   * offered as ready rules; camera and buttons stay empty until picked and are found on their own meanwhile.
+   */
+  private renderPopups() {
+    const c = this.config
+    const list = c.popups ?? []
+    const set = (next: PopupRule[]) => this.change({ popups: next.length ? next : undefined })
+    const update = (i: number, patch: Partial<PopupRule>) => set(list.map((rule, j) => j !== i ? rule
+      : Object.fromEntries(Object.entries({ ...rule, ...patch }).filter(([k, v]) => k === 'trigger' || (v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)))) as unknown as PopupRule))
+    const doorbells = findDoorbells(this.hass!).filter(id => !list.some(rule => rule.trigger === id))
+    const name = (id: string) => {
+      const device = this.hass!.devices[this.hass!.entities[id]?.device_id ?? '']
+      return device?.name_by_user ?? device?.name ?? entityName(this.hass!.states[id], id)
+    }
+    const auto = (rule: PopupRule) => {
+      if (!rule.trigger || (rule.camera && rule.actions?.length)) return nothing
+      const ids = [...(rule.camera ? [] : [cameraFor(this.hass!, rule.trigger)]), ...(rule.actions?.length ? [] : actionsFor(this.hass!, rule.trigger))]
+        .filter((id): id is string => !!id)
+      return html`<span class="hint">${ids.length ? this.l('ed.popup_auto', { ids: ids.join(', ') }) : this.l('ed.popup_auto_none')}</span>`
+    }
+    return this.field(this.l('ed.popups'), html`
+      ${list.map((rule, i) => html`<div class="appliance">
+        <span>${this.l('ed.popup_trigger')}</span>
+        ${this.singleEntityPicker(rule.trigger || undefined, ['binary_sensor', 'event', 'input_boolean'], trigger => update(i, { trigger: trigger ?? '' }))}
+        <span>${this.l('ed.popup_camera')}</span>
+        ${this.singleEntityPicker(rule.camera, 'camera', camera => update(i, { camera }))}
+        <span>${this.l('ed.popup_actions')}</span>
+        ${this.entityPicker(rule.actions, ['lock', 'button', 'input_button', 'script', 'switch'], actions => update(i, { actions }))}
+        <span></span>${auto(rule)}
+        <span>${this.l('ed.popup_title')}</span>
+        <input type="text" .value=${rule.title ?? ''} placeholder=${rule.trigger ? name(rule.trigger) : ''}
+          @change=${(e: Event) => update(i, { title: (e.target as HTMLInputElement).value.trim() || undefined })}>
+        <span>${this.l('ed.popup_close_after')}</span>
+        <div class="seg" role="group">${[30, 60, 120, 300].map(n => html`
+          <button aria-pressed=${(rule.close_after ?? CLOSE_AFTER) === n} @click=${() => update(i, { close_after: n === CLOSE_AFTER ? undefined : n })}>${n < 60 ? `${n} s` : `${n / 60} min`}</button>`)}</div>
+        <button class="link" @click=${() => set(list.filter((_, j) => j !== i))}>${this.l('ed.remove')}</button>
+      </div>`)}
+      ${doorbells.map(id => html`<button class="link" @click=${() => set([...list, { trigger: id }])}>${this.l('ed.popup_doorbell', { name: name(id) })}</button>`)}
+      <button class="link" @click=${() => set([...list, { trigger: '' }])}>${this.l('ed.popup_add')}</button>`,
+    this.l('ed.popups_hint'))
+  }
+
   /** HA's media picker with upload, like in its own view background editor, when it is loaded, else a path. */
   private imagePicker(value: string | undefined) {
     const set = (background_image?: string) => this.change({ background_image: background_image?.trim() || undefined })
@@ -406,6 +451,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.calendars'), this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
         ${this.toggle(this.l('ed.calendar_edit'), c.calendar_edit !== false, calendar_edit => this.change({ calendar_edit: calendar_edit ? undefined : false }))}
         ${this.renderAppliances()}
+        ${this.renderPopups()}
         ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
           c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint'))}
         ${c.hide_domains?.includes('weather') ? nothing : html`

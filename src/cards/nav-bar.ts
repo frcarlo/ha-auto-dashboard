@@ -8,6 +8,8 @@ import type { NavPosition } from '../types'
 import { PALETTE_VARS, haGlassVars, haThemeVars } from '../styles/palette'
 import './face'
 import type { AdFace, FaceSettings } from './face'
+import { AdPopup } from './popup'
+import type { Popup } from '../popups'
 
 export interface NavItem {
   path: string
@@ -22,6 +24,8 @@ interface NavBarConfig extends BaseConfig {
   ha_colors?: boolean
   /** The face after a while without a touch; the bar is on every page, so it carries it */
   face?: FaceSettings
+  /** Windows that open when something happens (the doorbell rings); carried by the bar for the same reason */
+  popups?: Popup[]
 }
 
 
@@ -95,6 +99,28 @@ function placeFace(settings: FaceSettings | undefined, from: HTMLElement, hass: 
     else face.style.removeProperty(name)
   }
 }
+
+/** The popup window, one for the whole dashboard, so a ring is seen on whatever page is open */
+let popup: AdPopup | undefined
+
+function placePopup(config: NavBarConfig | undefined, hass: unknown) {
+  if (!config?.popups?.length) {
+    popup?.remove()
+    popup = undefined
+    return
+  }
+  if (!popup) {
+    if (!customElements.get('ad-popup')) customElements.define('ad-popup', AdPopup)
+    popup = document.createElement('ad-popup') as AdPopup
+    document.body.appendChild(popup)
+  }
+  const next = { type: 'popup', popups: config.popups, theme: config.theme, glass: config.glass, primary_color: config.primary_color, access: config.access }
+  if (JSON.stringify(popup.config) !== JSON.stringify(next)) popup.setConfig(next)
+  popup.hass = hass as AdPopup['hass']
+}
+
+/** The dashboard's popup element, for the dev harness */
+export const popupElement = () => popup
 
 let sidebarObserver: ResizeObserver | undefined
 
@@ -229,6 +255,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
         tintHa(undefined)
         pad(undefined, undefined)
         placeFace(undefined, document.body, undefined)
+        placePopup(undefined, undefined)
       }
     }, 0)
   }
@@ -236,6 +263,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
   // The bar itself only changes with the config or theme, but the face shows live states
   protected shouldUpdate(changed: Map<string | number | symbol, unknown>) {
     if (face && this.config?.face && changed.has('hass')) face.hass = this.hass
+    if (popup && this.config?.popups && changed.has('hass')) popup.hass = this.hass
     return super.shouldUpdate(changed as never)
   }
 
@@ -267,6 +295,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     bar.style.setProperty('--ad-offset', `${sidebarRight()}px`)
     this.padView()
     placeFace(this.config.face, this, this.hass)
+    placePopup(this.config, this.hass)
     // A bare dashboard URL shows the first view
     const active = currentView() || this.config.items[0]?.path
     const dashboard = location.pathname.split('/')[1]

@@ -143,7 +143,8 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     const c = this.config!
     const entities = this.entities
     const ids = entities.map(e => e.entity_id)
-    const progress = ids.some(id => this.waiting(id)) ? 'busy' : ids.some(id => this.noAnswer(id)) ? 'failed' : ''
+    // Only a heading with a control for the whole group reports on it; its tiles speak for themselves otherwise
+    const progress = !c.control ? '' : ids.some(id => this.waiting(id)) ? 'busy' : ids.some(id => this.noAnswer(id)) ? 'failed' : ''
     const count = progress ? t(this.hass, progress === 'busy' ? 'wait.switching' : 'wait.failed') : this.countText(entities)
     return html`<div class="wrap ${c.sub ? 'sub' : ''} ${c.minor ? 'minor' : ''}">
       <span class="title" role=${c.path ? 'link' : nothing} tabindex=${c.path ? '0' : nothing}

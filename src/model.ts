@@ -28,7 +28,7 @@ export type { GroupKey } from './types'
 
 /** Order in which groups appear on a room page. */
 export const GROUP_ORDER: GroupKey[] = [
-  'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene',
+  'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene', 'button',
 ]
 
 /** Groups the security page collects. */
@@ -49,6 +49,8 @@ const GROUP_BY_DOMAIN: Record<string, GroupKey> = {
   input_select: 'select',
   scene: 'scene',
   script: 'scene',
+  button: 'button',
+  input_button: 'button',
   sensor: 'sensor',
 }
 
@@ -75,8 +77,20 @@ export function coverKind(entity: HassEntity): 'shading' | 'awning' | 'opening' 
 
 export const isAwning = (entity: HassEntity) => domainOf(entity.entity_id) === 'cover' && coverKind(entity) === 'awning'
 
+/**
+ * Buttons that keep a device running rather than do something in the room: identify, restart, update, calibrate,
+ * "battery replaced", caches. Integrations often leave them without a category, so the name decides.
+ */
+const MAINTENANCE_BUTTON = /identif|reboot|neu ?start|restart|batter(y|ie)|calibrat|kalibrier|platform api|favorisier|purge|cache|firmware|update|aktualisier|screenshot|snapshot|selbsttest|self[ _-]?test|report|ignore|ignorier/i
+
+export function isMaintenanceButton(entity: HassEntity) {
+  if (['restart', 'update', 'identify'].includes(deviceClassOf(entity) ?? '')) return true
+  return MAINTENANCE_BUTTON.test(`${entity.entity_id} ${entity.attributes.friendly_name ?? ''}`)
+}
+
 export function groupOf(entity: HassEntity): GroupKey | undefined {
   const domain = domainOf(entity.entity_id)
+  if ((domain === 'button' || domain === 'input_button') && isMaintenanceButton(entity)) return undefined
   if (domain === 'binary_sensor') return BINARY_GROUPS[deviceClassOf(entity) ?? '']
   if (domain === 'cover') return coverKind(entity)
   // Sockets are devices of their own on a room page, apart from switches that are device settings
@@ -110,6 +124,19 @@ function labelled(hass: HomeAssistant, entityId: string, labels: string[]) {
   return has(entry?.labels) || has(hass.devices[entry?.device_id ?? '']?.labels) || has(hass.areas[entityAreaId(hass, entityId) ?? '']?.labels)
 }
 
+/** A word for a screen in a light's id or name: "Wandtablet Screen", light.tv_backlight, "Display Helligkeit". */
+const SCREEN_WORDS = /(^|[\s_.-])(screen|bildschirm|display|backlight|hintergrundbeleuchtung)([\s_.-]|$)/i
+
+/**
+ * A tablet's or display's brightness that its integration reports as a light (ESPHome, Fully Kiosk and others).
+ * It's a device setting, not a lamp: it stays out of the lights, their counts and "all off".
+ */
+export function isScreenLight(hass: HomeAssistant, entityId: string) {
+  if (domainOf(entityId) !== 'light') return false
+  const name = hass.entities[entityId]?.name ?? hass.states[entityId]?.attributes.friendly_name ?? ''
+  return SCREEN_WORDS.test(entityId) || SCREEN_WORDS.test(String(name))
+}
+
 /**
  * Entities that should show up anywhere, keyed by area. Area comes from the entity,
  * falling back to its device. Cached per registry object and label set, so cheap to call on every render.
@@ -125,8 +152,11 @@ export function entityIndex(hass: HomeAssistant, hideLabels: string[] = []): Ind
 
   const byArea = new Map<string, string[]>()
   const all: string[] = []
+  // A wall tablet's or display's own buttons (reload page, next slide, close overlays) go with its screen
+  const screens = new Set(Object.values(hass.entities).filter(e => isScreenLight(hass, e.entity_id)).map(e => e.device_id).filter(Boolean))
   for (const entry of Object.values(hass.entities)) {
-    if (entry.hidden || entry.entity_category || labelled(hass, entry.entity_id, labels)) continue
+    if (entry.hidden || entry.entity_category || labelled(hass, entry.entity_id, labels) || isScreenLight(hass, entry.entity_id)) continue
+    if (domainOf(entry.entity_id) === 'button' && entry.device_id && screens.has(entry.device_id)) continue
     all.push(entry.entity_id)
     const areaId = entityAreaId(hass, entry.entity_id)
     if (!areaId) continue

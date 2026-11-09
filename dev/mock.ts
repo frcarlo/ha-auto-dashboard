@@ -24,12 +24,16 @@ const defs: Def[] = [
   ['binary_sensor.kuche_fenster', 'off', { friendly_name: 'Küche Fenster', device_class: 'window' }, 'kuche'],
   ['media_player.kuche_radio', 'paused', { friendly_name: 'Küche Radio', app_name: 'Radio Bremen', supported_features: 16417 }, 'kuche'],
   ['switch.kuche_kaffee', 'on', { friendly_name: 'Kaffeemaschine', device_class: 'outlet' }, 'kuche'],
+  // Buttons: one that does something in the room, and an identify button that stays out
+  ['button.kuche_dunstabzug_nachlauf', '2026-11-08T18:00:00+00:00', { friendly_name: 'Dunstabzug Nachlauf' }, 'kuche'],
+  ['button.kuche_dunstabzug_identifizieren', 'unknown', { friendly_name: 'Dunstabzug Identifizieren' }, 'kuche'],
 
   ['light.esszimmer', 'on', { friendly_name: 'Esszimmer', brightness: 90, supported_color_modes: ['brightness'] }, 'esszimmer'],
   ['cover.esszimmer', 'closed', { friendly_name: 'Esszimmer Rollo', current_position: 0 }, 'esszimmer'],
   ['cover.esszimmer_markise', 'open', { friendly_name: 'Esszimmer Markise', device_class: 'awning', current_position: 60 }, 'esszimmer'],
 
-  ['lock.eingangstur', 'locked', { friendly_name: 'Haustür' }, 'eingangstur'],
+  // Supports lock.open (feature 1), like the Nuki: the doorbell popup offers "Open door"
+  ['lock.eingangstur', 'locked', { friendly_name: 'Haustür', supported_features: 1 }, 'eingangstur'],
   ['binary_sensor.eingangstur_kontakt', 'off', { friendly_name: 'Haustür Kontakt', device_class: 'door' }, 'eingangstur'],
   ['binary_sensor.flur_bewegung', 'on', { friendly_name: 'Flur Bewegung', device_class: 'motion' }, 'flur'],
   ['light.flur', 'off', { friendly_name: 'Flur', supported_color_modes: ['onoff'] }, 'flur'],
@@ -489,6 +493,7 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
     const attributes = { ...e.attributes }
     if (service === 'toggle') state = state === 'on' ? 'off' : 'on'
     if (service === 'turn_on') state = domain === 'scene' ? new Date().toISOString() : 'on'
+    if (service === 'press') state = new Date().toISOString()
     if (service === 'turn_off') state = 'off'
     if (domain === 'light' && data.brightness_pct) { state = 'on'; attributes.brightness = Math.round(data.brightness_pct * 2.55) }
     if (domain === 'light' && service === 'turn_on' && !attributes.brightness) attributes.brightness = 255
@@ -497,7 +502,8 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
       if (service === 'open_cover') { state = 'open'; attributes.current_position = 100 }
       if (service === 'close_cover') { state = 'closed'; attributes.current_position = 0 }
     }
-    if (domain === 'lock') state = service === 'lock' ? 'locked' : 'unlocked'
+    // lock.open unlatches the door, like a Nuki pulling the latch
+    if (domain === 'lock') state = service === 'lock' ? 'locked' : service === 'open' ? 'open' : 'unlocked'
     if (domain === 'media_player' && service === 'media_play_pause') state = state === 'playing' ? 'paused' : 'playing'
     if (domain === 'media_player' && service === 'media_play') state = 'playing'
     if (domain === 'media_player' && service === 'media_pause') state = 'paused'

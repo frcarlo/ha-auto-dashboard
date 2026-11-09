@@ -117,6 +117,7 @@ export abstract class BaseCard<C extends BaseConfig = BaseConfig> extends LitEle
   protected toggle(entity: HassEntity) {
     const domain = domainOf(entity.entity_id)
     if (domain === 'scene' || domain === 'script') return this.call(domain, 'turn_on', entity.entity_id)
+    if (domain === 'button' || domain === 'input_button') return this.call(domain, 'press', entity.entity_id)
     if (domain === 'lock') return this.call('lock', entity.state === 'locked' ? 'unlock' : 'lock', entity.entity_id)
     if (domain === 'cover') return this.call('cover', 'toggle', entity.entity_id)
     if (domain === 'vacuum') return this.call('vacuum', entity.state === 'cleaning' ? 'return_to_base' : 'start', entity.entity_id)

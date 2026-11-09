@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -423,5 +423,60 @@ describe('favorite rooms', () => {
     const list = ['light.a', 'kuche', 'switch.b', 'bad']
     expect(replaceFavorites(list, true, ['bad', 'flur'])).toEqual(['light.a', 'bad', 'switch.b', 'flur'])
     expect(replaceFavorites(list, false, ['switch.b'])).toEqual(['switch.b', 'kuche', 'bad'])
+  })
+})
+
+describe('screen lights', () => {
+  const hass = (entityId: string, friendly_name: string) => ({
+    states: { [entityId]: st(entityId, 'on', { friendly_name }) },
+    entities: { [entityId]: { entity_id: entityId, area_id: 'kueche' } },
+    devices: {}, areas: { kueche: { area_id: 'kueche', name: 'Küche' } },
+  }) as unknown as HomeAssistant
+
+  it('treats a tablet or display brightness as a device setting, not a lamp', () => {
+    const tablet = hass('light.samsung_sm_x200_screen', 'Wandtablet Screen')
+    expect(isScreenLight(tablet, 'light.samsung_sm_x200_screen')).toBe(true)
+    expect(areaEntities(tablet, 'kueche')).toEqual([])
+    expect(isScreenLight(hass('light.tablet', 'Küche Bildschirm'), 'light.tablet')).toBe(true)
+    expect(isScreenLight(hass('light.tv_backlight', 'TV'), 'light.tv_backlight')).toBe(true)
+  })
+
+  it('keeps lamps whose names only contain the letters', () => {
+    expect(isScreenLight(hass('light.screenplay_lampe', 'Leselampe'), 'light.screenplay_lampe')).toBe(false)
+    expect(isScreenLight(hass('light.kuche', 'Küchenlicht'), 'light.kuche')).toBe(false)
+    expect(isScreenLight(hass('switch.screen', 'Screen'), 'switch.screen')).toBe(false)
+  })
+})
+
+describe('buttons', () => {
+  const button = (entity_id: string, friendly_name: string, device_class?: string) =>
+    st(entity_id, 'unknown', { friendly_name, ...(device_class ? { device_class } : {}) })
+
+  it('puts buttons that do something into their own group', () => {
+    expect(groupOf(button('button.wake_on_lan_palmi', 'Palmi Wake UP'))).toBe('button')
+    expect(groupOf(button('button.dryer_zyklus_anhalten', 'Trockner Zyklus anhalten'))).toBe('button')
+    expect(groupOf(st('input_button.klingel', 'unknown'))).toBe('button')
+  })
+
+  it('leaves out buttons that keep a device running', () => {
+    for (const [id, name, dc] of [
+      ['button.lampe_identify', 'Lampe Identifizieren'], ['button.spots_reboot', 'Spots Neustart'],
+      ['button.x', 'Thermostat Batterie ersetzt'], ['button.y', 'Restart', 'restart'], ['button.z', 'Deckenlicht Request Platform API State'],
+      ['button.rauchmelder_selbsttest', 'Rauchmelder Selbsttest'],
+    ] as [string, string, string?][]) expect(groupOf(button(id, name, dc)), name).toBeUndefined()
+  })
+
+  it('keeps a wall tablet\'s own buttons out together with its screen', () => {
+    const hass = {
+      states: Object.fromEntries([button('button.tablet_reload_page', 'Wandtablet Reload page'), st('light.tablet_screen', 'on', { friendly_name: 'Wandtablet Screen' }),
+        button('button.kueche_nachlauf', 'Nachlauf')].map(e => [e.entity_id, e])),
+      entities: {
+        'button.tablet_reload_page': { entity_id: 'button.tablet_reload_page', device_id: 'tab' },
+        'light.tablet_screen': { entity_id: 'light.tablet_screen', device_id: 'tab' },
+        'button.kueche_nachlauf': { entity_id: 'button.kueche_nachlauf', area_id: 'kueche' },
+      },
+      devices: { tab: { id: 'tab', area_id: 'kueche' } }, areas: { kueche: { area_id: 'kueche', name: 'Küche' } },
+    } as unknown as HomeAssistant
+    expect(areaEntities(hass, 'kueche').map(e => e.entity_id)).toEqual(['button.kueche_nachlauf'])
   })
 })

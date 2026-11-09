@@ -75,7 +75,7 @@ export type ThemeMode = 'auto' | 'dark' | 'light'
 /** Groups on a room page, by what the entities do */
 export type GroupKey =
   | 'light' | 'climate' | 'shading' | 'awning' | 'opening' | 'gate' | 'lock' | 'media' | 'outlet' | 'switch'
-  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene'
+  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene' | 'button'
 
 /** Where own cards go on a room page: top, bottom, or at the end of a group */
 export type CardSlot = 'top' | 'bottom' | GroupKey
@@ -156,6 +156,23 @@ export interface ApplianceConfig {
   notices?: string[]
 }
 
+/**
+ * A popup under `popups:`: when the trigger fires (the doorbell rings), every open dashboard shows a window with
+ * the camera and buttons for the door. Camera and buttons are found from the trigger's device and room when left out.
+ */
+export interface PopupRule {
+  /** A binary sensor, input boolean or event entity, e.g. the doorbell's visitor sensor */
+  trigger: string
+  camera?: string
+  /** Locks (open, unlock, lock) and buttons, scripts or switches; unset = the locks in the trigger's room */
+  actions?: string[]
+  title?: string
+  /** Seconds the window stays after the trigger fired, 60 by default; it stays while the trigger is still on */
+  close_after?: number
+  /** The state that fires it, on by default; event entities fire on every new event */
+  to?: string
+}
+
 export interface StrategyConfig extends Look {
   type: string
   title?: string
@@ -205,4 +222,6 @@ export interface StrategyConfig extends Look {
   calendar_edit?: boolean
   /** The face after a while without a touch; per user under users */
   face?: FaceConfig
+  /** Windows that open on every dashboard when something happens, e.g. the camera and door buttons when it rings */
+  popups?: PopupRule[]
 }
