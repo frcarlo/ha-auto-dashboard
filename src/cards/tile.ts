@@ -78,9 +78,32 @@ export class AdTile extends BaseCard<TileConfig> {
     .btn { width: 30px; height: 30px; }
     .unavailable { opacity: 0.45; }
 
-    /* Light: the whole tile is the dimmer, so vertical scrolling stays with the page */
-    .light { touch-action: pan-y; }
+    /*
+     * Light: a small square. Light rises from the bottom as high as it is bright, with a clear edge where it ends;
+     * the round icon glows in amber while it is on. The whole tile is the dimmer: dragging across sets the
+     * brightness, so vertical scrolling stays with the page.
+     */
+    .light { touch-action: pan-y; padding: 12px; }
     .light.dragging { cursor: ew-resize; }
+    .light .rise {
+      position: absolute; inset: auto 0 0 0; z-index: 0; pointer-events: none; height: var(--level, 0%);
+      background: linear-gradient(0deg, rgba(var(--ad-warning), 0.42), rgba(var(--ad-warning), 0.24));
+      transition: height 0.25s ease;
+    }
+    .light .rise::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: rgb(var(--ad-warning)); }
+    .light .rise[data-full]::after { display: none; }
+    .light .bulb {
+      position: relative; z-index: 1; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
+      background: rgba(var(--ad-on-surface), 0.1); transition: background 0.25s ease, color 0.25s ease;
+    }
+    .light .bulb ha-icon { --mdc-icon-size: 20px; opacity: 0.6; }
+    .light.on .bulb { background: rgb(var(--ad-warning)); color: #3b2405; box-shadow: 0 0 18px rgba(var(--ad-warning), 0.45); }
+    .light.on .bulb ha-icon { opacity: 1; }
+    .light .label-block { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .light .label-block .name { flex: none; }
+    .light .state { font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .light.on .state { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
+    @media (prefers-reduced-motion: reduce) { .light .rise, .light .bulb { transition: none; } }
 
     /* Thermostat */
     .mode { font-size: 12px; white-space: nowrap; opacity: 0.7; }
@@ -143,7 +166,10 @@ export class AdTile extends BaseCard<TileConfig> {
   }
 
   getGridOptions() {
-    const large = LARGE.includes(domainOf(this.config?.entity ?? ''))
+    const domain = domainOf(this.config?.entity ?? '')
+    // A light is a small square: three to a row in a room, more where the section is wider
+    if (domain === 'light') return { columns: 4, rows: 2, min_columns: 3, min_rows: 2 }
+    const large = LARGE.includes(domain)
     // Rows take the full section width, so names have room
     return { columns: large ? 6 : 12, rows: large ? 2 : 1, min_rows: large ? 2 : 1 }
   }
@@ -317,14 +343,11 @@ export class AdTile extends BaseCard<TileConfig> {
     const lit = level > 0
     const state = !lit ? t(this.hass, 'off') : dimmable ? `${level} %` : t(this.hass, 'on')
     return this.wrap(`light ${lit ? 'on' : ''} ${this.drag?.active ? 'dragging' : ''} ${off}`, html`
-      ${lit ? html`<div class="light-fill" ?data-full=${level >= 100}></div>` : nothing}
-      <div class="top">
+      ${lit ? html`<div class="rise" ?data-full=${level >= 100}></div>` : nothing}
+      <span class="bulb"><ha-icon icon=${entityIcon({ ...entity, state: lit ? 'on' : 'off' })}></ha-icon></span>
+      <div class="label-block">
         <span class="name">${this.label}</span>
-        <span class="pilot ${lit ? 'on' : ''}" style="--pilot: var(--ad-warning)"></span>
-      </div>
-      <div class="bottom">
-        ${lit && dimmable ? html`<span class="big">${level}<small>%</small></span>`
-          : html`<span class="word">${lit ? t(this.hass, 'on') : t(this.hass, 'off')}</span>`}
+        <span class="state">${state}</span>
       </div>
     `, {
       style: `--level:${level}%`,

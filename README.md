@@ -40,7 +40,7 @@ Mehrere Tipps auf −/+ am Thermostat werden gesammelt und nach einer kurzen Pau
 
 Bedienung: Raumkarte antippen öffnet die Raumseite, Doppeltipp schaltet alle Lichter im Raum, ein Tipp auf einen Status-Kreis öffnet den More-Info-Dialog. Kacheln: Tippen schaltet Licht, Schalter und Szenen, alles andere öffnet More-Info. Lange drücken öffnet immer More-Info.
 
-**Kacheln zeigen die Menge, die sie steuern:** Eine Lichtkachel füllt sich mit warmem Licht bis zur Helligkeit; waagerecht über die Kachel ziehen dimmt, die Pfeiltasten auch. Rollos zeigen ihre Lamellen so weit geschlossen, wie sie es sind. Thermostate haben unten einen Streifen von kalt nach warm mit Punkt (gemessen) und Strich (Soll), Prozentwerte wie Luftfeuchte einen Füllstreifen. Schalter und Sensoren sind Zeilen wie ein Wandschalter: die ganze Zeile schaltet, die Kontrolllampe rechts zeigt den Zustand.
+**Kacheln zeigen die Menge, die sie steuern:** Eine Lichtkachel ist ein kleines Quadrat mit rundem Lampensymbol, das bei eingeschaltetem Licht bernsteinfarben leuchtet; warmes Licht steigt von unten so hoch, wie die Lampe hell ist. Waagerecht über die Kachel ziehen dimmt (senkrecht scrollt die Seite weiter), die Pfeiltasten auch. Rollos zeigen ihre Lamellen so weit geschlossen, wie sie es sind. Thermostate haben unten einen Streifen von kalt nach warm mit Punkt (gemessen) und Strich (Soll), Prozentwerte wie Luftfeuchte einen Füllstreifen. Schalter und Sensoren sind Zeilen wie ein Wandschalter: die ganze Zeile schaltet, die Kontrolllampe rechts zeigt den Zustand.
 
 ## Installation
 
