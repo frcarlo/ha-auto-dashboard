@@ -1,8 +1,10 @@
 // The popup: when a rule's trigger fires (someone rings at the door), a window opens over whatever page is showing,
 // with the camera live and buttons for the door. Opening and unlocking ask once more; locking goes right away.
-// It closes on its own a while after the ring, once the trigger is off again, or with a tap on the close button.
+// It closes on its own a while after the ring, once the trigger is off again, or with a tap on the close button;
+// a bar under the title runs down until then.
 // The nav bar puts one into document.body, like the face, so it is there on every page of the dashboard.
 import { css, html, nothing } from 'lit'
+import { keyed } from 'lit/directives/keyed.js'
 import { BaseCard, type BaseConfig } from './base'
 import { tokens } from '../styles/tokens'
 import { t, type Key } from '../i18n'
@@ -35,13 +37,15 @@ const LOCK_LABEL: Record<LockButton, Key> = { open: 'popup.open', unlock: 'popup
 const LOCK_AGAIN: Partial<Record<LockButton, Key>> = { open: 'popup.open_again', unlock: 'popup.unlock_again' }
 
 export class AdPopup extends BaseCard<PopupConfig> {
-  static properties = { ...BaseCard.properties, shown: { state: true }, armed: { state: true }, still: { state: true } }
+  static properties = { ...BaseCard.properties, shown: { state: true }, armed: { state: true }, still: { state: true }, countdown: { state: true } }
 
   /** The popup on screen and when its trigger fired */
   shown?: { popup: Popup; at: number }
   /** `entity|button` waiting for its second tap */
   armed?: string
   still?: string
+  /** When the window closes and how long the bar takes to run down from now; `hold` while the trigger keeps it open */
+  countdown?: { until: number; ms: number } | { hold: true }
 
   private closeTimer?: number
   private armTimer?: number
@@ -105,6 +109,7 @@ export class AdPopup extends BaseCard<PopupConfig> {
     this.live = undefined
     this.liveFor = undefined
     this.still = undefined
+    this.countdown = undefined
     window.clearTimeout(this.closeTimer)
     window.clearTimeout(this.armTimer)
     window.clearInterval(this.stillTimer)
@@ -115,12 +120,17 @@ export class AdPopup extends BaseCard<PopupConfig> {
     window.clearTimeout(this.closeTimer)
     if (!this.shown) return
     const until = Math.max(this.shown.at + this.shown.popup.close_after * 1000, this.touchedAt + AFTER_TOUCH)
+    // A tap that moves the end starts the bar full again; one that doesn't leaves it running
+    if (!this.countdown || !('until' in this.countdown) || this.countdown.until !== until) {
+      this.countdown = { until, ms: Math.max(0, until - Date.now()) }
+    }
     this.closeTimer = window.setTimeout(() => this.check(), Math.max(0, until - Date.now()))
   }
 
   private check() {
     if (!this.shown) return
     if (stillOn(this.shown.popup, this.hass?.states[this.shown.popup.trigger])) {
+      this.countdown = { hold: true }
       this.closeTimer = window.setTimeout(() => this.check(), RECHECK)
       return
     }
@@ -244,7 +254,20 @@ export class AdPopup extends BaseCard<PopupConfig> {
       display: grid; place-items: center;
     }
     .camera img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .camera .live { position: absolute; inset: 0; }
+    /* HA's card around the stream: black like the box, no corners or edge of its own */
+    .camera .live {
+      position: absolute; inset: 0; display: grid; align-content: center;
+      --ha-card-background: #000; --card-background-color: #000; --ha-card-border-radius: 0; --ha-card-border-width: 0;
+      --ha-card-box-shadow: none; --ha-card-backdrop-filter: none;
+    }
+    /* Time until the window closes: runs down from full, starts full again when a tap keeps it open longer */
+    .timer { height: 4px; margin-top: -6px; border-radius: 2px; overflow: hidden; background: rgba(var(--ad-on-surface), 0.1); }
+    .timer span { display: block; height: 100%; border-radius: 2px; background: rgb(var(--ad-primary)); transform-origin: left; }
+    .timer .run { animation: drain var(--ms) linear forwards; }
+    @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+    /* The bell still says someone is there: the window stays, the bar waits full */
+    .timer .hold { opacity: 0.5; animation: ad-wait 1.2s ease-in-out infinite alternate; }
+    @media (prefers-reduced-motion: reduce) { .timer .hold { animation: none; } }
     .camera .none { color: rgba(255, 255, 255, 0.7); display: flex; flex-direction: column; align-items: center; gap: 6px; }
     .group { display: flex; flex-direction: column; gap: 8px; }
     .name { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
@@ -263,6 +286,14 @@ export class AdPopup extends BaseCard<PopupConfig> {
     .act[disabled] { opacity: 0.4; cursor: default; }
   `]
 
+  private timer() {
+    const c = this.countdown
+    if (!c) return nothing
+    return html`<div class="timer" aria-hidden="true">${'hold' in c
+      ? html`<span class="hold"></span>`
+      : keyed(c.until, html`<span class="run" style="--ms: ${c.ms}ms"></span>`)}</div>`
+  }
+
   protected updated() {
     this.toggleAttribute('open', !!this.shown)
   }
@@ -279,6 +310,7 @@ export class AdPopup extends BaseCard<PopupConfig> {
           <div class="title"><strong>${popup.title}</strong><span>${t(this.hass, 'popup.at', { time: this.time(at) })}</span></div>
           <button class="close" aria-label=${t(this.hass, 'popup.close')} @click=${() => this.close()}><ha-icon icon="mdi:close"></ha-icon></button>
         </header>
+        ${this.timer()}
         ${popup.camera ? html`<div class="camera">
           ${this.still ? html`<img src=${this.still} alt="">` : !live ? html`<div class="none"><ha-icon icon="mdi:cctv"></ha-icon></div>` : nothing}
           ${live ? html`<div class="live">${live}</div>` : nothing}

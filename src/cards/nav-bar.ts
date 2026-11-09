@@ -112,7 +112,10 @@ function placePopup(config: NavBarConfig | undefined, hass: unknown) {
   if (!popup) {
     if (!customElements.get('ad-popup')) customElements.define('ad-popup', AdPopup)
     popup = document.createElement('ad-popup') as AdPopup
-    document.body.appendChild(popup)
+    // Inside HA's own tree, not in body: HA's camera player gets its connection from there (Lit context) and
+    // stays black without it
+    const ha = document.querySelector('home-assistant')?.shadowRoot
+    ;(ha ?? document.body).appendChild(popup)
   }
   const next = { type: 'popup', popups: config.popups, theme: config.theme, glass: config.glass, primary_color: config.primary_color, access: config.access }
   if (JSON.stringify(popup.config) !== JSON.stringify(next)) popup.setConfig(next)
