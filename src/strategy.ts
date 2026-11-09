@@ -132,6 +132,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const indoor = areas.filter(a => !outdoor.includes(a.area_id))
   // Pages hidden on the dashboard go for everyone, a rule's on top of them for that user
   const pageAllowed = (path: PagePath) => !config.hide_pages?.includes(path) && !rule?.hide_pages?.includes(path)
+  // Chips hidden for everyone, plus the user's own
+  const hiddenChips = [...new Set([...(config.hide_chips ?? []), ...(rule?.hide_chips ?? []), ...(config.school_chips === false ? ['school' as const] : [])])]
+  const chipOpts = hiddenChips.length ? { hide_chips: hiddenChips } : {}
   // The energy settings know the house meter; without them (or without access) the rooms' sum stands in
   const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
   const sources = powerSources(hass, prefs)
@@ -303,7 +306,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
           // Cancelled and changed lessons as chips of their own
-          ...(schools.length && config.school_chips !== false ? { schools } : {}),
+          ...(schools.length && !hiddenChips.includes('school') ? { schools } : {}), ...chipOpts,
           links: {
             lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate'),
             battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
@@ -421,8 +424,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           { type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look },
           // The home page's chips, counted for this room only
           {
-            type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look,
-            ...(schools.some(s => s.area === area.area_id) ? { schools: schools.filter(s => s.area === area.area_id) } : {}),
+            type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look, ...chipOpts,
+            ...(schools.some(s => s.area === area.area_id) && !hiddenChips.includes('school') ? { schools: schools.filter(s => s.area === area.area_id) } : {}),
           },
         ]),
         ...roomSections(area),

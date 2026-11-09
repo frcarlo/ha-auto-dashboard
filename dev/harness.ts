@@ -45,6 +45,8 @@ const config: StrategyConfig = {
   // ?fav=light.flur,lock.eingangstur  ?scenes=script.gute_nacht,scene.wohnzimmer_kino
   favorites: list('fav'),
   scenes: list('scenes'),
+  // ?chips=unavailable,battery hides those status chips
+  hide_chips: list('chips') as StrategyConfig['hide_chips'],
   // ?warnings=binary_sensor.warning_mulheim_1&warn=on   ?days=5
   weather_warnings: list('warnings'),
   forecast_days: params.has('days') ? Number(params.get('days')) : undefined,
@@ -91,7 +93,13 @@ function setLists(change: (states: HomeAssistant['states'], entities: HomeAssist
   hass = { ...hass, states, entities }
   for (const card of cards) card.hass = hass
 }
-hass.callApi = async <T,>(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>) => {
+hass.callApi = async <T,>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: Record<string, unknown>) => {
+  // Like HA: deleting an integration entry is a REST call, not a websocket command
+  if (method === 'DELETE' && path.startsWith('config/config_entries/entry/')) {
+    const id = path.split('/').pop()!.replace('entry-', '')
+    setTimeout(() => setLists((states, entities) => { delete states[id]; delete entities[id] }), 300)
+    return { require_restart: false } as T
+  }
   if (path === 'config/config_entries/flow') return { type: 'form', flow_id: 'f1' } as T
   if (path.startsWith('config/config_entries/flow/')) {
     const name = String(body?.todo_list_name ?? '')
@@ -107,11 +115,6 @@ hass.callApi = async <T,>(method: 'GET' | 'POST', path: string, body?: Record<st
 }
 hass.callWS = async <T,>(msg: Record<string, unknown>) => {
   if (msg.type === 'config/entity_registry/get') return { config_entry_id: `entry-${msg.entity_id}` } as T
-  if (msg.type === 'config_entries/delete') {
-    const id = String(msg.entry_id).replace('entry-', '')
-    setTimeout(() => setLists((states, entities) => { delete states[id]; delete entities[id] }), 300)
-    return { require_restart: false } as T
-  }
   return baseWS<T>(msg)
 }
 

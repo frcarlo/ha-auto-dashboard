@@ -65,7 +65,7 @@ export interface HomeAssistant {
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>
   callWS?<T>(msg: Record<string, unknown>): Promise<T>
   /** HA's REST API, e.g. calendar events */
-  callApi?<T>(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<T>
+  callApi?<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: Record<string, unknown>): Promise<T>
   /** Subscriptions, e.g. weather forecasts, which HA no longer keeps in the state */
   connection?: { subscribeMessage<T>(callback: (msg: T) => void, msg: Record<string, unknown>): Promise<() => void> }
   formatEntityState?(stateObj: HassEntity, state?: string): string
@@ -120,12 +120,17 @@ export interface FaceConfig {
   style?: FaceStyle
 }
 
+/** Chips in the status bar that can be hidden; `school` is cancelled and changed lessons */
+export type StatusChip = 'presence' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'battery' | 'unavailable' | 'school'
+
 export interface UserRule {
   /** The face for this user only; false switches the dashboard's face off */
   face?: FaceConfig | false
   areas?: string[]
   floors?: string[]
   hide_pages?: PagePath[]
+  /** Status chips this user doesn't see, on top of the dashboard's */
+  hide_chips?: StatusChip[]
   /** full (default), no_critical: no locks, alarm panels or bulk actions like "all off", read_only: nothing can be switched */
   access?: Access
   /** false: the user can't change their own look, face, pages and favorites on the settings page */
@@ -226,6 +231,8 @@ export interface StrategyConfig extends Look {
   school_home?: boolean
   /** false: no chips for cancelled and changed lessons on Home */
   school_chips?: boolean
+  /** Status chips nobody sees, e.g. [unavailable]; per user under users */
+  hide_chips?: StatusChip[]
   /** The face after a while without a touch; per user under users */
   face?: FaceConfig
   /** Windows that open on every dashboard when something happens, e.g. the camera and door buttons when it rings */

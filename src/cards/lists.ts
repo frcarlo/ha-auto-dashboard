@@ -193,7 +193,8 @@ export class AdLists extends BaseCard<ListsCardConfig> {
     try {
       const entry = await this.hass!.callWS!<{ config_entry_id?: string }>({ type: 'config/entity_registry/get', entity_id: id })
       if (!entry.config_entry_id) throw new Error(id)
-      await this.hass!.callWS!({ type: 'config_entries/delete', entry_id: entry.config_entry_id })
+      // HA deletes an integration entry over REST only; there is no websocket command for it
+      await this.hass!.callApi!('DELETE', `config/config_entries/entry/${entry.config_entry_id}`)
       this.confirming = undefined
       this.cards.delete(id)
     } catch (err) {

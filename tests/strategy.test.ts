@@ -490,6 +490,18 @@ describe('calendar page', () => {
     expect(calendar.entities).not.toContain('calendar.leni_stundenplan')
   })
 
+  it('hides status chips for everyone, and more for one user', async () => {
+    const hass = createHass(true)
+    const bar = (views: Record<string, unknown>[], path = 'home') => cardsOf(views.find(v => v.path === path)!).find(c => c.type === 'custom:ad-status-bar')!
+    const all = await generateDashboard({ type: 'custom:auto-dashboard', hide_chips: ['unavailable'] }, hass)
+    expect(bar(all.views).hide_chips).toEqual(['unavailable'])
+    expect(bar(all.views, 'area-kuche').hide_chips).toEqual(['unavailable'])
+    const ruled = await generateDashboard({ type: 'custom:auto-dashboard', hide_chips: 'unavailable', users: { [hass.user!.id]: { hide_chips: ['battery', 'school'] } } } as never, hass)
+    expect(bar(ruled.views).hide_chips).toEqual(['unavailable', 'battery', 'school'])
+    expect(bar(ruled.views).schools).toBeUndefined()
+    expect(bar((await generateDashboard({ type: 'custom:auto-dashboard' }, hass)).views).hide_chips).toBeUndefined()
+  })
+
   it('leaves the school cards or chips off Home when switched off, the room keeps its card', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', school_home: false, school_chips: false }, createHass(true))
     const home = cardsOf(views[0]!)

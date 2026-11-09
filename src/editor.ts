@@ -14,7 +14,7 @@ import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import { accessOf } from './access'
-import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
+import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
 
 interface HaUser {
   id: string
@@ -45,6 +45,7 @@ type Tool = 'hide' | 'outdoor' | 'only'
 const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide: 'hide_areas', outdoor: 'outdoor_areas', only: 'areas' }
 
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
+const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'battery', 'unavailable', 'presence', 'school']
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
   'lock', 'alarm_control_panel', 'scene', 'script', 'button', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
@@ -451,9 +452,11 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
         ${this.field(this.l('ed.calendars'), this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
         ${this.toggle(this.l('ed.calendar_edit'), c.calendar_edit !== false, calendar_edit => this.change({ calendar_edit: calendar_edit ? undefined : false }))}
-        ${findSchools(this.hass!).length ? html`
-          ${this.toggle(this.l('ed.school_home'), c.school_home !== false, on => this.change({ school_home: on ? undefined : false }))}
-          ${this.toggle(this.l('ed.school_chips'), c.school_chips !== false, on => this.change({ school_chips: on ? undefined : false }))}` : nothing}
+        ${findSchools(this.hass!).length
+          ? this.toggle(this.l('ed.school_home'), c.school_home !== false, on => this.change({ school_home: on ? undefined : false })) : nothing}
+        ${this.field(this.l('ed.hide_chips'), this.chips(this.chipOptions,
+          [...(c.hide_chips ?? []), ...(c.school_chips === false ? ['school' as const] : [])],
+          hide_chips => this.change({ hide_chips: hide_chips as StatusChip[], school_chips: undefined })), this.l('ed.hide_chips_hint'))}
         ${this.renderAppliances()}
         ${this.renderPopups()}
         ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
@@ -534,6 +537,13 @@ export class AdStrategyEditor extends LitElement {
         </div>`)}`
   }
 
+  /** The status chips by the name they carry; the lessons chip only with pupils in the house */
+  private get chipOptions() {
+    const school = findSchools(this.hass!).length > 0
+    return CHIPS.filter(k => k !== 'school' || school)
+      .map(k => ({ id: k, label: this.l(k === 'school' ? 'ed.chip_school' : `status.${k}`) }))
+  }
+
   private renderUsers() {
     const rules = Object.entries(this.config.users ?? {})
     const free = [
@@ -565,6 +575,8 @@ export class AdStrategyEditor extends LitElement {
       ${this.field(this.l('ed.hide_pages'), this.chips(
         PAGES.map(p => ({ id: p, label: this.l(p) })),
         rule.hide_pages, hide_pages => this.changeRule(key, { hide_pages: hide_pages as PagePath[] })))}
+      ${this.field(this.l('ed.hide_chips'), this.chips(this.chipOptions,
+        rule.hide_chips, hide_chips => this.changeRule(key, { hide_chips: hide_chips as StatusChip[] })))}
       ${this.field(this.l('ed.face'), this.faceFields(rule.face, face => this.changeRule(key, { face }), true))}
       ${this.toggle(this.l('ed.settings_allowed'), rule.settings !== false, on => this.changeRule(key, { settings: on ? undefined : false }))}
       <span class="hint">${this.l('ed.settings_allowed_hint')}</span>

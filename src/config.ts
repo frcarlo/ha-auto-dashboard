@@ -34,9 +34,9 @@ export function cleanConfig(config: StrategyConfig): StrategyConfig {
 
 const LIST_KEYS = [
   'areas', 'floors', 'hide_pages', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities',
-  'favorites', 'scenes', 'todo_lists', 'outdoor_areas', 'weather_warnings', 'calendars', 'tv_apps',
+  'favorites', 'scenes', 'todo_lists', 'outdoor_areas', 'weather_warnings', 'calendars', 'tv_apps', 'hide_chips',
 ] as const
-const RULE_LIST_KEYS = ['areas', 'floors', 'hide_pages'] as const
+const RULE_LIST_KEYS = ['areas', 'floors', 'hide_pages', 'hide_chips'] as const
 const ROOM_LIST_KEYS = ['hide_groups', 'group_order', 'order'] as const
 
 /** One value where YAML wants a list (`hide_areas: keller`) becomes a one-item list. */

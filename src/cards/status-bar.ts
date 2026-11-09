@@ -7,7 +7,7 @@ import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import { peopleIds, peopleStyles, renderPeople } from './people'
 import { schoolIds, schoolNotes, type School, type SchoolNote } from '../school'
-import type { HassEntity } from '../types'
+import type { HassEntity, StatusChip } from '../types'
 
 interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
@@ -23,6 +23,8 @@ interface StatusBarConfig extends BaseConfig {
   presence?: boolean
   /** Pupils with a WebUntis timetable: cancelled and changed lessons today or tomorrow get chips of their own */
   schools?: School[]
+  /** Chips not shown here, e.g. unavailable devices on a family tablet */
+  hide_chips?: StatusChip[]
 }
 
 type SchoolChip = 'cancelled' | 'changed'
@@ -145,6 +147,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     const { hide_labels: labels, hide_entities: hidden, areas } = this.config!
     const hide = hideOf(this.config!)
     const items = homeStatus(allEntities(this.hass!, hide, areas), batteryEntities(this.hass!, areas, labels, hidden), unavailableDevices(this.hass!, hide, areas), { presence: !!this.config!.presence })
+      .filter(item => !this.config!.hide_chips?.includes(item.key))
     const school = this.config!.schools?.length ? schoolNotes(this.hass!, this.config!.schools, Date.now()) : undefined
     const openSchool = school && (this.open === 'cancelled' || this.open === 'changed') ? school[this.open] : undefined
     const openItem = items.find(i => i.key === this.open)

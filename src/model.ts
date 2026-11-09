@@ -1,5 +1,5 @@
 // Pure functions that turn the HA registries into rooms, groups and counts.
-import type { AreaRegistryEntry, FloorRegistryEntry, GroupKey, HassEntity, HomeAssistant, RoomSettings, StrategyConfig } from './types'
+import type { AreaRegistryEntry, FloorRegistryEntry, GroupKey, HassEntity, HomeAssistant, RoomSettings, StrategyConfig, StatusChip } from './types'
 import { OPENING_CLASSES, deviceClassOf, domainOf, entityName, isActive } from './presentation'
 
 export const HIDE_LABEL = 'ad_hide'
@@ -293,7 +293,7 @@ export function roomSummary(entities: HassEntity[], area?: AreaRegistryEntry, st
   }
 }
 
-export type StatusKey = 'presence' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'battery' | 'unavailable'
+export type StatusKey = Exclude<StatusChip, 'school'>
 
 export interface StatusItem {
   key: StatusKey
