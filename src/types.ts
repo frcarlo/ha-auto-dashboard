@@ -222,6 +222,10 @@ export interface StrategyConfig extends Look {
   calendars?: string[]
   /** false: the calendar page only shows events, no adding, changing or deleting */
   calendar_edit?: boolean
+  /** false: no school cards (WebUntis) on Home; the pupils' rooms keep theirs */
+  school_home?: boolean
+  /** false: no chips for cancelled and changed lessons on Home */
+  school_chips?: boolean
   /** The face after a while without a touch; per user under users */
   face?: FaceConfig
   /** Windows that open on every dashboard when something happens, e.g. the camera and door buttons when it rings */

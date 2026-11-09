@@ -303,7 +303,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         {
           type: 'custom:ad-status-bar', ...scopeOpts,
           // Cancelled and changed lessons as chips of their own
-          ...(schools.length ? { schools } : {}),
+          ...(schools.length && config.school_chips !== false ? { schools } : {}),
           links: {
             lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate'),
             battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
@@ -330,7 +330,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         // Each shows only while its appliance runs, waits to be emptied or needs someone
         ...appliances.map(a => applianceCard(a, true)),
         // The children's school day side by side: what's on now, or when school starts next time
-        ...side(schools.map(s => schoolCard(s))),
+        ...(config.school_home === false ? [] : side(schools.map(s => schoolCard(s)))),
       ]),
       ...(singleRoom ? [] : favoritesSection(homeFavorites)),
       // One room: its content right on the home page instead of a single room card

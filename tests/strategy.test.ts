@@ -490,6 +490,14 @@ describe('calendar page', () => {
     expect(calendar.entities).not.toContain('calendar.leni_stundenplan')
   })
 
+  it('leaves the school cards or chips off Home when switched off, the room keeps its card', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', school_home: false, school_chips: false }, createHass(true))
+    const home = cardsOf(views[0]!)
+    expect(home.some(c => c.type === 'custom:ad-school' || (c.type === 'custom:ad-row' && c.cards.some((k: { type: string }) => k.type === 'custom:ad-school')))).toBe(false)
+    expect(home.find(c => c.type === 'custom:ad-status-bar')!.schools).toBeUndefined()
+    expect(cardsOf(views.find(v => v.path === 'area-kinderzimmer')!).filter(c => c.type === 'custom:ad-school')).toHaveLength(2)
+  })
+
   it('takes the picked calendars, and drops the page with hide_domains or a user rule', async () => {
     const picked = await generateDashboard({ type: 'custom:auto-dashboard', calendars: ['calendar.abfall'] }, createHass(true))
     expect(cardsOf(picked.views.find(v => v.path === 'calendar')!).find(c => c.type === 'custom:ad-calendar')!.entities).toEqual(['calendar.abfall'])

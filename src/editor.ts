@@ -2,6 +2,7 @@
 // Only admins can edit dashboards, so only admins reach it. Uses HA's theme variables to fit the dialog.
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
+import { findSchools } from './school'
 import { HIDE_LABEL, hideOf, isRoomFavorite, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
 import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
@@ -450,6 +451,9 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
         ${this.field(this.l('ed.calendars'), this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
         ${this.toggle(this.l('ed.calendar_edit'), c.calendar_edit !== false, calendar_edit => this.change({ calendar_edit: calendar_edit ? undefined : false }))}
+        ${findSchools(this.hass!).length ? html`
+          ${this.toggle(this.l('ed.school_home'), c.school_home !== false, on => this.change({ school_home: on ? undefined : false }))}
+          ${this.toggle(this.l('ed.school_chips'), c.school_chips !== false, on => this.change({ school_chips: on ? undefined : false }))}` : nothing}
         ${this.renderAppliances()}
         ${this.renderPopups()}
         ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
