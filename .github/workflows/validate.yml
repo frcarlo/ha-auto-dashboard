@@ -1,7 +1,10 @@
 name: Validate
 
+# Tags are checked by the Release workflow once the bundle is attached: HACS looks for it in the release,
+# and on the tag push it isn't there yet.
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 

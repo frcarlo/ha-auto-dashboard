@@ -25,3 +25,14 @@ jobs:
         run: gh release upload "$GITHUB_REF_NAME" dist/auto-dashboard.js --clobber
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # HACS checks the release for the bundle, so only after it is attached
+  validate-hacs:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: HACS validation
+        uses: hacs/action@22.5.0
+        with:
+          category: plugin
