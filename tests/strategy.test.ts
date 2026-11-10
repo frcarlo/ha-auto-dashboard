@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateDashboard } from '../src/strategy'
+import { generateDashboard, ownSections } from '../src/strategy'
 import { findCameras, detectionsFrom, detectionKind } from '../src/cameras'
 import { createHass } from '../dev/mock'
 import { cleanConfig } from '../src/config'
@@ -650,5 +650,31 @@ describe('own cards on pages', () => {
   it('drops empty pages when the editor saves', () => {
     expect(cleanConfig({ type: 'custom:auto-dashboard', pages: { home: { cards: { top: [] } }, lights: { cards: { bottom: [md('x')], top: [] } } } }).pages)
       .toEqual({ lights: { cards: { bottom: [md('x')] } } })
+  })
+})
+
+describe('own cards side by side', () => {
+  it('gives every card a section of its own, two columns wide on pages', () => {
+    expect(ownSections([{ type: 'a' }, { type: 'b', column_span: 4 }], 2)).toEqual([
+      { type: 'grid', column_span: 2, cards: [{ type: 'a' }] },
+      { type: 'grid', column_span: 4, cards: [{ type: 'b' }] },
+    ])
+  })
+
+  it('keeps the default width on room pages and caps column_span', () => {
+    expect(ownSections([{ type: 'a' }, { type: 'b', column_span: 9 }])).toEqual([
+      { type: 'grid', cards: [{ type: 'a' }] },
+      { type: 'grid', column_span: 4, cards: [{ type: 'b' }] },
+    ])
+  })
+
+  it('puts several cards next to each other below the header', async () => {
+    const pages = { maintenance: { cards: { top: [{ type: 'gauge' }, { type: 'markdown', content: 'x' }] } } }
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', pages } as any, createHass(true))
+    const sections = (views.find(v => v.path === 'maintenance') as any).sections
+    expect(sections.slice(1, 3)).toEqual([
+      { type: 'grid', column_span: 2, cards: [{ type: 'gauge' }] },
+      { type: 'grid', column_span: 2, cards: [{ type: 'markdown', content: 'x' }] },
+    ])
   })
 })

@@ -32,6 +32,7 @@ export class AdSystem extends BaseCard<SystemConfig> {
     data: { state: true },
     failed: { state: true },
     busy: { state: true },
+    expanded: { state: true },
   }
 
   data?: {
@@ -45,6 +46,8 @@ export class AdSystem extends BaseCard<SystemConfig> {
 
   failed = false
   busy = false
+  /** The whole list instead of the first rows */
+  expanded = false
   private timer?: number
 
   static styles = [tokens, css`
@@ -63,7 +66,9 @@ export class AdSystem extends BaseCard<SystemConfig> {
     .empty { display: flex; align-items: center; gap: 10px; padding: 10px; font-size: 13px; opacity: 0.6; }
     .empty ha-icon { color: rgb(var(--ad-success)); }
     .empty.off ha-icon { color: inherit; }
-    .more { all: unset; align-self: flex-start; margin: 2px 10px 6px; font-size: 12px; color: rgb(var(--ad-primary)); cursor: pointer; }
+    .more { all: unset; display: inline-flex; align-items: center; gap: 2px; margin: 2px 10px 6px; font-size: 12px; color: rgb(var(--ad-primary)); cursor: pointer; }
+    .more ha-icon { --mdc-icon-size: 16px; }
+    .foot { display: flex; flex-wrap: wrap; justify-content: space-between; }
     .more:focus-visible { outline: 2px solid rgb(var(--ad-primary)); border-radius: 6px; }
 
     .meters { display: grid; gap: 12px; padding: 12px 14px; }
@@ -186,8 +191,13 @@ export class AdSystem extends BaseCard<SystemConfig> {
 
   private list<T>(items: T[], row: (item: T) => unknown, more: string, allGood: string) {
     if (!items.length) return html`<div class="empty"><ha-icon icon="mdi:check-circle-outline"></ha-icon>${allGood}</div>`
-    return html`${items.slice(0, MAX_ROWS).map(row)}
-      <button class="more" @click=${() => openHa(more)}>${items.length > MAX_ROWS ? t(this.hass, 'sys.show_all', { n: items.length }) : t(this.hass, 'sys.open_ha')}</button>`
+    const long = items.length > MAX_ROWS
+    return html`${(this.expanded ? items : items.slice(0, MAX_ROWS)).map(row)}
+      <div class="foot">
+        ${long ? html`<button class="more" aria-expanded=${this.expanded} @click=${() => (this.expanded = !this.expanded)}>
+          <ha-icon icon=${this.expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}></ha-icon>${this.expanded ? t(this.hass, 'list.less') : t(this.hass, 'list.more', { n: items.length })}</button>` : nothing}
+        <button class="more" @click=${() => openHa(more)}>${t(this.hass, 'sys.open_ha')}</button>
+      </div>`
   }
 
   private renderHealth(h: Health) {

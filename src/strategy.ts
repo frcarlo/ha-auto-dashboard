@@ -41,6 +41,18 @@ function heading(text: string, icon?: string | null, navigateTo?: string, style:
 
 const fullWidth = (cards: Card[]): Section => ({ type: 'grid', column_span: MAX_COLUMNS, cards })
 
+/**
+ * Own cards at the top or the bottom of a page, each in a section of its own, so they sit side by side where there is
+ * room and stack on a phone. `column_span` on a card (1 to 4) sets how wide its section is; it is taken off the card.
+ */
+export function ownSections(cards: Card[] | undefined, span?: number): Section[] {
+  return (cards ?? []).map(card => {
+    const { column_span, ...rest } = card
+    const width = Math.min(MAX_COLUMNS, Math.max(1, Math.round(Number(column_span) || span || 1)))
+    return { type: 'grid', ...(column_span !== undefined || span ? { column_span: width } : {}), cards: [rest] }
+  })
+}
+
 /** Build the generated dashboard. Runs in the browser whenever the dashboard loads. */
 export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAssistant) {
   const baseConfig = normalizeConfig(rawConfig)
@@ -285,7 +297,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     // Own cards are plain Lovelace configs, passed through untouched
     const own = (slot: CardSlot) => room.cards?.[slot] ?? []
     return [
-      ...(own('top').length ? [{ type: 'grid' as const, cards: own('top') }] : []),
+      ...ownSections(own('top')),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map(e => tile(e, area.name)), true),
       // A pupil's day: every lesson, cancelled and changed ones marked
       ...schools.filter(s => s.area === area.area_id).map((s): Section => ({ type: 'grid', cards: [schoolCard(s, true)] })),
@@ -302,7 +314,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         type: 'grid',
         cards: [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name)), ...own(key)],
       })),
-      ...(own('bottom').length ? [{ type: 'grid' as const, cards: own('bottom') }] : []),
+      ...ownSections(own('bottom')),
     ]
   }
   const singleRoom = scoped && areas.length === 1 ? areas[0] : undefined
@@ -543,7 +555,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     const sections = [...(view.sections as Section[])]
     const navAt = sections.findIndex(s => s.cards.some(c => c.type === 'custom:ad-nav-bar'))
     const navTop = navAt === 0
-    const own = (list?: Record<string, unknown>[]): Section[] => list?.length ? [{ type: 'grid', cards: list }] : []
+    // Two columns wide, like the lists on the pages: two cards side by side on a wide screen
+    const own = (list?: Card[]) => ownSections(list, 2)
     const headerAt = navTop ? 1 : 0
     sections.splice(headerAt + 1, 0, ...own(cards.top))
     const end = navTop ? sections.length : sections.length - 1

@@ -16,7 +16,18 @@ interface MaintenanceConfig extends BaseConfig {
   hide_entities?: string[]
 }
 
+/** Rows shown before the list is opened */
+const MAX_ROWS = 6
+
 export class AdMaintenanceList extends BaseCard<MaintenanceConfig> {
+  static properties = {
+    ...BaseCard.properties,
+    expanded: { state: true },
+  }
+
+  /** The whole list instead of the first rows */
+  expanded = false
+
   static styles = [tokens, css`
     :host { display: block; }
     .card { padding: 6px; display: flex; flex-direction: column; gap: 2px; }
@@ -32,6 +43,9 @@ export class AdMaintenanceList extends BaseCard<MaintenanceConfig> {
     .s.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .empty { display: flex; align-items: center; gap: 10px; padding: 10px; font-size: 13px; opacity: 0.6; }
     .empty ha-icon { color: rgb(var(--ad-success)); }
+    .more { all: unset; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin: 2px 10px 6px; font-size: 12px; color: rgb(var(--ad-primary)); cursor: pointer; }
+    .more ha-icon { --mdc-icon-size: 16px; }
+    .more:focus-visible { outline: 2px solid rgb(var(--ad-primary)); border-radius: 6px; }
   `]
 
   getGridOptions() {
@@ -83,8 +97,10 @@ export class AdMaintenanceList extends BaseCard<MaintenanceConfig> {
   protected render() {
     const items = this.items()
     return html`<div class="card">
-      ${items.length ? items.map(e => this.row(e))
+      ${items.length ? (this.expanded ? items : items.slice(0, MAX_ROWS)).map(e => this.row(e))
         : html`<div class="empty"><ha-icon icon="mdi:check-circle-outline"></ha-icon>${t(this.hass, 'all_good')}</div>`}
+      ${items.length > MAX_ROWS ? html`<button class="more" aria-expanded=${this.expanded} @click=${() => (this.expanded = !this.expanded)}>
+        <ha-icon icon=${this.expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}></ha-icon>${this.expanded ? t(this.hass, 'list.less') : t(this.hass, 'list.more', { n: items.length })}</button>` : nothing}
     </div>`
   }
 }
