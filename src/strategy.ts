@@ -445,8 +445,18 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     }
   })
 
+  // A room's shown entities as a set, built once for all domain pages
+  const roomSets = new Map<string, Set<HassEntity>>()
+  const roomSet = (areaId: string) => {
+    let set = roomSets.get(areaId)
+    if (!set) roomSets.set(areaId, (set = new Set(areaEntities(hass, areaId, hide))))
+    return set
+  }
   const domainViews: View[] = domainPages.map(page => {
-    const inArea = (areaId: string) => page.entities.filter(e => areaEntities(hass, areaId, hide).includes(e))
+    const inArea = (areaId: string) => {
+      const here = roomSet(areaId)
+      return page.entities.filter(e => here.has(e))
+    }
     // One section per floor with a subtitle per room, so single-entity rooms don't each fill a section
     const floorSections: Section[] = floors.map(group => {
       const rooms = group.areas.map(area => ({ area, entities: inArea(area.area_id) })).filter(r => r.entities.length)

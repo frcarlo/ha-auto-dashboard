@@ -169,6 +169,28 @@ export function entityIndex(hass: HomeAssistant, hideLabels: string[] = []): Ind
   return index
 }
 
+const deviceCache = new WeakMap<object, Map<string, string[]>>()
+
+/** The entity ids of a device, from an index built once per registry instead of a scan per call */
+export function deviceEntityIds(hass: HomeAssistant, deviceId: string): string[] {
+  let byDevice = deviceCache.get(hass.entities)
+  if (!byDevice) {
+    byDevice = new Map()
+    for (const entry of Object.values(hass.entities)) {
+      if (!entry.device_id) continue
+      const list = byDevice.get(entry.device_id)
+      if (list) list.push(entry.entity_id)
+      else byDevice.set(entry.device_id, [entry.entity_id])
+    }
+    deviceCache.set(hass.entities, byDevice)
+  }
+  return byDevice.get(deviceId) ?? []
+}
+
+/** The states of a device's entities, hidden ones included */
+export const deviceEntities = (hass: HomeAssistant, deviceId: string): HassEntity[] =>
+  deviceEntityIds(hass, deviceId).map(id => hass.states[id]).filter((e): e is HassEntity => !!e)
+
 export function areaEntities(hass: HomeAssistant, areaId: string, hide: Hide = {}): HassEntity[] {
   return (entityIndex(hass, hide.labels).byArea.get(areaId) ?? [])
     .filter(shown(hide))

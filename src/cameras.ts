@@ -1,7 +1,7 @@
 // Cameras, one per device. A doorbell brings several camera entities (sub stream, main stream, snapshots);
 // the page wants one picture of it, and the detections the device reports beside: person, vehicle, animal,
 // package, a ring at the door, plain motion.
-import { allEntities, entityAreaId, type Hide } from './model'
+import { allEntities, areaEntities, deviceEntities, entityAreaId, type Hide } from './model'
 import { domainOf, entityName } from './presentation'
 import type { HassEntity, HomeAssistant } from './types'
 
@@ -78,14 +78,14 @@ export function findCameras(hass: HomeAssistant, cameras: HassEntity[], hide: Hi
     // Both names of the device: what the user called it shows in the entity names, what it called itself in the ids
     const deviceNames = [device?.name_by_user, device?.name].filter((n): n is string => !!n)
     const area = entityAreaId(hass, best.entity_id)
-    const own = device ? Object.values(hass.entities).filter(e => e.device_id === key).map(e => hass.states[e.entity_id]).filter((e): e is HassEntity => !!e) : []
+    const own = device ? deviceEntities(hass, key) : []
     // Detection sensors may well be hidden from the rooms; they still say what the camera saw
     const detections = own
       .map(e => ({ entity: e.entity_id, kind: detectionKind(e, deviceNames) }))
       .filter((d): d is { entity: string; kind: DetectionKind } => !!d.kind && !hass.entities[d.entity]?.entity_category)
     const lights = [
       ...own.filter(e => domainOf(e.entity_id) === 'light' && visible.has(e.entity_id)),
-      ...(area ? [...visible].map(id => hass.states[id]!).filter(e => domainOf(e.entity_id) === 'light' && !own.includes(e) && entityAreaId(hass, e.entity_id) === area) : []),
+      ...(area ? areaEntities(hass, area, hide).filter(e => domainOf(e.entity_id) === 'light' && !own.includes(e)) : []),
     ].slice(0, 3).map(e => e.entity_id)
     return {
       entity: best.entity_id,

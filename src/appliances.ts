@@ -2,7 +2,7 @@
 // entities include an operation state (Home Connect, WashData, Miele, ...); the card around it needs the state,
 // and whatever else the device offers: progress, end time or time left, program, door, power, notices.
 // A TV is a media player of class tv, with the remote on the same device for the arrow keys.
-import { HIDE_LABEL, allEntities, entityAreaId } from './model'
+import { HIDE_LABEL, allEntities, deviceEntityIds, entityAreaId } from './model'
 import { domainOf, entityName } from './presentation'
 import { isMusicAssistantDashboard } from './music'
 import type { ApplianceConfig, ApplianceKind, HassEntity, HomeAssistant } from './types'
@@ -151,9 +151,8 @@ export function applianceEntities(hass: HomeAssistant, appliance: Appliance): st
     ...(appliance.notices ?? [])].filter((id): id is string => !!id)
   // Found ones take their whole device's read-outs along; switches and buttons of it stay on the page
   const device = hass.entities[appliance.status]?.device_id
-  const readOuts = device ? Object.values(hass.entities)
-    .filter(e => e.device_id === device && ['sensor', 'select', 'binary_sensor'].includes(domainOf(e.entity_id)) && hass.states[e.entity_id]?.attributes.device_class !== 'power')
-    .map(e => e.entity_id) : []
+  const readOuts = device ? deviceEntityIds(hass, device)
+    .filter(id => ['sensor', 'select', 'binary_sensor'].includes(domainOf(id)) && hass.states[id]?.attributes.device_class !== 'power') : []
   return [...new Set([...roles, ...readOuts])]
 }
 

@@ -2,7 +2,7 @@
 // every open dashboard shows a window with the camera beside it and buttons for the door. Camera and buttons are
 // found from the trigger's device and room when the rule doesn't name them.
 import { detectionKind, findCameras } from './cameras'
-import { entityAreaId } from './model'
+import { deviceEntities, entityAreaId } from './model'
 import { domainOf, entityName } from './presentation'
 import type { HassEntity, HomeAssistant, PopupRule } from './types'
 
@@ -26,9 +26,6 @@ const LOCK_OPEN = 1
 const GONE = ['unknown', 'unavailable']
 
 const deviceOf = (hass: HomeAssistant, entityId: string) => hass.entities[entityId]?.device_id ?? undefined
-
-const deviceEntities = (hass: HomeAssistant, deviceId: string) =>
-  Object.values(hass.entities).filter(e => e.device_id === deviceId).map(e => hass.states[e.entity_id]).filter((e): e is HassEntity => !!e)
 
 /** The camera for a trigger: the trigger's own device's best picture, else the one camera in its room. */
 export function cameraFor(hass: HomeAssistant, trigger: string): string | undefined {

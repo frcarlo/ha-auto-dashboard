@@ -82,7 +82,11 @@ export function hvacColor(mode: string): StateColor {
   return 'muted'
 }
 
-export const domainOf = (entityId: string) => entityId.split('.')[0] ?? ''
+// Called for every entity many times over while the dashboard is built, so without splitting into an array
+export const domainOf = (entityId: string) => {
+  const dot = entityId.indexOf('.')
+  return dot < 0 ? entityId : entityId.slice(0, dot)
+}
 export const deviceClassOf = (entity?: MinimalEntity) => entity?.attributes?.device_class as string | undefined
 /** Their state is the last time they ran, so "unknown" only means never yet */
 const STATELESS = ['button', 'input_button', 'scene']
