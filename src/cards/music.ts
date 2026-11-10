@@ -1172,8 +1172,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
         </div>`}
       </div>`
     }
-    const ma = this.players.filter(p => p.ma)
-    const spotify = this.players.filter(p => p.spotify)
+    // Speakers that are out of reach (unplugged, or a leftover of an old setup) stay out of the list
+    const shown = this.players.filter(p => this.reachable(p.entity))
+    const ma = shown.filter(p => p.ma)
+    const spotify = shown.filter(p => p.spotify)
     return html`
       ${ma.length ? html`<div class="sub-head"><ha-icon icon="mdi:music-circle"></ha-icon>${t(this.hass, 'mu.ma_players')}</div>
         <div class="players">${ma.map(card)}</div>` : nothing}
