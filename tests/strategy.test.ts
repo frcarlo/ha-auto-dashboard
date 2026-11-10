@@ -654,17 +654,18 @@ describe('own cards on pages', () => {
 })
 
 describe('own cards side by side', () => {
+  const full = { columns: 'full' }
   it('gives every card a section of its own, two columns wide on pages', () => {
     expect(ownSections([{ type: 'a' }, { type: 'b', column_span: 4 }], 2)).toEqual([
-      { type: 'grid', column_span: 2, cards: [{ type: 'a' }] },
-      { type: 'grid', column_span: 4, cards: [{ type: 'b' }] },
+      { type: 'grid', column_span: 2, cards: [{ type: 'a', grid_options: full }] },
+      { type: 'grid', column_span: 4, cards: [{ type: 'b', grid_options: full }] },
     ])
   })
 
   it('keeps the default width on room pages and caps column_span', () => {
-    expect(ownSections([{ type: 'a' }, { type: 'b', column_span: 9 }])).toEqual([
-      { type: 'grid', cards: [{ type: 'a' }] },
-      { type: 'grid', column_span: 4, cards: [{ type: 'b' }] },
+    expect(ownSections([{ type: 'a' }, { type: 'b', column_span: 9, grid_options: { columns: 6 } }])).toEqual([
+      { type: 'grid', cards: [{ type: 'a', grid_options: full }] },
+      { type: 'grid', column_span: 4, cards: [{ type: 'b', grid_options: { columns: 6 } }] },
     ])
   })
 
@@ -673,8 +674,8 @@ describe('own cards side by side', () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', pages } as any, createHass(true))
     const sections = (views.find(v => v.path === 'maintenance') as any).sections
     expect(sections.slice(1, 3)).toEqual([
-      { type: 'grid', column_span: 2, cards: [{ type: 'gauge' }] },
-      { type: 'grid', column_span: 2, cards: [{ type: 'markdown', content: 'x' }] },
+      { type: 'grid', column_span: 2, cards: [{ type: 'gauge', grid_options: full }] },
+      { type: 'grid', column_span: 2, cards: [{ type: 'markdown', content: 'x', grid_options: full }] },
     ])
   })
 })

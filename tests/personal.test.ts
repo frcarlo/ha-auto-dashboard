@@ -92,6 +92,6 @@ describe('own cards for one user', () => {
       msg.type === 'frontend/get_user_data' && msg.key === key ? { value: { pages: { maintenance: { cards: { top: [md('mine')] } } } } } as T : ws<T>(msg)
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
     const maintenance = views.find(v => v.path === 'maintenance') as any
-    expect(maintenance.sections[1].cards).toEqual([md('mine')])
+    expect(maintenance.sections[1].cards).toEqual([{ ...md('mine'), grid_options: { columns: 'full' } }])
   })
 })
