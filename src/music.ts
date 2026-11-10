@@ -157,6 +157,14 @@ export function mediaPosition(entity: HassEntity | undefined, now = Date.now()):
   return duration ? Math.min(position, duration) : position
 }
 
+/**
+ * A picture address the page can load: on an https page the browser blocks http pictures, so they go over https
+ * (TuneIn's station logos, which Music Assistant keeps as http, are on https as well).
+ */
+export function secureImage(src: string, pageProtocol = typeof location === 'undefined' ? 'http:' : location.protocol): string {
+  return pageProtocol === 'https:' && src.startsWith('http://') ? `https://${src.slice(7)}` : src
+}
+
 /** The picture of what a player plays: HA's proxy first, Music Assistant's own address may not be reachable */
 export const playerPicture = (entity: HassEntity | undefined): string | undefined =>
   (entity?.attributes.entity_picture_local ?? entity?.attributes.entity_picture) as string | undefined

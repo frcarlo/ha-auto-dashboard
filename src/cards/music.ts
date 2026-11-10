@@ -6,7 +6,7 @@ import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import {
   SPOTIFY_SECTIONS, browseToItem, canOpenItem, currentLine, fetchLyrics, formatTime, groupMembers, isSpotifyItem, itemSub, mediaPosition, playableUri,
-  playerPicture, playsItem, type Lyrics, type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
+  playerPicture, playsItem, secureImage, type Lyrics, type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
 } from '../music'
 import { tokens } from '../styles/tokens'
 import type { HassEntity, NavPosition } from '../types'
@@ -924,8 +924,14 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   // ── Pieces ───────────────────────────────────────────────
 
   private art(src: string | null | undefined, icon = 'mdi:music-note', round = false) {
-    return html`<div class="art ${round ? 'round' : ''}"><ha-icon icon=${icon}></ha-icon>${src ? html`<img src=${src} alt="" loading="lazy"
-      @error=${(e: Event) => (e.target as HTMLElement).remove()}>` : nothing}</div>`
+    // An http picture that doesn't load (an app that blocks http) gets one more try over https
+    const failed = (e: Event) => {
+      const img = e.target as HTMLImageElement
+      if (img.src.startsWith('http://')) img.src = `https://${img.src.slice(7)}`
+      else img.remove()
+    }
+    return html`<div class="art ${round ? 'round' : ''}"><ha-icon icon=${icon}></ha-icon>${src ? html`<img src=${secureImage(src)} alt="" loading="lazy"
+      @error=${failed}>` : nothing}</div>`
   }
 
   private typeLabel(type: string) {
@@ -1149,7 +1155,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       const stop = (e: Event) => e.stopPropagation()
       return html`<div class="player ${p.entity === selected ? 'selected' : ''} ${playing ? 'playing' : ''} ${off ? 'off' : ''}" role="button" tabindex="0"
         aria-pressed=${p.entity === selected} @click=${() => !off && this.select(p.entity)} @keydown=${(ev: KeyboardEvent) => ev.key === 'Enter' && !off && this.select(p.entity)}>
-        ${pic ? html`<div class="bg" style="background-image:url('${pic}')"></div>` : nothing}
+        ${pic ? html`<div class="bg" style="background-image:url('${secureImage(pic)}')"></div>` : nothing}
         <div class="top">
           <div class="icon ${p.spotify ? 'spotify' : ''}"><ha-icon icon=${p.spotify ? 'mdi:spotify' : a.mass_player_type === 'group' ? 'mdi:speaker-multiple' : 'mdi:speaker'}></ha-icon></div>
           <div style="min-width:0;flex:1"><div class="name">${p.name}</div>${p.area && !p.name.includes(p.area) ? html`<div class="area">${p.area}</div>` : nothing}</div>
@@ -1359,7 +1365,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
           </button>`)}</div>` : nothing}
       </aside>
       <main class="main card ${this.view === 'now' ? 'big' : ''}">
-        ${glow && ['playing', 'paused'].includes(this.player?.state ?? '') ? html`<div class="glow-wrap"><div class="glow" style="background-image:url('${glow}')"></div></div>` : nothing}
+        ${glow && ['playing', 'paused'].includes(this.player?.state ?? '') ? html`<div class="glow-wrap"><div class="glow" style="background-image:url('${secureImage(glow)}')"></div></div>` : nothing}
         ${this.view === 'home' ? this.renderHome()
           : this.view === 'search' ? this.renderSearch()
           : this.view === 'radio' ? this.renderRadio()

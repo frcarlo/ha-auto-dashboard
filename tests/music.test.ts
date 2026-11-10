@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateDashboard } from '../src/strategy'
-import { browseToItem, cleanTitle, currentLine, fetchLyrics, findMusicPlayers, parseLrc, findSpotifyBrowsers, formatTime, groupMembers, itemSub, mediaPosition, playableUri, playsItem } from '../src/music'
+import { browseToItem, cleanTitle, currentLine, fetchLyrics, findMusicPlayers, parseLrc, findSpotifyBrowsers, formatTime, groupMembers, itemSub, mediaPosition, playableUri, playsItem, secureImage } from '../src/music'
 import { createHass } from '../dev/mock'
 
 const musicCard = async (config: Record<string, unknown> = {}, hass = createHass(true)) => {
@@ -138,5 +138,14 @@ describe('lyrics', () => {
   it('says none when LRCLIB has nothing', async () => {
     const get = (async () => ({ ok: true, json: async () => [] })) as unknown as typeof fetch
     expect(await fetchLyrics('Unknown', 'Nobody', undefined, undefined, get)).toBeNull()
+  })
+})
+
+describe('secureImage', () => {
+  it('moves http pictures to https on an https page only', () => {
+    expect(secureImage('http://cdn-profiles.tunein.com/s1216/images/logoq.png?t=1', 'https:')).toBe('https://cdn-profiles.tunein.com/s1216/images/logoq.png?t=1')
+    expect(secureImage('http://cdn-profiles.tunein.com/x.png', 'http:')).toBe('http://cdn-profiles.tunein.com/x.png')
+    expect(secureImage('/api/media_player_proxy/media_player.kueche?token=1', 'https:')).toBe('/api/media_player_proxy/media_player.kueche?token=1')
+    expect(secureImage('https://i.scdn.co/image/abc', 'https:')).toBe('https://i.scdn.co/image/abc')
   })
 })
