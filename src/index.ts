@@ -15,6 +15,7 @@ import { AdHouseInfo } from './cards/house-info'
 import { AdWeather } from './cards/weather'
 import { AdPower } from './cards/power'
 import { AdMaintenanceList } from './cards/maintenance-list'
+import { AdSystem } from './cards/system'
 import { AdAppliance } from './cards/appliance'
 import { AdTv } from './cards/tv'
 import { AdRow } from './cards/row'
@@ -75,6 +76,7 @@ define('ad-house-info', AdHouseInfo)
 define('ad-weather', AdWeather)
 define('ad-power', AdPower)
 define('ad-maintenance-list', AdMaintenanceList)
+define('ad-system', AdSystem)
 define('ad-appliance', AdAppliance)
 define('ad-tv', AdTv)
 define('ad-row', AdRow)

@@ -526,6 +526,8 @@ export function createHass(dark: boolean): HomeAssistant {
         { label_id: 'technik', name: 'Technik' },
         { label_id: 'gast', name: 'Gast' },
       ] as T
+      const system = systemResponse(msg)
+      if (system !== undefined) return system as T
       if (msg.type !== 'config/auth/list') throw new Error(`mock: ${msg.type}`)
       return [
         { id: 'u-frank', name: 'Frank Carlo', system_generated: false, is_active: true, group_ids: ['system-admin'] },
@@ -689,4 +691,52 @@ function calendarCommand(msg: Record<string, unknown>) {
     Object.assign(target, { location: undefined, description: undefined }, fields(msg.event as Record<string, string>))
   }
   return null
+}
+
+// What HA tells admins about itself, shaped like the real websocket answers (HA OS with Supervisor)
+let backupState = 'idle'
+let lastBackup = new Date(Date.now() - 5 * 3_600_000).toISOString()
+function systemResponse(msg: Record<string, unknown>): unknown {
+  const ago = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
+  if (msg.type === 'supervisor/api' && msg.endpoint === '/core/stats') return { cpu_percent: 12.4, memory_percent: 23.6, memory_usage: 1_935_462_400, memory_limit: 8_218_099_712 }
+  if (msg.type === 'supervisor/api' && msg.endpoint === '/host/info') return { disk_total: 1877.1, disk_used: 54.2, disk_free: 1746.6 }
+  if (msg.type === 'repairs/list_issues') return { issues: [
+    { domain: 'homeassistant', issue_id: 'deprecated_yaml_ping', translation_key: 'deprecated_yaml', translation_placeholders: { integration_title: 'Ping' }, severity: 'warning', ignored: false, is_fixable: false, created: ago(30) },
+    { domain: 'zha', issue_id: 'inconsistent_network_settings', translation_key: 'inconsistent_network_settings', translation_placeholders: null, severity: 'error', ignored: false, is_fixable: true, created: ago(2) },
+    { domain: 'spook', issue_id: 'unused_blueprint', translation_key: 'unused_blueprints', translation_placeholders: { blueprint: 'Cast to Hub' }, severity: 'warning', ignored: true, created: ago(300) },
+  ] }
+  if (msg.type === 'frontend/get_translations') return { resources: {
+    'component.homeassistant.issues.deprecated_yaml.title': 'The {integration_title} YAML configuration is being removed',
+  } }
+  if (msg.type === 'config_entries/get') return [
+    { entry_id: 'e1', domain: 'hue', title: 'Hue Bridge', state: 'loaded', source: 'zeroconf', disabled_by: null, reason: null },
+    { entry_id: 'e2', domain: 'wiz', title: 'WiZ Stehlampe', state: 'setup_retry', source: 'user', disabled_by: null, reason: 'Failed to connect to the WiZ device at 192.168.178.142' },
+    { entry_id: 'e3', domain: 'tuya_local', title: 'LED-Streifen', state: 'setup_error', source: 'user', disabled_by: null, reason: null },
+    { entry_id: 'e4', domain: 'fritz', title: 'Repeater Dach', state: 'not_loaded', source: 'ignore', disabled_by: null, reason: null },
+    { entry_id: 'e5', domain: 'shelly', title: 'Alte Steckdose', state: 'not_loaded', source: 'user', disabled_by: 'user', reason: null },
+  ]
+  if (msg.type === 'config_entries/flow/progress') return [
+    { flow_id: 'f9', handler: 'spotify', context: { source: 'reauth', title_placeholders: { name: 'Spotify Frank' } } },
+  ]
+  if (msg.type === 'system_log/list') return [
+    { name: 'homeassistant.components.sonos.speaker', message: ['Subscription renewal failed for Küche'], level: 'ERROR', timestamp: Date.now() / 1000 - 600, count: 14 },
+    { name: 'custom_components.device_pulse.coordinator', message: ['[Shelly] ping failed'], level: 'WARNING', timestamp: Date.now() / 1000 - 60, count: 236 },
+    { name: 'homeassistant.components.automation.flur_licht', message: ['Error while executing automation automation.flur_licht: entity light.flur_alt not found'], level: 'ERROR', timestamp: Date.now() / 1000 - 4000, count: 1 },
+  ]
+  if (msg.type === 'backup/info') return {
+    backups: [
+      { backup_id: 'b2', name: 'Automatic backup 2026.11.0', date: lastBackup, agents: { 'google_drive.frank': { size: 8_808_304_640 } } },
+      { backup_id: 'b1', name: 'Automatic backup 2026.10.2', date: ago(29), agents: { 'hassio.local': { size: 8_500_000_000 } } },
+    ],
+    last_attempted_automatic_backup: lastBackup,
+    last_completed_automatic_backup: lastBackup,
+    next_automatic_backup: new Date(Date.now() + 19 * 3_600_000).toISOString(),
+    state: backupState,
+  }
+  if (msg.type === 'backup/generate_with_automatic_settings') {
+    backupState = 'create_backup'
+    setTimeout(() => { backupState = 'idle'; lastBackup = new Date().toISOString() }, 8000)
+    return { backup_job_id: 'job1' }
+  }
+  return undefined
 }

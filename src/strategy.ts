@@ -227,6 +227,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(hasMusic ? [{ path: 'music', icon: 'mdi:music', label: t(hass, 'music') }] : []),
     ...(calendars.length ? [{ path: 'calendar', icon: 'mdi:calendar-month-outline', label: t(hass, 'calendar') }] : []),
     ...(hasLists ? [{ path: 'lists', icon: 'mdi:clipboard-list-outline', label: t(hass, 'todos') }] : []),
+    // Admins reach maintenance from the bar; others through the battery and unavailable chips
+    ...(hasMaintenance && hass.user?.is_admin ? [{ path: 'maintenance', icon: 'mdi:wrench-outline', label: t(hass, 'maintenance') }] : []),
   ]
   // The face sits with the nav bar, which is on every page; a user's own face wins over the dashboard's
   const faceConfig = faceFor(config, rule, personal)
@@ -362,11 +364,22 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ]),
   }
 
+  // Admins also see HA itself: the server, repairs, failing integrations, the log, backups and updates.
+  // HA answers these websocket calls for admins only, so others keep batteries and unavailable devices.
+  const isAdmin = !!hass.user?.is_admin
+  const system = (source: string, title: string, icon: string): Section =>
+    ({ type: 'grid', column_span: 2, cards: [heading(title, icon), { type: 'custom:ad-system', source, ...look }] })
   const maintenanceView = subview('maintenance', t(hass, 'maintenance'), 'mdi:wrench-outline', [
+    ...(isAdmin ? [
+      system('health', t(hass, 'sys.system'), 'mdi:server-outline'),
+      system('backup', t(hass, 'sys.backups'), 'mdi:backup-restore'),
+      system('repairs', t(hass, 'sys.repairs'), 'mdi:auto-fix'),
+      system('integrations', t(hass, 'sys.integrations'), 'mdi:puzzle-outline'),
+      { type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'updates'), 'mdi:package-up'), { type: 'custom:ad-maintenance-list', source: 'updates', ...scopeOpts }] },
+      system('log', t(hass, 'sys.log'), 'mdi:text-box-search-outline'),
+    ] : []),
     { type: 'grid', column_span: 2, cards: [heading(t(hass, 'batteries'), 'mdi:battery-50'), { type: 'custom:ad-maintenance-list', source: 'battery', ...scopeOpts }] },
     { type: 'grid', column_span: 2, cards: [heading(t(hass, 'status.unavailable'), 'mdi:lan-disconnect'), { type: 'custom:ad-maintenance-list', source: 'unavailable', ...scopeOpts }] },
-    // Only admins can install updates
-    ...(hass.user?.is_admin ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'updates'), 'mdi:package-up'), { type: 'custom:ad-maintenance-list', source: 'updates', ...scopeOpts }] }] : []),
   ])
 
   const calendarView = subview('calendar', t(hass, 'calendar'), 'mdi:calendar-month-outline', [
