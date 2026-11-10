@@ -92,6 +92,14 @@ export interface RoomSettings {
   cards?: Partial<Record<CardSlot, Record<string, unknown>[]>>
 }
 
+/** Own cards on a page under `pages: <page>:`, like a room's: plain Lovelace configs at the top or the bottom */
+export interface PageSettings {
+  cards?: Partial<Record<'top' | 'bottom', Record<string, unknown>[]>>
+}
+
+/** Pages that take own cards: Home and the pages in the nav bar */
+export type OwnCardsPage = 'home' | PagePath
+
 /** What the viewing user may operate. Only shapes the UI; HA itself does not enforce it. */
 export type Access = 'full' | 'no_critical' | 'read_only'
 
@@ -204,6 +212,8 @@ export interface StrategyConfig extends Look {
   /** Single entities left out everywhere (set per room in the editor) */
   hide_entities?: string[]
   rooms?: Record<string, RoomSettings>
+  /** Own cards on Home and the other pages, e.g. pages: { maintenance: { cards: { top: [...] } } } */
+  pages?: Partial<Record<OwnCardsPage, PageSettings>>
   /** Entities shown on Home and, for those in a room, at the top of the room page */
   favorites?: string[]
   /** Scenes and scripts in the row on Home; unset = every visible scene */

@@ -167,11 +167,20 @@ strategy:
             content: Welcome
         light: []          # at the end of a group
         bottom: []
+  pages:                   # own cards on Home and the other pages, see below
+    maintenance:
+      cards:
+        top:
+          - type: entities
+            entities: [sensor.processor_temperature]
+        bottom: []
 ```
 
 Wherever a list is expected, a single value also works, e.g. `hide_areas: basement` or `calendars: calendar.family`.
 
 **Customizing room pages:** Easiest in the editor under "Room pages". Pick a room, then sort groups and devices with the arrows and hide them with the eye. Hidden devices (`hide_entities`) disappear everywhere in the dashboard, hidden groups (`hide_groups`) only on that room page. Own cards are ordinary Lovelace cards and go at the top (`top`), the bottom (`bottom`) or the end of a group (group name like `light`, `climate`, `shading`, `awning`, `opening`, `gate`, `lock`, `media`, `outlet`, `switch`, `select`, `motion`, `safety`, `sensor`, `scene`). "Reset room" makes the page automatic again.
+
+**Own cards on pages:** Home and every page in the nav bar take own cards too, under `pages:` with the page's name (`home`, `lights`, `climate`, `covers`, `security`, `cameras`, `music`, `calendar`, `lists`, `energy`, `maintenance`). `top` puts them below the page's heading, `bottom` at its end. In the editor they are under "Home" → "Own cards on pages": pick the page and the place, then write the cards as YAML.
 
 **Room picture:** If an area has a picture in HA (Settings → Areas → edit the area), the room header shows it whole, in its own proportions, on the right, with a blurred copy of it behind the room name. On a phone the picture sits small in the top right corner and the name below it.
 

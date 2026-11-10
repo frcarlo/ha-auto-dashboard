@@ -620,3 +620,35 @@ describe('kiosk mode', () => {
     expect(cleanConfig({ type: 'custom:auto-dashboard', kiosk_mode: { hide_header: true } }).kiosk_mode).toEqual({ hide_header: true })
   })
 })
+
+describe('own cards on pages', () => {
+  const md = (content: string) => ({ type: 'markdown', content })
+  const sectionsOf = async (config: Record<string, unknown>, path: string) => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', ...config }, createHass(true))
+    return (views.find(v => v.path === path) as any).sections.map((s: any) => s.cards.map((c: any) => c.content ?? c.type))
+  }
+
+  it('puts them below the header and before the nav bar', async () => {
+    const pages = { maintenance: { cards: { top: [md('oben')], bottom: [md('unten')] } }, home: { cards: { top: [md('home')] } } }
+    const maintenance = await sectionsOf({ pages }, 'maintenance')
+    expect(maintenance[0]).toEqual(['custom:ad-header'])
+    expect(maintenance[1]).toEqual(['oben'])
+    expect(maintenance.at(-2)).toEqual(['unten'])
+    expect(maintenance.at(-1)).toEqual(['custom:ad-nav-bar'])
+    expect((await sectionsOf({ pages }, 'home'))[1]).toEqual(['home'])
+  })
+
+  it('keeps the header first when the nav bar is at the top', async () => {
+    const pages = { lights: { cards: { top: [md('oben')], bottom: [md('unten')] } } }
+    const lights = await sectionsOf({ pages, nav_position: 'top' }, 'lights')
+    expect(lights[0]).toEqual(['custom:ad-nav-bar'])
+    expect(lights[1][0]).toBe('custom:ad-header')
+    expect(lights[2]).toEqual(['oben'])
+    expect(lights.at(-1)).toEqual(['unten'])
+  })
+
+  it('drops empty pages when the editor saves', () => {
+    expect(cleanConfig({ type: 'custom:auto-dashboard', pages: { home: { cards: { top: [] } }, lights: { cards: { bottom: [md('x')], top: [] } } } }).pages)
+      .toEqual({ lights: { cards: { bottom: [md('x')] } } })
+  })
+})

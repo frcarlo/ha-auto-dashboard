@@ -1,6 +1,7 @@
 // Config editor HA shows for this strategy in edit mode (pencil → "Edit dashboard").
 // Only admins can edit dashboards, so only admins reach it. Uses HA's theme variables to fit the dialog.
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
+import { keyed } from 'lit/directives/keyed.js'
 import { cleanConfig, normalizeConfig } from './config'
 import { findSchools } from './school'
 import { CO2_LIMIT, co2Sensors } from './events'
@@ -15,7 +16,7 @@ import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import { accessOf } from './access'
-import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
+import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, OwnCardsPage, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
 
 interface HaUser {
   id: string
@@ -64,6 +65,9 @@ export class AdStrategyEditor extends LitElement {
     tab: { state: true },
     tool: { state: true },
     roomArea: { state: true },
+    cardsPage: { state: true },
+    cardsSlot: { state: true },
+    cardsError: { state: true },
   }
 
   hass?: HomeAssistant
@@ -75,6 +79,10 @@ export class AdStrategyEditor extends LitElement {
   tool: Tool = 'hide'
   /** Room being edited on the room pages tab */
   roomArea = ''
+  /** Page and place whose own cards are being edited */
+  cardsPage: OwnCardsPage = 'home'
+  cardsSlot: 'top' | 'bottom' = 'top'
+  cardsError = false
   private usersRequested = false
 
   static styles = [houseStyles, css`
@@ -465,6 +473,7 @@ export class AdStrategyEditor extends LitElement {
           <button aria-pressed=${(c.co2_limit ?? CO2_LIMIT) === n} @click=${() => this.change({ co2_limit: n === CO2_LIMIT ? undefined : n })}>${n}</button>`)}</div>`) : nothing}
         ${this.renderAppliances()}
         ${this.renderPopups()}
+        ${this.renderPageCards()}
         ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
           c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint'))}
         ${c.hide_domains?.includes('weather') ? nothing : html`
@@ -479,6 +488,36 @@ export class AdStrategyEditor extends LitElement {
           ${this.field(this.l('ed.warnings'), this.entityPicker(c.weather_warnings, ['binary_sensor', 'sensor'], weather_warnings => this.change({ weather_warnings })), this.l('ed.warnings_hint'))}
           ${this.field(this.l('ed.forecast_days'), html`<div class="seg" role="group">${[0, 3, 5, 7].map(n => html`
             <button aria-pressed=${(c.forecast_days ?? 3) === n} @click=${() => this.change({ forecast_days: n })}>${n}</button>`)}</div>`)}`}`
+  }
+
+  /** Own Lovelace cards at the top or the bottom of Home and the other pages, like a room's own cards */
+  private renderPageCards() {
+    const pages: OwnCardsPage[] = ['home', ...PAGES]
+    const page = this.config.pages?.[this.cardsPage]
+    const value = page?.cards?.[this.cardsSlot] ?? []
+    const count = (p: OwnCardsPage) => (this.config.pages?.[p]?.cards?.top?.length ?? 0) + (this.config.pages?.[p]?.cards?.bottom?.length ?? 0)
+    const set = (raw: unknown) => {
+      const list = raw === undefined || raw === null || raw === '' ? [] : Array.isArray(raw) ? raw : [raw]
+      this.cardsError = !list.every(c => c && typeof c === 'object' && typeof (c as { type?: unknown }).type === 'string')
+      if (this.cardsError) return
+      const cards = { ...(page?.cards ?? {}), [this.cardsSlot]: list as Record<string, unknown>[] }
+      this.change({ pages: { ...(this.config.pages ?? {}), [this.cardsPage]: { ...(page ?? {}), cards } } })
+    }
+    return this.field(this.l('ed.page_cards'), html`
+      <select .value=${this.cardsPage} @change=${(e: Event) => { this.cardsPage = (e.target as HTMLSelectElement).value as OwnCardsPage; this.cardsError = false }}>
+        ${pages.map(p => html`<option value=${p} ?selected=${p === this.cardsPage}>${this.l(p)}${count(p) ? ` (${count(p)})` : ''}</option>`)}
+      </select>
+      ${this.seg<'top' | 'bottom'>([['top', 'ed.page_top'], ['bottom', 'ed.page_bottom']], this.cardsSlot, slot => { this.cardsSlot = slot; this.cardsError = false })}
+      ${customElements.get('ha-selector')
+        // HA's object selector is its YAML editor; keyed so switching page or place loads those cards
+        ? keyed(`${this.cardsPage}/${this.cardsSlot}`, html`<ha-selector .hass=${this.hass} .selector=${{ object: {} }} .value=${value}
+            @value-changed=${(e: CustomEvent) => set(e.detail.value)}></ha-selector>`)
+        : html`<textarea .value=${value.length ? JSON.stringify(value, null, 2) : ''} placeholder='[{"type": "markdown", "content": "…"}]'
+            @change=${(e: Event) => {
+              const text = (e.target as HTMLTextAreaElement).value.trim()
+              try { set(text ? JSON.parse(text) : []) } catch { this.cardsError = true }
+            }}></textarea>`}`,
+      this.l(this.cardsError ? 'ed.cards_error' : 'ed.page_cards_hint'))
   }
 
   private renderLook() {

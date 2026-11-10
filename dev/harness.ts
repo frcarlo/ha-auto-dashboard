@@ -58,6 +58,7 @@ const config: StrategyConfig = {
   face: params.has('face') ? { after: Number(params.get('after') ?? 3), style: (params.get('face') || 'clock') as NonNullable<StrategyConfig['face']>['style'] } : undefined,
   // ?as=leni&users={"leni":{"access":"read_only"}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,
+  pages: params.has('pages') ? JSON.parse(params.get('pages')!) : undefined,
   // ?popup adds the doorbell popup; "Klingeln" in the bar (or ?ring=3, after three seconds) rings like the Reolink: on for 4 s
   popups: params.has('popup') ? [{ trigger: 'binary_sensor.haustur_besucher', ...(params.get('popup') ? { close_after: Number(params.get('popup')) } : {}) }] : undefined,
 }

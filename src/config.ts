@@ -22,13 +22,24 @@ export function cleanRoom(room: RoomSettings): RoomSettings | undefined {
   return Object.keys(out).length ? out : undefined
 }
 
+/** Pages without own cards drop out, so the YAML stays short */
+function cleanPages(pages: StrategyConfig['pages']): StrategyConfig['pages'] {
+  const kept = Object.entries(pages ?? {}).flatMap(([path, page]) => {
+    const cards = Object.fromEntries(Object.entries(page?.cards ?? {}).filter(([, list]) => list?.length))
+    return Object.keys(cards).length ? [[path, { ...page, cards }]] : []
+  })
+  return kept.length ? Object.fromEntries(kept) : undefined
+}
+
 export function cleanConfig(config: StrategyConfig): StrategyConfig {
-  const { users, rooms, type: _type, ...rest } = config
+  const { users, rooms, pages, type: _type, ...rest } = config
   const out = clean(rest, DEFAULTS) as Omit<StrategyConfig, 'type'>
   const keptRooms = Object.entries(rooms ?? {}).map(([id, room]) => [id, cleanRoom(room)] as const).filter(([, room]) => room)
   if (keptRooms.length) out.rooms = Object.fromEntries(keptRooms) as Record<string, RoomSettings>
   // Users keep their entry even without restrictions, so the editor doesn't drop a rule while it's being filled in
   if (users && Object.keys(users).length) out.users = Object.fromEntries(Object.entries(users).map(([k, r]) => [k, cleanRule(r)]))
+  const keptPages = cleanPages(pages)
+  if (keptPages) out.pages = keptPages
   return { type: config.type, ...out }
 }
 

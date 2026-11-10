@@ -18,7 +18,7 @@ import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import type { NavItem } from './cards/nav-bar'
 import type { FaceSettings } from './cards/face'
-import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, PagePath, StrategyConfig } from './types'
+import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, OwnCardsPage, PagePath, StrategyConfig } from './types'
 
 type Card = Record<string, unknown>
 type Section = { type: 'grid'; column_span?: number; cards: Card[] }
@@ -536,8 +536,23 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const background = config.background_image?.trim() ? imageBackground(config.background_image, config.theme)
     : look.glass ? glassBackground(look.primary_color, config.theme)
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
+  // Own cards (pages: <page>: cards: top/bottom) go below the page's header and at its end, like a room's
+  const withOwnCards = (view: View): View => {
+    const cards = config.pages?.[String(view.path) as OwnCardsPage]?.cards
+    if (!cards?.top?.length && !cards?.bottom?.length) return view
+    const sections = [...(view.sections as Section[])]
+    const navAt = sections.findIndex(s => s.cards.some(c => c.type === 'custom:ad-nav-bar'))
+    const navTop = navAt === 0
+    const own = (list?: Record<string, unknown>[]): Section[] => list?.length ? [{ type: 'grid', cards: list }] : []
+    const headerAt = navTop ? 1 : 0
+    sections.splice(headerAt + 1, 0, ...own(cards.top))
+    const end = navTop ? sections.length : sections.length - 1
+    sections.splice(end, 0, ...own(cards.bottom))
+    return { ...view, sections }
+  }
   const views = [home, ...domainViews, ...(hasMusic ? [musicView] : []), ...(calendars.length ? [calendarView] : []), ...(hasLists ? [listsView] : []), ...(hasEnergy ? [energyView] : []), ...(hasMaintenance ? [maintenanceView] : []), ...(allowPersonal ? [settingsView] : []), ...roomViews]
     .filter(view => !ownHidden.has(String(view.path)))
+    .map(withOwnCards)
   return {
     title: config.title ?? t(hass, 'home'),
     // kiosk-mode reads its options from the generated dashboard, not from the strategy, so they go along unchanged
