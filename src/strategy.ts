@@ -517,6 +517,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     .filter(view => !ownHidden.has(String(view.path)))
   return {
     title: config.title ?? t(hass, 'home'),
+    // kiosk-mode reads its options from the generated dashboard, not from the strategy, so they go along unchanged
+    ...(rawConfig.kiosk_mode ? { kiosk_mode: rawConfig.kiosk_mode } : {}),
     views: background ? views.map((view): View => ({ ...view, background })) : views,
   }
 }

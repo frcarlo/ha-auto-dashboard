@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { generateDashboard } from '../src/strategy'
 import { findCameras, detectionsFrom, detectionKind } from '../src/cameras'
 import { createHass } from '../dev/mock'
+import { cleanConfig } from '../src/config'
 
 describe('generateDashboard', () => {
   it('builds home, domain and room views from the registries', async () => {
@@ -605,5 +606,17 @@ describe('cameras', () => {
     }
     const found = detectionsFrom(history, [door], since)
     expect(found.map(d => [d.kind, (d.at / 1000 - since / 1000) / 60])).toEqual([['person', 800], ['motion', 700], ['package', 600.5]])
+  })
+})
+
+describe('kiosk mode', () => {
+  it('hands the kiosk-mode options on to the generated dashboard', async () => {
+    const kiosk_mode = { user_settings: [{ users: ['tv'], kiosk: true }] }
+    expect((await generateDashboard({ type: 'custom:auto-dashboard', kiosk_mode }, createHass(true)) as any).kiosk_mode).toEqual(kiosk_mode)
+    expect('kiosk_mode' in await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))).toBe(false)
+  })
+
+  it('keeps the options when the editor saves', () => {
+    expect(cleanConfig({ type: 'custom:auto-dashboard', kiosk_mode: { hide_header: true } }).kiosk_mode).toEqual({ hide_header: true })
   })
 })

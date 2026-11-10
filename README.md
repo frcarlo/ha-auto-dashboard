@@ -141,6 +141,10 @@ strategy:
   face:                    # face after a while without a touch
     after: 120             # seconds, 0 = right on opening (after a touch then 1 minute)
     style: clock           # clock | analog | photo | calendar
+  kiosk_mode:              # passed on to the kiosk-mode plugin, see "Kiosk mode" below
+    user_settings:
+      - users: [tv]
+        kiosk: true
   tv_apps: [magenta, netflix, prime]   # app buttons on the TV card
   appliances:              # appliances without an operation state of their own; the dashboard finds the others
     - status: sensor.dryer_power   # state: power, switch, binary sensor or status sensor
@@ -218,6 +222,10 @@ strategy:
 - `access` is `full` (default), `no_critical` or `read_only`. The former switches `read_only: true` and `control_critical: false` still work.
 - `areas`, `floors` and `hide_pages` apply on top of the dashboard's filters.
 - What someone may not operate appears without switches and buttons. HA's more-info dialog doesn't open for it either, since it could be used to switch. Display-only entities like sensors still open their info.
+
+### Kiosk mode
+
+The dashboard doesn't hide HA's header and sidebar itself; the [kiosk-mode](https://github.com/NemesisRE/kiosk-mode) plugin does. It reads its options from the dashboard HA builds, and a strategy dashboard has only `strategy:` at the top, so put them under `kiosk_mode:` inside the strategy: they are passed on to the plugin as they are. Every option of the plugin works there, e.g. `kiosk: true` for everyone, or `user_settings` for one user only like the wall tablet's. Without the plugin the option does nothing. Its URL parameters (`?kiosk`, `?hide_header`, `?hide_sidebar`) work without any option. With the nav bar on the left, the bar moves to the edge once the sidebar is gone.
 
 ### Own settings
 

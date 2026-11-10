@@ -242,6 +242,8 @@ export interface StrategyConfig extends Look {
   co2_limit?: number
   /** The face after a while without a touch; per user under users */
   face?: FaceConfig
+  /** Options for the kiosk-mode plugin (hide HA's header and sidebar), passed on to it as they are */
+  kiosk_mode?: Record<string, unknown>
   /** Windows that open on every dashboard when something happens, e.g. the camera and door buttons when it rings */
   popups?: PopupRule[]
 }
