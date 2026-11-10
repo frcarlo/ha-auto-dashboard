@@ -36,7 +36,7 @@ describe('weather', () => {
     hass.states['sensor.dwd'] = st('sensor.dwd', '1', { warning_count: 1, warning_1_name: 'Frost', warning_1_headline: 'Amtliche WARNUNG vor FROST', warning_1_level: 1 })
     expect(activeWarnings(hass, ['binary_sensor.nina_1', 'binary_sensor.nina_2', 'sensor.dwd', 'sensor.missing'])).toEqual([
       { entity_id: 'binary_sensor.nina_1', headline: 'Sturmböen', severity: 'error', until: '2026-11-06T18:00:00+01:00' },
-      { entity_id: 'sensor.dwd', headline: 'Amtliche WARNUNG vor FROST', severity: 'warning', until: undefined },
+      { entity_id: 'sensor.dwd', headline: 'Amtliche WARNUNG vor FROST', severity: 'warning', until: undefined, name: 'Frost' },
     ])
   })
 

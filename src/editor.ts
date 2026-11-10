@@ -3,6 +3,7 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { cleanConfig, normalizeConfig } from './config'
 import { findSchools } from './school'
+import { CO2_LIMIT, co2Sensors } from './events'
 import { HIDE_LABEL, hideOf, isRoomFavorite, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
 import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
@@ -45,7 +46,10 @@ type Tool = 'hide' | 'outdoor' | 'only'
 const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide: 'hide_areas', outdoor: 'outdoor_areas', only: 'areas' }
 
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
-const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'battery', 'unavailable', 'presence', 'school']
+const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'battery', 'unavailable', 'presence', 'school',
+  'warning', 'waste', 'birthday', 'parcel', 'appliance', 'co2']
+const EVENT_CHIPS: StatusChip[] = ['school', 'warning', 'waste', 'birthday', 'parcel', 'appliance', 'co2']
+const CO2_LIMITS = [1000, 1200, 1500, 2000]
 const DOMAINS = [
   'light', 'climate', 'cover', 'media_player', 'switch', 'fan', 'input_boolean', 'vacuum',
   'lock', 'alarm_control_panel', 'scene', 'script', 'button', 'sensor', 'binary_sensor', 'camera', 'todo', 'weather',
@@ -457,6 +461,8 @@ export class AdStrategyEditor extends LitElement {
         ${this.field(this.l('ed.hide_chips'), this.chips(this.chipOptions,
           [...(c.hide_chips ?? []), ...(c.school_chips === false ? ['school' as const] : [])],
           hide_chips => this.change({ hide_chips: hide_chips as StatusChip[], school_chips: undefined })), this.l('ed.hide_chips_hint'))}
+        ${co2Sensors(this.hass!, Object.keys(this.hass!.states)).length && !c.hide_chips?.includes('co2') ? this.field(this.l('ed.co2_limit'), html`<div class="seg" role="group">${CO2_LIMITS.map(n => html`
+          <button aria-pressed=${(c.co2_limit ?? CO2_LIMIT) === n} @click=${() => this.change({ co2_limit: n === CO2_LIMIT ? undefined : n })}>${n}</button>`)}</div>`) : nothing}
         ${this.renderAppliances()}
         ${this.renderPopups()}
         ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
@@ -541,7 +547,7 @@ export class AdStrategyEditor extends LitElement {
   private get chipOptions() {
     const school = findSchools(this.hass!).length > 0
     return CHIPS.filter(k => k !== 'school' || school)
-      .map(k => ({ id: k, label: this.l(k === 'school' ? 'ed.chip_school' : `status.${k}`) }))
+      .map(k => ({ id: k, label: this.l(EVENT_CHIPS.includes(k) ? `ed.chip_${k as 'school'}` : `status.${k as 'lights'}`) }))
   }
 
   private renderUsers() {

@@ -120,8 +120,13 @@ export interface FaceConfig {
   style?: FaceStyle
 }
 
-/** Chips in the status bar that can be hidden; `school` is cancelled and changed lessons */
-export type StatusChip = 'presence' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'battery' | 'unavailable' | 'school'
+/**
+ * Chips in the status bar that can be hidden; `school` is cancelled and changed lessons, the rest from `warning` on
+ * are what's coming up: weather warnings, the bin to put out, birthdays, parcels, appliances that finished, stuffy rooms
+ */
+export type StatusChip = 'presence' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'battery' | 'unavailable' | 'school' | EventKey
+
+export type EventKey = 'warning' | 'waste' | 'birthday' | 'parcel' | 'appliance' | 'co2'
 
 export interface UserRule {
   /** The face for this user only; false switches the dashboard's face off */
@@ -233,6 +238,8 @@ export interface StrategyConfig extends Look {
   school_chips?: boolean
   /** Status chips nobody sees, e.g. [unavailable]; per user under users */
   hide_chips?: StatusChip[]
+  /** CO₂ in ppm from which a room gets a chip, 1200 by default */
+  co2_limit?: number
   /** The face after a while without a touch; per user under users */
   face?: FaceConfig
   /** Windows that open on every dashboard when something happens, e.g. the camera and door buttons when it rings */

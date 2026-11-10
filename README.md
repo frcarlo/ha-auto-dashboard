@@ -32,6 +32,16 @@ The dashboard speaks German and English and follows the language set in Home Ass
 
 **Appliances:** The dashboard finds dishwasher, washer, dryer and oven by their operation state, a sensor like `sensor.geschirrspuler_betriebszustand` (Home Connect) or `sensor.washing_machine_state` (WashData). Whatever else the appliance reports goes on the card: progress, end time or remaining time, the running program, the door and notices like "Salt almost empty". While a program runs, a ring fills up with the remaining time in the middle, with start and end below. "Done" is green and stays until the appliance reports "Ready" again, with Home Connect until someone opens the door. Each appliance appears on its room page under "Appliances", and its single sensors don't show there again. On Home it only appears while it runs, is done or needs something. Appliances without an operation state of their own, e.g. a dryer on a smart plug, are added with `appliances`: a power sensor is enough as state (from 5 W it runs), or a switch or a status sensor of its own. `hide_domains: [appliance]` turns the cards off.
 
+**What's coming up:** Next to the status chips on Home, chips for things that want doing today, each found on its own, a tap lists them:
+- **Weather warnings** from DWD (the current level, not the advance one) or NINA, e.g. "Frost", red for severe ones; `weather_warnings` picks the entities instead.
+- **Bins** from Waste Collection Schedule: "Gelbe Tonne tomorrow" from 15:00 the day before until 9:00 on the day, with the bin's colour, every bin of the day on one chip.
+- **Birthdays** from all-day or timed events in any calendar whose title says "Geburtstag", "birthday" or 🎂: "Margit's birthday".
+- **Parcels** due today from a parcel service's calendar (DHL, DPD, Hermes, parcel trackers; found by "delivery", "Zustellung", "parcel" or "Paket" in its id or name).
+- **Appliances done**: "Washer done" while a washer, dryer or dishwasher waits to be emptied.
+- **Stuffy rooms**: "Air the office" when a CO₂ sensor (ppm) reads 1200 or more (`co2_limit`). The room's page shows the chip too.
+
+Each one can be hidden with `hide_chips` (`warning`, `waste`, `birthday`, `parcel`, `appliance`, `co2`), for everyone or per user.
+
 **School (WebUntis):** With the WebUntis integration (`untis`), every pupil gets a card, found by the integration's own entities, so their names don't matter. While school is on it shows the lesson now with room and end ("Now: Physics · PH4 · until 10:40"), in a break the next one. After school it moves to the next school day: tomorrow, or Monday after the weekend, with start and end, and "ends early, normally 15:05" when the last lessons are cancelled. A strip shows the day's lessons as bars: cancelled ones striped red, changed ones amber, a line for now. On Home the pupils' cards sit side by side and list only what's different (cancelled lessons, other rooms, substitutes); a tap opens the pupil's room. There the card lists every lesson of the day, double lessons as one, and the integration's many sensors no longer appear as tiles. The status chips on Home get "3 cancelled tomorrow" in red and "1 change today" in amber, each pupil counted for their own next school day; a tap lists the lessons. Timetables stay off the calendar page unless they're picked under `calendars`. `school_home: false` keeps the cards off Home and `hide_chips: [school]` the chips (in the editor under Home page); `hide_domains: [school]` turns cards and chips off everywhere.
 
 **TVs:** A media player with class `tv` gets a card like a remote on its room page: power, the running app, a round d-pad with OK, volume up, volume down and mute, back and home. The d-pad goes through the remote entity of the same device (Android TV Remote or Android Debug Bridge). If both integrations bring the same TV, it appears once, with the Android TV Remote. Below, buttons start an app directly, and the running one is highlighted. Which ones is set by `tv_apps` (in the editor "Apps on the TV"): `netflix`, `prime`, `youtube`, `magenta`, `disney`, `spotify`, `plex`, `kodi`, by default Netflix, YouTube and Prime Video. Instead of package names like `de.telekom.magentatv.tv` the card shows the app name, "Home" for the launcher.
@@ -127,6 +137,7 @@ strategy:
   school_home: false       # no school cards on Home (the pupils' rooms keep theirs)
   school_chips: false      # no "3 cancelled tomorrow" chips on Home
   hide_chips: [unavailable, battery]   # status chips nobody sees; per user under users
+  co2_limit: 1000          # CO₂ in ppm from which a room gets an "Air the room" chip, 1200 by default
   face:                    # face after a while without a touch
     after: 120             # seconds, 0 = right on opening (after a touch then 1 minute)
     style: clock           # clock | analog | photo | calendar
@@ -192,7 +203,7 @@ strategy:
       areas: [leni_room, living_room]
       floors: [upstairs]
       hide_pages: [security]       # on top of the dashboard's hide_pages
-      hide_chips: [unavailable]    # status chips this user doesn't see, on top of the dashboard's: lights | openings | unlocked | heating | media | battery | unavailable | presence | school
+      hide_chips: [unavailable]    # status chips this user doesn't see, on top of the dashboard's: lights | openings | unlocked | heating | media | battery | unavailable | presence | school | warning | waste | birthday | parcel | appliance | co2
       access: no_critical          # no locks, alarm panel, "All off/close all"
     guest:
       access: read_only            # view only

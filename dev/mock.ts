@@ -209,7 +209,29 @@ export const musicDefs: Def[] = [
   ['media_player.wohnzimmer_sonos_raw', 'idle', { friendly_name: 'Wohnzimmer Sonos (direkt)', supported_features: 8321599 }, 'wohnzimmer'],
 ]
 
+/** Local yyyy-mm-dd, days from today */
+const dateKey = (offset: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const deviceDefs: DeviceDef[] = [
+  // Waste Collection Schedule: one sensor per bin, the dates as attributes
+  {
+    id: 'dev-waste', name: 'Waste Collection Schedule', area: '', platform: 'waste_collection_schedule', entities: [
+      ['sensor.waste_collection_schedule_gelbe_tonne', 'heute', { friendly_name: 'Waste Collection Schedule Gelbe Tonne', [dateKey(0)]: 'Gelbe Tonne', [dateKey(14)]: 'Gelbe Tonne', icon: 'mdi:trash-can' }],
+      ['sensor.waste_collection_schedule_restmull', 'morgen', { friendly_name: 'Waste Collection Schedule Restmüll', [dateKey(1)]: 'Restmüll', [dateKey(8)]: 'Restmüll', icon: 'mdi:trash-can' }],
+      ['sensor.waste_collection_schedule_biotonne', 'morgen', { friendly_name: 'Waste Collection Schedule Biotonne', [dateKey(1)]: 'Biotonne', [dateKey(8)]: 'Biotonne', icon: 'mdi:trash-can' }],
+    ],
+  },
+  // DWD: the current warnings of the region, ?warn=on adds frost
+  {
+    id: 'dev-dwd', name: 'DWD Mülheim', area: '', platform: 'dwd_weather_warnings', entities: [
+      ['sensor.dwd_aktuelle_warnstufe', '0', { friendly_name: 'Aktuelle Warnstufe', region_name: 'Stadt Mülheim an der Ruhr', warning_count: 0 }, undefined, 'current_warning_level'],
+      ['sensor.dwd_vorwarnstufe', '0', { friendly_name: 'Vorwarnstufe', region_name: 'Stadt Mülheim an der Ruhr', warning_count: 0 }, undefined, 'advance_warning_level'],
+    ],
+  },
   untisDevice('leni', 'Leni Carlo'),
   untisDevice('tom', 'Tom Carlo'),
   // A Reolink doorbell: three streams, of which the page shows one, and its detections
@@ -328,9 +350,10 @@ const extras: HassEntity[] = [
   { entity_id: 'calendar.familie', state: 'off', attributes: { friendly_name: 'Familie', supported_features: 7 } },
   { entity_id: 'calendar.abfall', state: 'off', attributes: { friendly_name: 'Abfall', supported_features: 3 } },
   { entity_id: 'calendar.feiertage', state: 'off', attributes: { friendly_name: 'Feiertage' } },
+  { entity_id: 'calendar.dhl_zustellungen', state: 'off', attributes: { friendly_name: 'DHL Zustellungen' } },
   // NINA keeps one binary sensor per warning slot; ?warn=on fills the first
-  { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1' } },
-  { entity_id: 'binary_sensor.warning_mulheim_2', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 2' } },
+  { entity_id: 'binary_sensor.warning_mulheim_1', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 1', device_class: 'safety' } },
+  { entity_id: 'binary_sensor.warning_mulheim_2', state: 'off', attributes: { friendly_name: 'Warnung Mülheim 2', device_class: 'safety' } },
 ]
 
 /** Today's detections as the recorder keeps them: off, then on and off again for each one, minutes ago */
@@ -631,6 +654,7 @@ function calendarStore() {
   const weekly = Array.from({ length: 8 }, (_, w) => timed('Fußball Training', w * 7 - 7, 17, 30, 90, { uid: 'mock-training', rrule: 'FREQ=WEEKLY', recurrence_id: local(day(w * 7 - 7)).replaceAll('-', '') }))
   calendars = {
     'calendar.familie': [
+      allDay('Geburtstag Margit', 0),
       timed('Zahnarzt Leni', 0, 9, 30, 60, { location: 'Praxis Dr. Berg, Schloßstraße 4' }),
       timed('Elternabend', 0, 19, 0, 90),
       timed('Einkaufen', 1, 10, 0, 60),
@@ -644,6 +668,7 @@ function calendarStore() {
     ],
     'calendar.abfall': [allDay('Restmüll', 1), allDay('Papier', 8), allDay('Gelbe Tonne', 4), allDay('Bio', 11), allDay('Restmüll', 15)],
     'calendar.feiertage': [allDay('Martinstag', 5)],
+    'calendar.dhl_zustellungen': [timed('Paket von Thalia', 0, 10, 0, 240)],
     'calendar.leni_stundenplan': untisEvents('leni'),
     'calendar.tom_stundenplan': untisEvents('tom'),
   }

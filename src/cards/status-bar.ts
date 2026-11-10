@@ -7,7 +7,13 @@ import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import { peopleIds, peopleStyles, renderPeople } from './people'
 import { schoolIds, schoolNotes, type School, type SchoolNote } from '../school'
-import type { HassEntity, StatusChip } from '../types'
+import {
+  applianceChipIcon, binColor, birthdays, currentWarnings, finishedAppliances, stuffyRooms, wastePickup, warningName,
+  type CalendarHit, type EventKey, type EventSources,
+} from '../events'
+import { applianceEntities } from '../appliances'
+import type { ApiEvent } from '../calendar'
+import type { HassEntity, HomeAssistant, StatusChip } from '../types'
 
 interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
@@ -25,9 +31,58 @@ interface StatusBarConfig extends BaseConfig {
   schools?: School[]
   /** Chips not shown here, e.g. unavailable devices on a family tablet */
   hide_chips?: StatusChip[]
+  /** Where the chips for what's coming up come from: bins, warnings, birthdays, parcels, appliances, CO₂ */
+  events?: EventSources
 }
 
 type SchoolChip = 'cancelled' | 'changed'
+
+/** A chip for something coming up, and the rows its list shows */
+interface EventChip {
+  key: EventKey
+  icon: string
+  color: 'primary' | 'warning' | 'error' | 'success'
+  /** The bin's own colour for its icon */
+  tint?: string
+  label: string
+  rows: { icon: string; text: string; sub?: string; entity?: string; tint?: string }[]
+}
+
+/** Today's events per calendar, shared by every status bar on the page; fetched again after a while or the next day */
+const STALE_MS = 30 * 60_000
+const calendarCache = new Map<string, { day: string; at: number; hits: CalendarHit[] }>()
+const loadingCalendars = new Set<string>()
+
+async function todaysEvents(hass: HomeAssistant, calendars: string[], now: number): Promise<boolean> {
+  const day = new Date(now).toDateString()
+  const due = calendars.filter(id => {
+    const c = calendarCache.get(id)
+    return !loadingCalendars.has(id) && (!c || c.day !== day || now - c.at > STALE_MS)
+  })
+  if (!due.length || !hass.callApi) return false
+  const from = new Date(now)
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(from)
+  to.setDate(to.getDate() + 1)
+  const range = `start=${encodeURIComponent(from.toISOString())}&end=${encodeURIComponent(to.toISOString())}`
+  due.forEach(id => loadingCalendars.add(id))
+  await Promise.all(due.map(async id => {
+    try {
+      const list = await hass.callApi!<ApiEvent[]>('GET', `calendars/${id}?${range}`)
+      calendarCache.set(id, { day, at: Date.now(), hits: (list ?? []).map(e => ({ calendar: id, title: e.summary ?? '' })) })
+    } catch {
+      calendarCache.set(id, { day, at: Date.now(), hits: [] })
+    } finally {
+      loadingCalendars.delete(id)
+    }
+  }))
+  return true
+}
+
+const hitsOf = (calendars: string[] = [], now: number) => {
+  const day = new Date(now).toDateString()
+  return calendars.flatMap(id => (calendarCache.get(id)?.day === day ? calendarCache.get(id)!.hits : []))
+}
 
 const ICONS: Record<StatusKey, string> = {
   presence: 'mdi:motion-sensor',
@@ -47,8 +102,28 @@ const COLORS: Record<StatusKey, string> = {
 }
 
 export class AdStatusBar extends BaseCard<StatusBarConfig> {
-  static properties = { ...BaseCard.properties, open: { state: true } }
-  open: StatusKey | SchoolChip | null = null
+  static properties = { ...BaseCard.properties, open: { state: true }, now: { state: true } }
+  open: StatusKey | SchoolChip | EventKey | null = null
+  /** Ticks every minute: bins show from the afternoon before, calendars are fetched again */
+  now = Date.now()
+  private timer?: number
+
+  connectedCallback() {
+    super.connectedCallback()
+    this.timer = window.setInterval(() => (this.now = Date.now()), 60_000)
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    window.clearInterval(this.timer)
+  }
+
+  protected updated() {
+    const ev = this.config?.events
+    if (!ev || !this.hass) return
+    const calendars = [...(ev.birthdays ?? []), ...(ev.parcels ?? [])]
+    if (calendars.length) void todaysEvents(this.hass, calendars, this.now).then(changed => changed && this.requestUpdate())
+  }
 
   static styles = [tokens, peopleStyles, css`
     :host { display: block; }
@@ -70,6 +145,8 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     .chip.primary ha-icon { color: rgb(var(--ad-primary)); }
     .chip.error ha-icon { color: rgb(var(--ad-error)); }
     .chip.muted ha-icon { opacity: 0.5; }
+    .chip.success ha-icon { color: rgb(var(--ad-success)); }
+    .chip ha-icon.tint, .item ha-icon.tint { color: var(--tint); opacity: 1; }
     .chip[aria-expanded=true] { background: var(--ad-surface-variant); }
     .chip:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     .quiet { cursor: default; }
@@ -98,7 +175,16 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
 
   protected watched() {
     const { areas, hide_labels: labels, hide_entities: hidden } = this.config!
-    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id), ...(this.config!.people === false ? [] : peopleIds(this.hass!, this.config!)), ...schoolIds(this.config!.schools ?? [])]
+    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id), ...(this.config!.people === false ? [] : peopleIds(this.hass!, this.config!)), ...schoolIds(this.config!.schools ?? []), ...this.eventIds()]
+  }
+
+  private eventIds() {
+    const ev = this.config!.events
+    if (!ev) return []
+    return [
+      ...(ev.waste ?? []), ...(ev.warnings ?? []), ...(ev.co2 ?? []), ...(ev.birthdays ?? []), ...(ev.parcels ?? []),
+      ...(ev.appliances ?? []).flatMap(a => applianceEntities(this.hass!, a)),
+    ]
   }
 
   private areaName(entity: HassEntity) {
@@ -111,7 +197,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     return new Date(ms).toLocaleTimeString(this.hass?.locale?.language ?? this.hass?.language, { hour: 'numeric', minute: '2-digit' })
   }
 
-  private flip(key: StatusKey | SchoolChip) {
+  private flip(key: StatusKey | SchoolChip | EventKey) {
     this.open = this.open === key ? null : key
   }
 
@@ -143,6 +229,95 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     </div>`
   }
 
+  /** The chips for what's coming up, most pressing first */
+  private eventChips(): EventChip[] {
+    const ev = this.config!.events
+    if (!ev) return []
+    const hass = this.hass!
+    const now = this.now
+    const out: EventChip[] = []
+    const when = (day: 'today' | 'tomorrow') => t(hass, `school.when_${day}`)
+
+    const warnings = currentWarnings(hass, ev.warnings, now)
+    if (warnings.length) {
+      out.push({
+        key: 'warning', icon: 'mdi:alert-outline', color: warnings.some(w => w.severity === 'error') ? 'error' : 'warning',
+        label: warnings.length === 1 ? warningName(warnings[0]!) : t(hass, 'event.warnings', { n: warnings.length }),
+        rows: warnings.map(w => ({
+          icon: w.severity === 'error' ? 'mdi:alert-octagon-outline' : 'mdi:alert-outline', text: w.headline, entity: w.entity_id,
+          ...(w.until ? { sub: t(hass, 'until', { time: this.time(Date.parse(w.until)) }) } : {}),
+        })),
+      })
+    }
+
+    const pickup = wastePickup(hass, ev.waste, now)
+    if (pickup) {
+      const tint = binColor(pickup.bins[0]!.name)
+      out.push({
+        key: 'waste', icon: 'mdi:trash-can-outline', color: 'primary', ...(tint ? { tint } : {}),
+        label: `${pickup.bins.map(b => b.name).join(', ')} ${when(pickup.day)}`,
+        rows: pickup.bins.map(b => ({ icon: 'mdi:trash-can-outline', text: b.name, sub: when(pickup.day), entity: b.entity, ...(binColor(b.name) ? { tint: binColor(b.name)! } : {}) })),
+      })
+    }
+
+    const names = birthdays(hitsOf(ev.birthdays, now))
+    if (names.length) {
+      out.push({
+        key: 'birthday', icon: 'mdi:cake-variant-outline', color: 'primary',
+        label: names.length <= 2 ? t(hass, names.length === 1 ? 'event.birthday_one' : 'event.birthday', { names: names.join(t(hass, 'event.and')) }) : t(hass, 'event.birthdays', { n: names.length }),
+        rows: names.map(n => ({ icon: 'mdi:cake-variant-outline', text: n, sub: t(hass, 'event.birthday_row') })),
+      })
+    }
+
+    const parcels = hitsOf(ev.parcels, now)
+    if (parcels.length) {
+      out.push({
+        key: 'parcel', icon: 'mdi:package-variant-closed', color: 'primary',
+        label: parcels.length === 1 ? t(hass, 'event.parcel_one') : t(hass, 'event.parcels', { n: parcels.length }),
+        rows: parcels.map(p => ({ icon: 'mdi:package-variant-closed', text: p.title || t(hass, 'event.parcel_one'), sub: entityName(hass.states[p.calendar]), entity: p.calendar })),
+      })
+    }
+
+    const done = finishedAppliances(hass, ev.appliances)
+    if (done.length) {
+      const name = (a: (typeof done)[number]) => (a.kind === 'appliance' ? a.name : t(hass, `event.kind.${a.kind}`))
+      out.push({
+        key: 'appliance', icon: applianceChipIcon(done), color: 'success',
+        label: t(hass, 'event.done', { names: done.map(name).join(', ') }),
+        rows: done.map(a => ({ icon: applianceChipIcon([a]), text: name(a), sub: t(hass, 'appliance.finished'), entity: a.status })),
+      })
+    }
+
+    const rooms = stuffyRooms(hass, ev.co2, ev.co2_limit)
+    if (rooms.length) {
+      // A room page needs no room name: there it is just the value
+      const single = this.config!.areas?.length === 1
+      out.push({
+        key: 'co2', icon: 'mdi:molecule-co2', color: rooms[0]!.value >= 2000 ? 'error' : 'warning',
+        label: rooms.length === 1 ? (single || !rooms[0]!.area ? t(hass, 'event.co2_here') : t(hass, 'event.co2_room', { room: rooms[0]!.area! })) : t(hass, 'event.co2_rooms', { n: rooms.length }),
+        rows: rooms.map(r => ({ icon: 'mdi:molecule-co2', text: r.area ?? entityName(hass.states[r.entity]), sub: `${Math.round(r.value)} ppm`, entity: r.entity })),
+      })
+    }
+    return out.filter(c => !this.config!.hide_chips?.includes(c.key))
+  }
+
+  private eventChip(chip: EventChip) {
+    return html`<button class="chip ${chip.color}" aria-expanded=${this.open === chip.key} @click=${() => this.flip(chip.key)}>
+      <ha-icon class=${chip.tint ? 'tint' : ''} style=${chip.tint ? `--tint:${chip.tint}` : ''} icon=${chip.icon}></ha-icon>
+      <span class="l">${chip.label}</span>
+    </button>`
+  }
+
+  private eventList(chip: EventChip) {
+    return html`<div class="list card">${chip.rows.map(r => html`
+      <button class="item" @click=${() => r.entity && this.moreInfo(r.entity)}>
+        <ha-icon class=${r.tint ? 'tint' : ''} style=${r.tint ? `--tint:${r.tint}` : ''} icon=${r.icon}></ha-icon>
+        <span>${r.text}</span>
+        ${r.sub ? html`<span class="s">${r.sub}</span>` : nothing}
+      </button>`)}
+    </div>`
+  }
+
   protected render() {
     const { hide_labels: labels, hide_entities: hidden, areas } = this.config!
     const hide = hideOf(this.config!)
@@ -150,22 +325,27 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       .filter(item => !this.config!.hide_chips?.includes(item.key))
     const school = this.config!.schools?.length ? schoolNotes(this.hass!, this.config!.schools, Date.now()) : undefined
     const openSchool = school && (this.open === 'cancelled' || this.open === 'changed') ? school[this.open] : undefined
+    const events = this.eventChips()
+    const openEvent = events.find(c => c.key === this.open)
     const openItem = items.find(i => i.key === this.open)
     const link = openItem && this.config!.links?.[openItem.key]
     return html`
       <div class="chips">
         ${this.config!.people === false ? nothing : renderPeople(this.hass!, this.config!, id => this.moreInfo(id))}
         <span class="sep"></span>
+        ${events.filter(c => c.key === 'warning').map(c => this.eventChip(c))}
         ${school ? [this.schoolChip('cancelled', school.cancelled), this.schoolChip('changed', school.changed)] : nothing}
+        ${events.filter(c => c.key !== 'warning').map(c => this.eventChip(c))}
         ${items.length ? items.map(item => html`
           <button class="chip ${COLORS[item.key]}" aria-expanded=${this.open === item.key} @click=${() => this.flip(item.key)}>
             <ha-icon icon=${ICONS[item.key]}></ha-icon>
             ${item.key === 'presence' ? nothing : html`<span class="n">${item.entities.length}</span>`}
             <span class="l">${t(this.hass, `status.${item.key}`)}</span>
           </button>`)
-        : school ? nothing : html`<span class="chip quiet"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="l">${t(this.hass, 'all_quiet')}</span></span>`}
+        : school || events.length ? nothing : html`<span class="chip quiet"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="l">${t(this.hass, 'all_quiet')}</span></span>`}
       </div>
       ${openSchool?.length ? this.schoolList(this.open as SchoolChip, openSchool) : nothing}
+      ${openEvent ? this.eventList(openEvent) : nothing}
       ${openItem ? html`<div class="list card">
         ${openItem.entities.map(e => {
           const area = this.areaName(e)

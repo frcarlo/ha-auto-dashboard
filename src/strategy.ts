@@ -11,6 +11,7 @@ import { weatherEntity, weatherSensors } from './weather'
 import { applianceEntities, findAppliances, findTvs } from './appliances'
 import { findCameras } from './cameras'
 import { findSchools, schoolIds, type School } from './school'
+import { co2Sensors, findEventSources } from './events'
 import { resolvePopups } from './popups'
 import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
@@ -135,6 +136,16 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   // Chips hidden for everyone, plus the user's own
   const hiddenChips = [...new Set([...(config.hide_chips ?? []), ...(rule?.hide_chips ?? []), ...(config.school_chips === false ? ['school' as const] : [])])]
   const chipOpts = hiddenChips.length ? { hide_chips: hiddenChips } : {}
+  // What's coming up: bins, warnings, birthdays and parcels for the whole house; CO₂ and appliances in the shown rooms
+  const co2 = co2Sensors(hass, all.map(e => e.entity_id))
+  const events = findEventSources(hass, {
+    hide, co2, appliances, warnings: config.weather_warnings, co2_limit: config.co2_limit, hidden: hiddenChips,
+    skipCalendars: new Set(schools.map(s => s.timetable).filter((id): id is string => !!id)),
+  })
+  const roomEvents = (areaId: string) => {
+    const ids = co2.filter(id => entityAreaId(hass, id) === areaId)
+    return ids.length && !hiddenChips.includes('co2') ? { events: { co2: ids, ...(config.co2_limit ? { co2_limit: config.co2_limit } : {}) } } : {}
+  }
   // The energy settings know the house meter; without them (or without access) the rooms' sum stands in
   const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
   const sources = powerSources(hass, prefs)
@@ -307,6 +318,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           type: 'custom:ad-status-bar', ...scopeOpts,
           // Cancelled and changed lessons as chips of their own
           ...(schools.length && !hiddenChips.includes('school') ? { schools } : {}), ...chipOpts,
+          ...(events ? { events } : {}),
           links: {
             lights: has('lights'), openings: has('security'), unlocked: has('security'), heating: has('climate'),
             battery: hasMaintenance ? 'maintenance' : undefined, unavailable: hasMaintenance ? 'maintenance' : undefined,
@@ -424,7 +436,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           { type: 'custom:ad-room-header', area: area.area_id, ...hideOpts, ...look },
           // The home page's chips, counted for this room only
           {
-            type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look, ...chipOpts,
+            type: 'custom:ad-status-bar', ...hideOpts, areas: [area.area_id], people: false, presence: true, ...look, ...chipOpts, ...roomEvents(area.area_id),
             ...(schools.some(s => s.area === area.area_id) && !hiddenChips.includes('school') ? { schools: schools.filter(s => s.area === area.area_id) } : {}),
           },
         ]),

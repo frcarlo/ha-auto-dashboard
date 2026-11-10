@@ -472,7 +472,7 @@ describe('calendar page', () => {
   it('collects every calendar on its own page in the nav', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const page = views.find(v => v.path === 'calendar')!
-    expect(cardsOf(page).find(c => c.type === 'custom:ad-calendar')!.entities).toEqual(['calendar.familie', 'calendar.abfall', 'calendar.feiertage'])
+    expect(cardsOf(page).find(c => c.type === 'custom:ad-calendar')!.entities).toEqual(['calendar.familie', 'calendar.abfall', 'calendar.feiertage', 'calendar.dhl_zustellungen'])
     expect(cardsOf(views[0]!).find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: { path: string }) => i.path)).toContain('calendar')
   })
 

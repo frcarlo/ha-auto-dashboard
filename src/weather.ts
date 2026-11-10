@@ -102,6 +102,8 @@ export interface Warning {
   severity: Severity
   /** ISO time the warning ends, when known */
   until?: string
+  /** What it warns of, short: DWD's FROST */
+  name?: string
 }
 
 const SEVERE = ['severe', 'extreme']
@@ -122,7 +124,11 @@ export function activeWarnings(hass: HomeAssistant, ids: string[] | undefined): 
       for (let n = 1; n <= count; n++) {
         const name = a[`warning_${n}_headline`] ?? a[`warning_${n}_name`]
         if (!name) continue
-        out.push({ entity_id: id, headline: String(name), severity: Number(a[`warning_${n}_level`] ?? 0) >= 3 ? 'error' : 'warning', until: a[`warning_${n}_end`] })
+        const short = a[`warning_${n}_name`]
+        out.push({
+          entity_id: id, headline: String(name), severity: Number(a[`warning_${n}_level`] ?? 0) >= 3 ? 'error' : 'warning', until: a[`warning_${n}_end`],
+          ...(short ? { name: String(short) } : {}),
+        })
       }
       continue
     }

@@ -68,6 +68,18 @@ if (params.get('warn') === 'on') {
     attributes: { friendly_name: 'Warnung Mülheim 1', headline: 'Amtliche WARNUNG vor STURMBÖEN', severity: 'Moderate', expires: new Date(Date.now() + 6 * 3600_000).toISOString() },
   }
 }
+if (params.get('warn') === 'on') {
+  const dwd = hass.states['sensor.dwd_aktuelle_warnstufe']!
+  hass.states[dwd.entity_id] = {
+    ...dwd, state: '1',
+    attributes: {
+      ...dwd.attributes, warning_count: 1, warning_1_name: 'FROST', warning_1_headline: 'Amtliche WARNUNG vor FROST', warning_1_level: 1,
+      warning_1_end: new Date(Date.now() + 3 * 3600_000).toISOString(),
+    },
+  }
+}
+// ?co2=1450 makes the living room stuffy
+if (params.has('co2')) hass.states['sensor.wohnzimmer_co2'] = { ...hass.states['sensor.wohnzimmer_co2']!, state: params.get('co2')! }
 if (params.has('as')) hass.user = { id: 'harness', name: params.get('as')!, is_admin: false }
 let views: any[] = []
 const cards: any[] = []
