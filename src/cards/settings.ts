@@ -1,13 +1,14 @@
 // The user's own settings page: look, nav bar, face, pages and favorites, for this user only.
 // What the dashboard sets is the starting point; only what the user changes is stored (see personal.ts).
 import { css, html, nothing, type TemplateResult } from 'lit'
+import { keyed } from 'lit/directives/keyed.js'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { allEntities, entityAreaId, hideOf, isRoomFavorite } from '../model'
 import { entityIcon, entityName, shortName } from '../presentation'
 import { loadPersonal, personalDiff, savePersonal, type PersonalSettings } from '../personal'
 import { tokens } from '../styles/tokens'
-import type { FaceConfig, FaceStyle, NavPosition, PagePath, ThemeMode } from '../types'
+import type { FaceConfig, FaceStyle, NavPosition, OwnCardsPage, PagePath, ThemeMode } from '../types'
 
 interface SettingsConfig extends BaseConfig {
   /** The dashboard's url path: settings are kept per dashboard */
@@ -38,6 +39,9 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     query: { state: true },
     busy: { state: true },
     error: { state: true },
+    cardsPage: { state: true },
+    cardsSlot: { state: true },
+    cardsError: { state: true },
   }
 
   /** What the page shows: the dashboard's values with the user's own on top, plus unsaved changes */
@@ -47,6 +51,10 @@ export class AdSettings extends BaseCard<SettingsConfig> {
   query = ''
   busy = false
   error = ''
+  /** Page and place whose own cards are being edited */
+  cardsPage: OwnCardsPage = 'home'
+  cardsSlot: 'top' | 'bottom' = 'top'
+  cardsError = false
   private loading = false
 
   static styles = [tokens, css`
@@ -111,6 +119,18 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     .primary[disabled] { opacity: 0.4; pointer-events: none; }
     .link { padding: 10px 12px; border-radius: 12px; font-size: 14px; color: rgb(var(--ad-primary)); }
     .link:hover { background: rgba(var(--ad-primary), 0.1); }
+
+    select {
+      all: unset; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 14px; cursor: pointer;
+      background: rgba(var(--ad-on-surface), 0.07);
+    }
+    select option { color: #111; }
+    textarea {
+      box-sizing: border-box; width: 100%; min-height: 140px; padding: 10px 12px; border: 0; border-radius: 12px; resize: vertical;
+      font: 12px/1.5 var(--code-font-family, ui-monospace, monospace); color: inherit; background: rgba(var(--ad-on-surface), 0.07);
+    }
+    ha-yaml-editor { display: block; border-radius: 12px; overflow: hidden; }
+    .hint.error { color: rgb(var(--ad-error)); opacity: 1; }
   `]
 
   getCardSize() {
@@ -284,6 +304,40 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     </section>`
   }
 
+  /** Own Lovelace cards on Home and the pages, for this user only, after the dashboard's */
+  private renderCards(d: PersonalSettings) {
+    const pages = [{ path: 'home', label: this.l('home') }, ...this.config!.pages] as { path: OwnCardsPage; label: string }[]
+    const page = d.pages?.[this.cardsPage]
+    const value = page?.cards?.[this.cardsSlot] ?? []
+    const count = (p: OwnCardsPage) => (d.pages?.[p]?.cards?.top?.length ?? 0) + (d.pages?.[p]?.cards?.bottom?.length ?? 0)
+    const set = (raw: unknown, valid = true) => {
+      const list = raw === undefined || raw === null || raw === '' ? [] : Array.isArray(raw) ? raw : [raw]
+      this.cardsError = !valid || !list.every(c => c && typeof c === 'object' && typeof (c as { type?: unknown }).type === 'string')
+      if (this.cardsError) return
+      const cards = { ...(page?.cards ?? {}), [this.cardsSlot]: list as Record<string, unknown>[] }
+      this.set({ pages: { ...(d.pages ?? {}), [this.cardsPage]: { ...(page ?? {}), cards } } })
+    }
+    const pick = (path: OwnCardsPage) => { this.cardsPage = path; this.cardsError = false }
+    return html`<section class="card panel">
+      <h2>${this.l('set.cards')}</h2>
+      <span class="hint">${this.l('set.cards_hint')}</span>
+      <select aria-label=${this.l('set.cards_page')} .value=${this.cardsPage} @change=${(e: Event) => pick((e.target as HTMLSelectElement).value as OwnCardsPage)}>
+        ${pages.map(p => html`<option value=${p.path} ?selected=${p.path === this.cardsPage}>${p.label}${count(p.path) ? ` (${count(p.path)})` : ''}</option>`)}
+      </select>
+      ${this.seg<'top' | 'bottom'>([['top', this.l('ed.page_top')], ['bottom', this.l('ed.page_bottom')]], this.cardsSlot, slot => { this.cardsSlot = slot; this.cardsError = false })}
+      ${customElements.get('ha-yaml-editor')
+        // HA's own YAML editor; keyed so switching page or place loads those cards
+        ? keyed(`${this.cardsPage}/${this.cardsSlot}`, html`<ha-yaml-editor .hass=${this.hass} .defaultValue=${value}
+            @value-changed=${(e: CustomEvent<{ value: unknown; isValid?: boolean }>) => set(e.detail.value, e.detail.isValid !== false)}></ha-yaml-editor>`)
+        : keyed(`${this.cardsPage}/${this.cardsSlot}`, html`<textarea .value=${value.length ? JSON.stringify(value, null, 2) : ''} placeholder='[{"type": "markdown", "content": "…"}]'
+            aria-label=${this.l('set.cards')} @change=${(e: Event) => {
+              const text = (e.target as HTMLTextAreaElement).value.trim()
+              try { set(text ? JSON.parse(text) : []) } catch { this.cardsError = true }
+            }}></textarea>`)}
+      ${this.cardsError ? html`<span class="hint error">${this.l('ed.cards_error')}</span>` : nothing}
+    </section>`
+  }
+
   protected render() {
     const d = this.draft
     if (!d) return nothing
@@ -300,6 +354,7 @@ export class AdSettings extends BaseCard<SettingsConfig> {
         ${this.renderLook(d)}
         ${this.renderFavorites(d)}
         ${this.config!.pages.length ? this.renderPages(d) : nothing}
+        ${this.renderCards(d)}
       </div>`
   }
 }

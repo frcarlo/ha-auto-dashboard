@@ -238,7 +238,7 @@ The dashboard doesn't hide HA's header and sidebar itself; the [kiosk-mode](http
 
 ### Own settings
 
-Every user, including one without admin rights like a wall tablet's, opens the **Settings** page with the cog next to the clock on Home. There they choose, for themselves only, theme, accent color, frosted glass, the nav bar position, the face and when it appears, which pages are in their bar, and their favorites, devices and rooms: search, add, reorder, remove. The starting point is what the dashboard has set; "Reset everything" goes back to it.
+Every user, including one without admin rights like a wall tablet's, opens the **Settings** page with the cog next to the clock on Home. There they choose, for themselves only, theme, accent color, frosted glass, the nav bar position, the face and when it appears, which pages are in their bar, their favorites, devices and rooms (search, add, reorder, remove), and own Lovelace cards at the top or the bottom of Home and the pages, which they alone see after the dashboard's own cards. The starting point is what the dashboard has set; "Reset everything" goes back to it.
 
 - Settings are stored in HA with the user (not in the browser), per dashboard, and only what differs from the dashboard. They apply on every device the user is signed in on and survive a cleared cache. If the admin later changes something the user hasn't touched, the change reaches them.
 - Rooms, rights and the pages the admin hid stay as the admin set them. If the admin set `face: false` for a user, that user can't switch the face on.

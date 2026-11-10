@@ -1,6 +1,7 @@
 // A user's own settings for one dashboard: the look, the face, pages they don't need, their favorites.
 // HA keeps them per user on the server (frontend user data), which every user may write, admin or not,
 // so a wall tablet's user sets them on the tablet and they survive a cleared cache or a new device.
+import { cleanPages } from './config'
 import type { FaceConfig, HomeAssistant, NavPosition, PagePath, StrategyConfig, ThemeMode, UserRule } from './types'
 
 export interface PersonalSettings {
@@ -14,6 +15,8 @@ export interface PersonalSettings {
   hide_pages?: PagePath[]
   /** This user's favorites, in place of the dashboard's */
   favorites?: string[]
+  /** This user's own cards on Home and the pages, after the dashboard's */
+  pages?: StrategyConfig['pages']
 }
 
 /** One entry per dashboard, so two Auto Dashboards keep their own settings */
@@ -47,7 +50,21 @@ export function withPersonal(config: StrategyConfig, personal?: PersonalSettings
   return {
     ...config,
     ...pick('theme'), ...pick('glass'), ...pick('primary_color'), ...pick('nav_position'), ...pick('favorites'),
+    ...(personal.pages ? { pages: mergePages(config.pages, personal.pages) } : {}),
   }
+}
+
+/** The dashboard's own cards, then the user's, page by page and place by place */
+function mergePages(base: StrategyConfig['pages'] = {}, own: NonNullable<StrategyConfig['pages']>): StrategyConfig['pages'] {
+  const out = { ...base }
+  for (const [path, page] of Object.entries(own) as [keyof typeof own, NonNullable<typeof own[keyof typeof own]>][]) {
+    const before = base[path]?.cards ?? {}
+    out[path] = { ...base[path], cards: {
+      top: [...(before.top ?? []), ...(page.cards?.top ?? [])],
+      bottom: [...(before.bottom ?? []), ...(page.cards?.bottom ?? [])],
+    } }
+  }
+  return out
 }
 
 /** The face: the admin's rule "off" wins, then the user's own choice, then the rule's and the dashboard's. */
@@ -68,6 +85,9 @@ export function personalDiff(draft: PersonalSettings, base: PersonalSettings): P
   for (const [key, value] of Object.entries(draft)) {
     if (key === 'hide_pages') {
       if ((value as string[] | undefined)?.length) out[key] = value
+    } else if (key === 'pages') {
+      const pages = cleanPages(value as PersonalSettings['pages'])
+      if (pages) out[key] = pages
     } else if (!same(value, base[key as keyof PersonalSettings])) out[key] = value
   }
   return Object.keys(out).length ? (out as PersonalSettings) : null

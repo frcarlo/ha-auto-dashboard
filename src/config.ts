@@ -23,7 +23,7 @@ export function cleanRoom(room: RoomSettings): RoomSettings | undefined {
 }
 
 /** Pages without own cards drop out, so the YAML stays short */
-function cleanPages(pages: StrategyConfig['pages']): StrategyConfig['pages'] {
+export function cleanPages(pages: StrategyConfig['pages']): StrategyConfig['pages'] {
   const kept = Object.entries(pages ?? {}).flatMap(([path, page]) => {
     const cards = Object.fromEntries(Object.entries(page?.cards ?? {}).filter(([, list]) => list?.length))
     return Object.keys(cards).length ? [[path, { ...page, cards }]] : []

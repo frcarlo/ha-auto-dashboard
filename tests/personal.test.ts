@@ -65,3 +65,33 @@ describe('own settings', () => {
     expect(home.find(c => c.type === 'custom:ad-header')).not.toHaveProperty('settings')
   })
 })
+
+describe('own cards for one user', () => {
+  const md = (content: string) => ({ type: 'markdown', content })
+
+  it("come after the dashboard's own cards, page by page", () => {
+    const config: StrategyConfig = { type: 'custom:auto-dashboard', pages: { home: { cards: { top: [md('admin')] } } } }
+    const merged = withPersonal(config, { pages: { home: { cards: { top: [md('mine')], bottom: [md('end')] } }, lights: { cards: { top: [md('licht')] } } } })
+    expect(merged.pages).toEqual({
+      home: { cards: { top: [md('admin'), md('mine')], bottom: [md('end')] } },
+      lights: { cards: { top: [md('licht')], bottom: [] } },
+    })
+  })
+
+  it('are stored without empty pages', () => {
+    expect(personalDiff({ pages: { home: { cards: { top: [] } }, music: { cards: { bottom: [md('x')] } } } }, {}))
+      .toEqual({ pages: { music: { cards: { bottom: [md('x')] } } } })
+    expect(personalDiff({ pages: { home: { cards: { top: [] } } } }, {})).toBeNull()
+  })
+
+  it('show on the page for that user', async () => {
+    const hass = createHass(true)
+    const key = 'auto_dashboard:lovelace'
+    const ws = hass.callWS!
+    hass.callWS = async <T,>(msg: Record<string, unknown>) =>
+      msg.type === 'frontend/get_user_data' && msg.key === key ? { value: { pages: { maintenance: { cards: { top: [md('mine')] } } } } } as T : ws<T>(msg)
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
+    const maintenance = views.find(v => v.path === 'maintenance') as any
+    expect(maintenance.sections[1].cards).toEqual([md('mine')])
+  })
+})
