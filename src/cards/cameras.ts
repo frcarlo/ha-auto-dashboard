@@ -241,35 +241,35 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
     .shot .none ha-icon { --mdc-icon-size: 36px; }
     .badge {
       position: absolute; display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px;
-      background: rgba(255, 255, 255, 0.88); color: #111827; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
-      text-transform: uppercase; font-variant-numeric: tabular-nums;
+      background: rgba(255, 255, 255, 0.88); color: #111827; font-size: var(--ad-fs-xs); font-weight: 600; letter-spacing: 0.06em;
+      font-variant-numeric: tabular-nums;
     }
     .shot .badge { top: 10px; right: 10px; }
     .badge .rec { width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--ad-error)); }
     .caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 14px 12px; min-width: 0; }
-    .caption .title { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .caption .seen { flex: none; font-size: 12px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+    .caption .title { font-size: var(--ad-fs-m); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .caption .seen { flex: none; font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
     .caption .seen.fresh { color: rgb(var(--ad-warning)); opacity: 1; }
 
     .feed { padding: 16px 18px 8px; height: auto; }
     .feed .top, .detail .label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-    .label-text { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
+    .label-text { font-size: var(--ad-fs-xs); font-weight: 600; opacity: var(--ad-o2); }
     .latest { display: block; width: 100%; padding: 14px 0 16px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
-    .where { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.6; }
+    .where { display: flex; align-items: center; gap: 6px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .where ha-icon { --mdc-icon-size: 15px; }
-    .clock { font-size: 44px; font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .sentence { font-size: 16px; font-weight: 500; margin-top: 2px; }
+    .clock { font-size: var(--ad-fs-2xl); font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .sentence { font-size: var(--ad-fs-m); font-weight: 500; margin-top: 2px; }
     ul { list-style: none; margin: 0; padding: 0; }
     .rows li + li { border-top: 1px solid rgba(var(--ad-on-surface), 0.06); }
     .row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 8px; width: 100%; padding: 10px 0; }
-    .row .at { font-size: 14px; opacity: 0.6; font-variant-numeric: tabular-nums; }
-    .row .what { font-size: 14px; }
+    .row .at { font-size: var(--ad-fs-m); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
+    .row .what { font-size: var(--ad-fs-m); }
     .row .where { grid-column: 2; }
-    .empty { padding: 16px 0; opacity: 0.55; font-size: 14px; }
+    .empty { padding: 16px 0; opacity: var(--ad-o2); font-size: var(--ad-fs-m); }
 
     .head { display: flex; align-items: center; gap: 16px; margin: 0 0 12px; min-width: 0; }
-    .backlink { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px 6px 6px; border-radius: 18px; font-size: 14px; background: rgba(var(--ad-on-surface), 0.08); }
-    .head h2 { margin: 0; font-size: 26px; font-weight: 500; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .backlink { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px 6px 6px; border-radius: 18px; font-size: var(--ad-fs-m); background: rgba(var(--ad-on-surface), 0.08); }
+    .head h2 { margin: 0; font-size: var(--ad-fs-xl); font-weight: 500; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
     @container (min-width: 760px) { .detail { grid-template-columns: minmax(0, 1fr) 300px; } }
     .stage { position: relative; height: auto; }
@@ -280,14 +280,14 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
     .side .card { height: auto; padding: 14px 16px; }
     .control { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 12px 16px; }
     .control .line { display: flex; align-items: center; justify-content: space-between; }
-    .control .state { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
+    .control .state { font-size: var(--ad-fs-xs); font-weight: 600; opacity: var(--ad-o2); }
     .control .state.on { color: rgb(var(--ad-warning)); opacity: 1; }
-    .control .title { font-size: 15px; font-weight: 500; }
-    .control .hint { font-size: 12px; opacity: 0.55; }
-    .control ha-icon { --mdc-icon-size: 18px; opacity: 0.7; }
+    .control .title { font-size: var(--ad-fs-m); font-weight: 500; }
+    .control .hint { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .control ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
     .control.on ha-icon { color: rgb(var(--ad-warning)); opacity: 1; }
     .tabs { display: flex; gap: 4px 20px; flex-wrap: wrap; margin-top: 16px; padding: 0 4px; }
-    .tabs button { padding: 8px 0; font-size: 15px; opacity: 0.55; border-bottom: 2px solid transparent; }
+    .tabs button { padding: 8px 0; font-size: var(--ad-fs-m); opacity: var(--ad-o2); border-bottom: 2px solid transparent; }
     .tabs button[aria-current='true'] { opacity: 1; font-weight: 500; border-bottom-color: currentColor; }
   `]
 

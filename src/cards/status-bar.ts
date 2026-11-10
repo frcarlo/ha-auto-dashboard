@@ -135,16 +135,16 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     .chip {
       all: unset; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
       padding: 7px 12px 7px 9px; border-radius: 999px; background: var(--ad-surface); box-shadow: var(--ad-shadow);
-      font-size: 13px; transition: background 0.2s ease;
+      font-size: var(--ad-fs-s); transition: background 0.2s ease;
     }
     :host([glass]) .chip { background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur); }
     .chip ha-icon { --mdc-icon-size: 17px; }
     .chip .n { font-weight: 600; }
-    .chip .l { opacity: 0.65; }
+    .chip .l { opacity: var(--ad-o2); }
     .chip.warning ha-icon { color: rgb(var(--ad-warning)); }
     .chip.primary ha-icon { color: rgb(var(--ad-primary)); }
     .chip.error ha-icon { color: rgb(var(--ad-error)); }
-    .chip.muted ha-icon { opacity: 0.5; }
+    .chip.muted ha-icon { opacity: var(--ad-o3); }
     .chip.success ha-icon { color: rgb(var(--ad-success)); }
     .chip ha-icon.tint, .item ha-icon.tint { color: var(--tint); opacity: 1; }
     .chip[aria-expanded=true] { background: var(--ad-surface-variant); }
@@ -152,14 +152,14 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     .quiet { cursor: default; }
     .quiet ha-icon { color: rgb(var(--ad-success)); }
     .list { margin-top: 8px; padding: 6px; border-radius: 20px; display: flex; flex-direction: column; gap: 2px; }
-    .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: 13px; }
+    .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: var(--ad-fs-s); }
     .item:hover { background: rgba(var(--ad-on-surface), 0.06); }
-    .item ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
-    .item .a { opacity: 0.45; font-size: 12px; white-space: nowrap; }
-    .item .s { margin-left: auto; opacity: 0.55; font-size: 12px; white-space: nowrap; }
-    .more { all: unset; align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; color: rgb(var(--ad-primary)); }
+    .item ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
+    .item .a { opacity: var(--ad-o3); font-size: var(--ad-fs-s); white-space: nowrap; }
+    .item .s { margin-left: auto; opacity: var(--ad-o2); font-size: var(--ad-fs-s); white-space: nowrap; }
+    .more { all: unset; align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; cursor: pointer; font-size: var(--ad-fs-s); color: rgb(var(--ad-primary)); }
     .more:hover { background: rgba(var(--ad-primary), 0.1); }
-    .item .who { opacity: 0.45; font-size: 12px; white-space: nowrap; }
+    .item .who { opacity: var(--ad-o3); font-size: var(--ad-fs-s); white-space: nowrap; }
     .item.cancelled .s { color: rgb(var(--ad-error)); opacity: 1; }
     .item.changed .s { color: rgb(var(--ad-warning)); opacity: 1; }
     .more ha-icon { --mdc-icon-size: 16px; }

@@ -53,13 +53,13 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
       border-radius: calc(var(--ad-radius) - 8px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
     }
     /* The room name is the page's one big type element */
-    h1 { min-width: 0; margin: 0; font-size: 44px; font-weight: 200; letter-spacing: -0.045em; line-height: 1; }
+    h1 { min-width: 0; margin: 0; font-size: var(--ad-fs-2xl); font-weight: 200; letter-spacing: -0.045em; line-height: 1; }
     .values { display: flex; gap: 16px; }
     .value {
-      all: unset; display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; font-size: 16px; font-weight: 300;
+      all: unset; display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; font-size: var(--ad-fs-m); font-weight: 300;
       font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0.8;
     }
-    .value ha-icon { --mdc-icon-size: 16px; opacity: 0.6; align-self: center; }
+    .value ha-icon { --mdc-icon-size: 16px; opacity: var(--ad-o2); align-self: center; }
     .value:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 3px; border-radius: 4px; }
     .row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
     .row::-webkit-scrollbar { display: none; }
@@ -73,8 +73,8 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     .tile:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .tile > .text, .tile > .btn, .tile > .pilot, .tile > .now, .tile > .set { position: relative; z-index: 1; }
     .tile .text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-    .tile .label { font-size: 14px; font-weight: 600; }
-    .tile .sub { font-size: 12px; opacity: 0.65; white-space: nowrap; }
+    .tile .label { font-size: var(--ad-fs-m); font-weight: 600; }
+    .tile .sub { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; }
     .tile .sub.ask { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
     /* Switched and waiting for HA */
     .tile .sub.busy { color: rgb(var(--ad-primary)); opacity: 1; }
@@ -83,15 +83,15 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     @media (prefers-reduced-motion: reduce) { .tile .pilot.busy { animation: none; } }
     .tile .btn { width: 30px; height: 30px; }
     .thermo { padding-bottom: 14px; }
-    .thermo .now { font-size: 28px; font-weight: 200; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .thermo .now { font-size: var(--ad-fs-xl); font-weight: 200; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; cursor: pointer; }
     .thermo .set { display: flex; align-items: center; gap: 4px; }
-    .thermo .target { min-width: 40px; text-align: center; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .thermo .target { min-width: 40px; text-align: center; font-size: var(--ad-fs-m); font-weight: 500; font-variant-numeric: tabular-nums; }
     .thermo .target.pending { opacity: 0.6; }
-    .mode { font-size: 12px; opacity: 0.7; }
+    .mode { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .mode.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
     @container (max-width: 480px) {
-      h1 { font-size: 34px; }
+      h1 { font-size: var(--ad-fs-xl); font-weight: 300; }
       /* Narrow: the picture small in the corner, the name beneath it across the whole width */
       .top.photo { flex-direction: column; gap: 8px; }
       .top.photo .pic { order: -1; align-self: flex-end; height: 84px; max-width: 60%; }

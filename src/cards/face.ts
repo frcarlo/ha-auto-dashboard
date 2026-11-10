@@ -288,17 +288,17 @@ export class AdFace extends LitElement {
     .time { font-size: clamp(88px, min(24vw, 34vh), 280px); font-weight: 200; letter-spacing: -0.04em; line-height: 0.95; }
     .time.medium { font-size: clamp(64px, min(12vw, 20vh), 160px); }
     .time.small { font-size: clamp(56px, min(9vw, 14vh), 120px); }
-    .date { font-size: clamp(18px, 2.6vw, 30px); font-weight: 400; opacity: 0.7; }
+    .date { font-size: clamp(18px, 2.6vw, 30px); font-weight: 400; opacity: var(--ad-o2); }
     .info { margin-top: clamp(16px, 4vh, 40px); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px 40px; }
     .weather { display: inline-flex; align-items: center; gap: 12px; font-size: clamp(18px, 2.4vw, 28px); }
     .weather ha-icon { --mdc-icon-size: clamp(28px, 3.4vw, 40px); opacity: 0.85; }
     .weather .temp { font-weight: 500; }
-    .weather .cond { opacity: 0.65; }
+    .weather .cond { opacity: var(--ad-o2); }
 
     ul { list-style: none; margin: 0; padding: 0; }
     li { display: flex; align-items: baseline; gap: 12px; min-width: 0; font-size: clamp(16px, 2vw, 24px); }
     li .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; align-self: center; }
-    li .when { flex: none; opacity: 0.65; }
+    li .when { flex: none; opacity: var(--ad-o2); }
     li .what { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
     .next li { max-width: 60vw; }
 
@@ -327,7 +327,7 @@ export class AdFace extends LitElement {
     }
     .chip {
       position: relative; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 18px; min-width: 0; max-width: 100%;
-      box-sizing: border-box; background: rgba(var(--ad-on-surface), 0.1); font-size: 14px; white-space: nowrap; overflow: hidden;
+      box-sizing: border-box; background: rgba(var(--ad-on-surface), 0.1); font-size: var(--ad-fs-m); white-space: nowrap; overflow: hidden;
     }
     .chip .text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .chip ha-icon { flex: none; --mdc-icon-size: 18px; }

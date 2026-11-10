@@ -33,27 +33,27 @@ export class AdRoomCard extends BaseCard<RoomCardConfig> {
     .dots { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px 4px; height: 28px; overflow: hidden; }
     .values { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 12px 6px; height: 26px; min-width: 0; overflow: hidden; }
     .values > * { flex-shrink: 0; }
-    .values > ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
-    .temp { font-size: 1.2rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+    .values > ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
+    .temp { font-size: var(--ad-fs-l); font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
     .chip {
       all: unset; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px 2px 5px; cursor: pointer;
-      border-radius: 999px; font-size: 11px; background: rgba(var(--ad-on-surface), 0.08); white-space: nowrap;
+      border-radius: 999px; font-size: var(--ad-fs-xs); background: rgba(var(--ad-on-surface), 0.08); white-space: nowrap;
     }
-    .chip ha-icon { --mdc-icon-size: 13px; opacity: 0.7; }
+    .chip ha-icon { --mdc-icon-size: 13px; opacity: var(--ad-o2); }
     /* Rooms with nothing to show still get their icon instead of an empty card */
     .area-icon { --mdc-icon-size: 26px; opacity: 0.35; }
     /* Lights switched by a double tap, waiting for HA */
     .dot.busy { animation: ad-wait 0.8s ease-in-out infinite alternate; }
     @media (prefers-reduced-motion: reduce) { .dot.busy { animation: none; } }
-    .room { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.75; }
+    .room { font-size: var(--ad-fs-s); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: var(--ad-o2); }
     .lit .room { opacity: 0.9; }
     .temp-ctl { display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
-    .temp-ctl .target { font-size: 12px; font-weight: 500; }
+    .temp-ctl .target { font-size: var(--ad-fs-s); font-weight: 500; }
     .temp-ctl .btn { width: 28px; height: 28px; }
     /* Narrow cards (phones, 4-up rows) drop the ± column; the climate dot still opens more-info */
     @container (max-width: 170px) {
       .temp-ctl { display: none; }
-      .temp { font-size: 1.05rem; }
+      .temp { font-size: var(--ad-fs-m); }
     }
   `]
 

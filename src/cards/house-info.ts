@@ -42,10 +42,10 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
     .tile[role=link] { cursor: pointer; }
     .tile:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     .text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-    .label { font-size: 12px; opacity: 0.6; }
-    .value { font-size: 20px; font-weight: 300; letter-spacing: -0.03em; white-space: nowrap; }
-    .value small { font-size: 13px; opacity: 0.6; margin-left: 2px; letter-spacing: 0; }
-    .value .hum { font-size: 13px; opacity: 0.7; margin-left: 8px; letter-spacing: 0; }
+    .label { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .value { font-size: var(--ad-fs-l); font-weight: 300; letter-spacing: -0.03em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .value small { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-left: 2px; letter-spacing: 0; }
+    .value .hum { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-left: 8px; letter-spacing: 0; }
   `]
 
   getGridOptions() {

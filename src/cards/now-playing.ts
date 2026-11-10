@@ -37,15 +37,15 @@ export class AdNowPlaying extends BaseCard<NowPlayingConfig> {
       width: 48px; height: 48px; flex: 0 0 48px; border-radius: 14px; display: grid; place-items: center;
       background: center / cover rgba(var(--ad-on-surface), 0.08);
     }
-    .art ha-icon { opacity: 0.45; }
+    .art ha-icon { opacity: var(--ad-o3); }
     .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sub { font-size: 12px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title { font-size: var(--ad-fs-m); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .btns { display: flex; align-items: center; gap: 6px; }
     .btn { width: 34px; height: 34px; }
     .btn.main { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .more {
-      all: unset; cursor: pointer; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      all: unset; cursor: pointer; padding: 4px 9px; border-radius: 999px; font-size: var(--ad-fs-s); font-weight: 600;
       background: rgba(var(--ad-on-surface), 0.08);
     }
     .more:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }

@@ -42,15 +42,15 @@ export class AdSchool extends BaseCard<SchoolCardConfig> {
     .card.link { cursor: pointer; }
     .card:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
 
-    .head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; }
-    .head ha-icon { --mdc-icon-size: 18px; opacity: 0.55; flex: 0 0 auto; }
+    .head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--ad-fs-m); }
+    .head ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); flex: 0 0 auto; }
     .head .who { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-    .head .day { margin-left: auto; font-size: 12px; opacity: 0.55; white-space: nowrap; }
+    .head .day { margin-left: auto; font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; }
 
     .main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .eyebrow { font-size: 12px; font-weight: 500; color: rgb(var(--ad-primary)); }
-    .big { font-size: 24px; font-weight: 400; line-height: 1.15; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-    .sub { font-size: 13px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+    .eyebrow { font-size: var(--ad-fs-s); font-weight: 500; color: rgb(var(--ad-primary)); }
+    .big { font-size: var(--ad-fs-xl); font-weight: 400; line-height: 1.15; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+    .sub { font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
     .sub.early { opacity: 1; color: rgb(var(--ad-warning)); }
 
     /* The day: one bar per lesson between the first and the last, now as a line */
@@ -65,23 +65,23 @@ export class AdSchool extends BaseCard<SchoolCardConfig> {
     }
     .bar.past.changed, .bar.past.cancelled { opacity: 0.45; }
     .nowline { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: rgb(var(--ad-on-surface)); }
-    .ends { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.45; font-variant-numeric: tabular-nums; }
+    .ends { display: flex; justify-content: space-between; font-size: var(--ad-fs-xs); opacity: var(--ad-o3); font-variant-numeric: tabular-nums; }
 
     .rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
-    .row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: baseline; gap: 2px 10px; padding: 6px 0; font-size: 14px; }
+    .row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: baseline; gap: 2px 10px; padding: 6px 0; font-size: var(--ad-fs-m); }
     .rows .row + .row { border-top: 1px solid rgba(var(--ad-on-surface), 0.06); }
-    .row .at { font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+    .row .at { font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
     .row .what { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row .what small { font-size: 12px; opacity: 0.5; margin-left: 4px; }
-    .row .where { font-size: 13px; opacity: 0.6; white-space: nowrap; }
-    .row .note { grid-column: 2 / -1; font-size: 12px; }
+    .row .what small { font-size: var(--ad-fs-s); opacity: var(--ad-o3); margin-left: 4px; }
+    .row .where { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; }
+    .row .note { grid-column: 2 / -1; font-size: var(--ad-fs-s); }
     .row.past { opacity: 0.45; }
     .row.current .what { font-weight: 600; }
     .row.current .at { color: rgb(var(--ad-primary)); opacity: 1; }
     .row.cancelled .what { text-decoration: line-through; text-decoration-color: rgba(var(--ad-error), 0.8); }
     .row.cancelled .note { color: rgb(var(--ad-error)); }
     .row.changed .note, .row.changed .where { color: rgb(var(--ad-warning)); opacity: 1; }
-    .empty { font-size: 14px; opacity: 0.55; }
+    .empty { font-size: var(--ad-fs-m); opacity: var(--ad-o2); }
   `]
 
   getGridOptions() {

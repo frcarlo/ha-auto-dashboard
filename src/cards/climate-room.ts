@@ -39,28 +39,28 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     .head { display: flex; align-items: center; gap: 8px; min-height: 28px; }
     .room {
       all: unset; display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer;
-      font-size: 14px; font-weight: 500;
+      font-size: var(--ad-fs-m); font-weight: 500;
     }
-    .room ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
+    .room ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
     .room .chev { --mdc-icon-size: 16px; opacity: 0.4; }
     .room span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .room:focus-visible, .now:focus-visible, .reading:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; border-radius: 6px; }
-    .mode { margin-left: auto; font-size: 12px; opacity: 0.7; white-space: nowrap; }
+    .mode { margin-left: auto; font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; }
     .mode.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
 
     /* The thermostat: the room's one large number. It takes the free height, so a short card next to a tall one stays balanced. */
     .dial { flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0 4px; }
     .dial + .dial { border-top: 1px solid rgba(var(--ad-on-surface), 0.06); }
-    .dial .label { font-size: 12px; opacity: 0.6; margin-bottom: 4px; }
+    .dial .label { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-bottom: 4px; }
     .now {
-      all: unset; cursor: pointer; font-size: 48px; font-weight: 300; letter-spacing: -0.03em; line-height: 1;
+      all: unset; cursor: pointer; font-size: var(--ad-fs-2xl); font-weight: 300; letter-spacing: -0.03em; line-height: 1;
       font-variant-numeric: tabular-nums;
     }
-    .now small { font-size: 24px; margin-left: 2px; opacity: 0.6; vertical-align: top; }
+    .now small { font-size: var(--ad-fs-l); margin-left: 2px; opacity: var(--ad-o2); vertical-align: top; }
     .set { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-    .target { min-width: 64px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
-    .target span { opacity: 0.6; }
+    .target { min-width: 64px; text-align: center; font-size: var(--ad-fs-m); font-variant-numeric: tabular-nums; }
+    .target span { opacity: var(--ad-o2); }
     .target b { font-weight: 500; }
     .target.pending b { opacity: 0.55; }
     .track { position: relative; align-self: stretch; height: 20px; margin-top: 8px; }
@@ -73,12 +73,12 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     /* Every other reading of the room */
     .readings { display: flex; flex-direction: column; margin-top: 8px; border-top: 1px solid rgba(var(--ad-on-surface), 0.06); padding-top: 4px; }
     .reading {
-      all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; font-size: 14px;
+      all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; font-size: var(--ad-fs-m);
     }
-    .reading ha-icon { --mdc-icon-size: 18px; opacity: 0.55; flex: 0 0 auto; }
-    .reading .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
+    .reading ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); flex: 0 0 auto; }
+    .reading .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: var(--ad-o2); }
     .reading .v { font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
-    .reading .v small { font-weight: 400; opacity: 0.6; margin-left: 2px; }
+    .reading .v small { font-weight: 400; opacity: var(--ad-o2); margin-left: 2px; }
     .reading.off { opacity: 0.45; }
   `]
 

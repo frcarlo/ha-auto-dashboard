@@ -61,11 +61,11 @@ export class AdLists extends BaseCard<ListsCardConfig> {
       all: unset; flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 20px; cursor: pointer; border-radius: 16px;
     }
     .fold:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: -2px; }
-    .fold ha-icon { --mdc-icon-size: 22px; opacity: 0.55; transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+    .fold ha-icon { --mdc-icon-size: 22px; opacity: var(--ad-o2); transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
     .folded .fold ha-icon { transform: rotate(-90deg); }
     .text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .title { font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .open { font-size: 12px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+    .title { font-size: var(--ad-fs-l); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .open { font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
     .head .btn { flex: none; background: transparent; color: rgba(var(--ad-on-surface), 0.55); }
     .head .btn:hover { background: rgba(var(--ad-on-surface), 0.08); }
 
@@ -76,28 +76,28 @@ export class AdLists extends BaseCard<ListsCardConfig> {
       margin-top: -8px;
     }
     .folded .body { display: none; }
-    .placeholder { padding: 0 20px 20px; font-size: 13px; opacity: 0.55; }
+    .placeholder { padding: 0 20px 20px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
 
-    .confirm { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 0 20px 16px; font-size: 14px; }
+    .confirm { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 0 20px 16px; font-size: var(--ad-fs-m); }
     .confirm span { flex: 1 1 100%; margin-bottom: 4px; }
     .new { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 16px; }
     .new input {
-      flex: 1 1 200px; box-sizing: border-box; min-width: 0; padding: 10px 12px; border: none; border-radius: 10px; font: inherit; font-size: 15px;
+      flex: 1 1 200px; box-sizing: border-box; min-width: 0; padding: 10px 12px; border: none; border-radius: 10px; font: inherit; font-size: var(--ad-fs-m);
       color: inherit; background: rgba(var(--ad-on-surface), 0.06);
     }
     .new input:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 0; }
-    .empty { padding: 24px 20px; font-size: 14px; opacity: 0.65; }
+    .empty { padding: 24px 20px; font-size: var(--ad-fs-m); opacity: var(--ad-o2); }
 
     .act {
       all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 18px;
-      font-size: 13px; font-weight: 500; background: rgba(var(--ad-on-surface), 0.08);
+      font-size: var(--ad-fs-s); font-weight: 500; background: rgba(var(--ad-on-surface), 0.08);
     }
     .act ha-icon { --mdc-icon-size: 18px; }
     .act:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .act.primary { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .act.danger { background: rgba(var(--ad-error), 0.16); color: rgb(var(--ad-error)); }
     .act[disabled] { opacity: 0.5; pointer-events: none; }
-    .error { margin: 0; font-size: 13px; color: rgb(var(--ad-error)); }
+    .error { margin: 0; font-size: var(--ad-fs-s); color: rgb(var(--ad-error)); }
 
     @media (prefers-reduced-motion: reduce) {
       .fold ha-icon { transition: none; }

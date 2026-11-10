@@ -244,8 +244,8 @@ export class AdPopup extends BaseCard<PopupConfig> {
     header { display: flex; align-items: center; gap: 12px; }
     header > ha-icon { --mdc-icon-size: 26px; color: rgb(var(--ad-primary)); }
     .title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-    .title strong { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .title span { font-size: 13px; opacity: 0.6; }
+    .title strong { font-size: var(--ad-fs-l); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title span { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     button { all: unset; box-sizing: border-box; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .close { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: rgba(var(--ad-on-surface), 0.08); }
@@ -270,15 +270,15 @@ export class AdPopup extends BaseCard<PopupConfig> {
     @media (prefers-reduced-motion: reduce) { .timer .hold { animation: none; } }
     .camera .none { color: rgba(255, 255, 255, 0.7); display: flex; flex-direction: column; align-items: center; gap: 6px; }
     .group { display: flex; flex-direction: column; gap: 8px; }
-    .name { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+    .name { display: flex; align-items: baseline; gap: 8px; font-size: var(--ad-fs-s); }
     .name span:first-child { font-weight: 500; }
-    .status { opacity: 0.6; }
+    .status { opacity: var(--ad-o2); }
     .status.busy { color: rgb(var(--ad-warning)); opacity: 1; }
     .status.failed { color: rgb(var(--ad-error)); opacity: 1; }
     .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
     .act {
       flex: 1 1 140px; min-height: 56px; padding: 0 16px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px;
-      background: rgba(var(--ad-on-surface), 0.08); font-size: 15px; font-weight: 600; text-align: center;
+      background: rgba(var(--ad-on-surface), 0.08); font-size: var(--ad-fs-m); font-weight: 600; text-align: center;
       transition: background 0.2s ease, box-shadow 0.2s ease;
     }
     .act.open { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); flex-basis: 220px; }

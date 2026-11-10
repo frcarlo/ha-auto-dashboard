@@ -34,8 +34,8 @@ export class AdScenes extends BaseCard<ScenesConfig> {
     button[disabled] { cursor: default; opacity: 0.5; }
     .dot { width: 28px; height: 28px; }
     .text { display: flex; flex-direction: column; gap: 1px; }
-    .name { font-size: 13px; font-weight: 500; white-space: nowrap; }
-    .sub { font-size: 11px; opacity: 0.55; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+    .name { font-size: var(--ad-fs-s); font-weight: 500; white-space: nowrap; }
+    .sub { font-size: var(--ad-fs-xs); opacity: var(--ad-o2); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
     .pulse { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--ad-primary)); animation: pulse 1.2s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.3; } }
     @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }

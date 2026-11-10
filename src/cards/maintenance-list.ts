@@ -31,19 +31,19 @@ export class AdMaintenanceList extends BaseCard<MaintenanceConfig> {
   static styles = [tokens, css`
     :host { display: block; }
     .card { padding: 6px; display: flex; flex-direction: column; gap: 2px; }
-    .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: 13px; }
+    .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: var(--ad-fs-s); }
     .item:hover { background: rgba(var(--ad-on-surface), 0.06); }
     .item:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
-    .item ha-icon { --mdc-icon-size: 18px; opacity: 0.6; }
+    .item ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
     .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .area { font-size: 11px; opacity: 0.5; }
-    .s { opacity: 0.6; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .area { font-size: var(--ad-fs-xs); opacity: var(--ad-o3); }
+    .s { opacity: var(--ad-o2); font-size: var(--ad-fs-s); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .s.error { color: rgb(var(--ad-error)); opacity: 1; font-weight: 600; }
     .s.warning { color: rgb(var(--ad-warning)); opacity: 1; }
-    .empty { display: flex; align-items: center; gap: 10px; padding: 10px; font-size: 13px; opacity: 0.6; }
+    .empty { display: flex; align-items: center; gap: 10px; padding: 10px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .empty ha-icon { color: rgb(var(--ad-success)); }
-    .more { all: unset; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin: 2px 10px 6px; font-size: 12px; color: rgb(var(--ad-primary)); cursor: pointer; }
+    .more { all: unset; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin: 2px 10px 6px; font-size: var(--ad-fs-s); color: rgb(var(--ad-primary)); cursor: pointer; }
     .more ha-icon { --mdc-icon-size: 16px; }
     .more:focus-visible { outline: 2px solid rgb(var(--ad-primary)); border-radius: 6px; }
   `]

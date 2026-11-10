@@ -53,29 +53,35 @@ export class AdSystem extends BaseCard<SystemConfig> {
   static styles = [tokens, css`
     :host { display: block; }
     .card { padding: 6px; display: flex; flex-direction: column; gap: 2px; }
-    .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: 13px; }
+    .item { all: unset; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; cursor: pointer; font-size: var(--ad-fs-s); }
     .item:hover { background: rgba(var(--ad-on-surface), 0.06); }
     .item:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
-    .item > ha-icon { --mdc-icon-size: 18px; opacity: 0.6; flex: none; }
+    .item > ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); flex: none; }
     .item.error > ha-icon { color: rgb(var(--ad-error)); opacity: 1; }
     .item.warning > ha-icon { color: rgb(var(--ad-warning)); opacity: 1; }
     .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sub { font-size: 11px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .s { opacity: 0.6; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .empty { display: flex; align-items: center; gap: 10px; padding: 10px; font-size: 13px; opacity: 0.6; }
+    .sub { font-size: var(--ad-fs-xs); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s { opacity: var(--ad-o2); font-size: var(--ad-fs-s); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .empty { display: flex; align-items: center; gap: 10px; padding: 10px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .empty ha-icon { color: rgb(var(--ad-success)); }
     .empty.off ha-icon { color: inherit; }
-    .more { all: unset; display: inline-flex; align-items: center; gap: 2px; margin: 2px 10px 6px; font-size: 12px; color: rgb(var(--ad-primary)); cursor: pointer; }
+    .more { all: unset; display: inline-flex; align-items: center; gap: 2px; margin: 2px 10px 6px; font-size: var(--ad-fs-s); color: rgb(var(--ad-primary)); cursor: pointer; }
     .more ha-icon { --mdc-icon-size: 16px; }
     .foot { display: flex; flex-wrap: wrap; justify-content: space-between; }
     .more:focus-visible { outline: 2px solid rgb(var(--ad-primary)); border-radius: 6px; }
 
-    .meters { display: grid; gap: 12px; padding: 12px 14px; }
-    .meter { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 4px 10px; font-size: 13px; }
-    .meter ha-icon { --mdc-icon-size: 18px; opacity: 0.6; grid-row: span 2; }
-    .meter .v { font-variant-numeric: tabular-nums; opacity: 0.7; font-size: 12px; }
-    .bar { grid-column: 2 / 4; height: 6px; border-radius: 3px; background: rgba(var(--ad-on-surface), 0.1); overflow: hidden; }
+    /* Processor, memory and disk side by side, each a large number over its bar; stacked when narrow */
+    .meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px 28px; padding: 14px 16px 16px; }
+    .meter { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; font-size: var(--ad-fs-s); min-width: 0; }
+    .meter ha-icon { --mdc-icon-size: 16px; opacity: var(--ad-o3); }
+    .meter .l { opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .meter .v { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin-top: 4px; min-width: 0; }
+    .meter .v b { font-size: var(--ad-fs-xl); font-weight: 300; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .meter .v small { font-size: var(--ad-fs-s); opacity: var(--ad-o3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+    .meter .v b.warning { color: rgb(var(--ad-warning)); }
+    .meter .v b.error { color: rgb(var(--ad-error)); }
+    .bar { grid-column: 1 / -1; margin-top: 8px; height: 6px; border-radius: 3px; background: rgba(var(--ad-on-surface), 0.1); overflow: hidden; }
     .bar i { display: block; height: 100%; border-radius: 3px; background: rgb(var(--ad-primary)); }
     .bar i.warning { background: rgb(var(--ad-warning)); }
     .bar i.error { background: rgb(var(--ad-error)); }
@@ -85,7 +91,7 @@ export class AdSystem extends BaseCard<SystemConfig> {
     .backup.failed > ha-icon { color: rgb(var(--ad-error)); }
     .backup .text .name { white-space: normal; }
     .act {
-      all: unset; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+      all: unset; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: var(--ad-fs-s);
       background: rgba(var(--ad-primary), 0.14); color: rgb(var(--ad-primary)); white-space: nowrap;
     }
     .act ha-icon { --mdc-icon-size: 16px; }
@@ -201,17 +207,18 @@ export class AdSystem extends BaseCard<SystemConfig> {
   }
 
   private renderHealth(h: Health) {
-    const meter = (icon: string, label: string, percent: number, value: string) => {
+    const meter = (icon: string, label: string, percent: number, detail?: string) => {
       const tone = percent >= 90 ? 'error' : percent >= 75 ? 'warning' : ''
       return html`<div class="meter" role="meter" aria-label=${label} aria-valuenow=${Math.round(percent)} aria-valuemin="0" aria-valuemax="100">
-        <ha-icon icon=${icon}></ha-icon><span>${label}</span><span class="v">${value}</span>
+        <ha-icon icon=${icon}></ha-icon><span class="l">${label}</span>
+        <span class="v"><b class=${tone}>${pct(percent)}</b>${detail ? html`<small>${detail}</small>` : nothing}</span>
         <span class="bar"><i class=${tone} style="width:${Math.min(100, Math.max(1, percent))}%"></i></span>
       </div>`
     }
     const pct = (n: number) => `${n.toLocaleString(this.language(), { maximumFractionDigits: n < 10 ? 1 : 0 })} %`
     return html`<div class="meters">
-      ${h.cpu !== undefined ? meter('mdi:cpu-64-bit', t(this.hass, 'sys.cpu'), h.cpu, pct(h.cpu)) : nothing}
-      ${h.memory !== undefined ? meter('mdi:memory', t(this.hass, 'sys.memory'), h.memory, pct(h.memory)) : nothing}
+      ${h.cpu !== undefined ? meter('mdi:cpu-64-bit', t(this.hass, 'sys.cpu'), h.cpu) : nothing}
+      ${h.memory !== undefined ? meter('mdi:memory', t(this.hass, 'sys.memory'), h.memory) : nothing}
       ${h.disk_total ? meter('mdi:harddisk', t(this.hass, 'sys.disk'), (h.disk_used! / h.disk_total) * 100,
         t(this.hass, 'sys.disk_of', { used: Math.round(h.disk_used!), total: Math.round(h.disk_total) })) : nothing}
     </div>`

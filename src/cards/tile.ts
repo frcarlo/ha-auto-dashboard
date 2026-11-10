@@ -76,14 +76,14 @@ export class AdTile extends BaseCard<TileConfig> {
     .top, .bottom, .big, .row-text, .row > ha-icon, .row > .pilot, .row > .btn { position: relative; z-index: 1; }
     .top { display: flex; align-items: flex-start; gap: 8px; }
     .name {
-      flex: 1; min-width: 0; font-size: 13px; font-weight: 500; line-height: 1.25; opacity: 0.85; letter-spacing: 0;
+      flex: 1; min-width: 0; font-size: var(--ad-fs-s); font-weight: 500; line-height: 1.25; opacity: 0.85; letter-spacing: 0;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .top .pilot { margin-top: 4px; }
     .bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-width: 0; }
-    .big { font-size: 30px; font-weight: 300; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .big small { font-size: 14px; font-weight: 400; letter-spacing: 0; opacity: 0.6; margin-left: 2px; }
-    .word { font-size: 15px; line-height: 1; opacity: 0.5; white-space: nowrap; }
+    .big { font-size: var(--ad-fs-xl); font-weight: 300; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .big small { font-size: var(--ad-fs-m); font-weight: 400; letter-spacing: 0; opacity: var(--ad-o2); margin-left: 2px; }
+    .word { font-size: var(--ad-fs-m); line-height: 1; opacity: var(--ad-o3); white-space: nowrap; }
     .ctl { display: flex; align-items: center; gap: 4px; }
     .btn { width: 30px; height: 30px; }
     .unavailable { opacity: 0.45; }
@@ -106,12 +106,12 @@ export class AdTile extends BaseCard<TileConfig> {
       position: relative; z-index: 1; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
       background: rgba(var(--ad-on-surface), 0.1); transition: background 0.25s ease, color 0.25s ease;
     }
-    .light .bulb ha-icon { --mdc-icon-size: 20px; opacity: 0.6; }
+    .light .bulb ha-icon { --mdc-icon-size: 20px; opacity: var(--ad-o2); }
     .light.on .bulb { background: rgb(var(--ad-warning)); color: #3b2405; box-shadow: 0 0 18px rgba(var(--ad-warning), 0.45); }
     .light.on .bulb ha-icon { opacity: 1; }
     .light .label-block { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .light .label-block .name { flex: none; }
-    .light .state { font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .light .state { font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .light.on .state { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
     @media (prefers-reduced-motion: reduce) { .light .rise, .light .bulb { transition: none; } }
     /* Waiting for HA: a ring turns around the lamp button */
@@ -127,42 +127,42 @@ export class AdTile extends BaseCard<TileConfig> {
     .light.busy .state, .light.failed .state { white-space: normal; line-height: 1.2; }
 
     /* Thermostat */
-    .mode { font-size: 12px; white-space: nowrap; opacity: 0.7; }
+    .mode { font-size: var(--ad-fs-s); white-space: nowrap; opacity: var(--ad-o2); }
     .mode.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
-    .target { min-width: 34px; text-align: center; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .target { min-width: 34px; text-align: center; font-size: var(--ad-fs-m); font-weight: 500; font-variant-numeric: tabular-nums; }
     /* Narrow tile: the reading on its own line, the target controls across the bottom above the scale */
     .climate { padding-bottom: 14px; gap: 2px; }
-    .climate .big { font-size: 26px; }
+    .climate .big { font-size: var(--ad-fs-xl); }
     .climate .ctl { width: 100%; justify-content: space-between; }
     /* Cover: the position above, the buttons across the bottom, so "100 %" and three buttons fit a narrow tile */
     .cover { gap: 2px; }
     .cover .bottom { flex-direction: column; align-items: stretch; gap: 4px; }
-    .cover .big { font-size: 26px; }
+    .cover .big { font-size: var(--ad-fs-xl); }
     .cover .ctl { justify-content: space-between; }
 
     /* Media: the artwork is the tile */
     .media.art { color: #fff; }
     .media.art .btn { background: rgba(255, 255, 255, 0.18); color: #fff; }
-    .title { font-size: 14px; font-weight: 600; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .artist { font-size: 12px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title { font-size: var(--ad-fs-m); font-weight: 600; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .artist { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .media .bottom { align-items: center; }
     .media .now { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 
     /* Rows: like a wall switch, the whole row is the switch and the pilot light shows the state */
     .row { flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 16px 0 14px; }
-    .row > ha-icon { --mdc-icon-size: 20px; opacity: 0.5; }
+    .row > ha-icon { --mdc-icon-size: 20px; opacity: var(--ad-o3); }
     /* The pilot carries the state's color; the icon only gets brighter */
     .row.on > ha-icon { opacity: 0.85; }
     .row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-    .label { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sub { font-size: 12px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .label { font-size: var(--ad-fs-m); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* A socket asking before it goes off: the question in amber, the button in the alarm red */
     .row.asking .sub { color: rgb(var(--ad-warning)); opacity: 1; font-weight: 500; }
     /* Scenes, scripts and buttons are half-width tiles: the name takes two lines, one while a line below says something */
     .row.run { gap: 10px; padding: 0 12px; }
     .row.run .label {
-      white-space: normal; font-size: 13px; line-height: 1.2;
+      white-space: normal; font-size: var(--ad-fs-s); line-height: 1.2;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .row.run:has(.sub) .label { -webkit-line-clamp: 1; }
@@ -171,10 +171,10 @@ export class AdTile extends BaseCard<TileConfig> {
     .row.armed .sub { color: rgb(var(--ad-primary)); opacity: 1; font-weight: 500; }
     .row.armed > ha-icon { color: rgb(var(--ad-primary)); opacity: 1; }
     /* A socket's current power, tappable for its history */
-    .watts { position: relative; z-index: 1; flex: none; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; opacity: 0.85; }
+    .watts { position: relative; z-index: 1; flex: none; font-size: var(--ad-fs-m); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; opacity: 0.85; }
     .off-btn {
       all: unset; position: relative; z-index: 1; flex: none; cursor: pointer; padding: 7px 14px; border-radius: 999px;
-      background: rgb(var(--ad-error)); color: #fff; font-size: 13px; font-weight: 600;
+      background: rgb(var(--ad-error)); color: #fff; font-size: var(--ad-fs-s); font-weight: 600;
     }
     .off-btn:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
 

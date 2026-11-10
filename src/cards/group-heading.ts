@@ -33,24 +33,24 @@ export class AdGroupHeading extends BaseCard<GroupHeadingConfig> {
     .wrap { display: flex; align-items: baseline; gap: 10px; min-height: 40px; padding: 10px 4px 2px; }
     .title {
       all: unset; display: inline-flex; align-items: baseline; gap: 6px; min-width: 0;
-      font-size: 17px; font-weight: 500;
+      font-size: var(--ad-fs-l); font-weight: 500;
     }
-    .sub .title { font-size: 15px; }
+    .sub .title { font-size: var(--ad-fs-m); }
     .minor { min-height: 32px; padding-top: 2px; }
-    .minor .title { font-size: 13px; font-weight: 500; opacity: 0.75; }
+    .minor .title { font-size: var(--ad-fs-s); font-weight: 500; opacity: var(--ad-o2); }
     .title[role=link] { cursor: pointer; }
     .title[role=link]:hover .name { text-decoration: underline; text-underline-offset: 3px; }
     .title:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 3px; border-radius: 4px; }
-    .title ha-icon { --mdc-icon-size: 18px; opacity: 0.5; align-self: center; }
+    .title ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o3); align-self: center; }
     .chev { --mdc-icon-size: 16px !important; opacity: 0.35; }
     /* The shared .name style is the small tile caption; a heading takes its size from .title */
     .title .name { font-size: inherit; opacity: 1; letter-spacing: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .count { font-size: 13px; opacity: 0.55; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .count { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .fill { flex: 1; }
     .ctl { display: flex; align-items: center; gap: 4px; align-self: center; }
     /* Bulk actions are words, so it is clear what happens to the whole group */
     .act {
-      all: unset; cursor: pointer; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap;
+      all: unset; cursor: pointer; padding: 4px 12px; border-radius: 999px; font-size: var(--ad-fs-s); font-weight: 500; white-space: nowrap;
       background: rgba(var(--ad-on-surface), 0.07);
     }
     .act:hover { background: rgba(var(--ad-on-surface), 0.12); }

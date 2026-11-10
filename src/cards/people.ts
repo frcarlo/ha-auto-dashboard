@@ -64,7 +64,7 @@ export const peopleStyles = css`
   .people { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .person {
     all: unset; position: relative; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; flex: 0 0 auto;
-    display: grid; place-items: center; font-size: 12px; font-weight: 600;
+    display: grid; place-items: center; font-size: var(--ad-fs-s); font-weight: 600;
     background: center / cover var(--ad-surface-variant);
   }
   .person.away { filter: grayscale(1); opacity: 0.55; }
@@ -76,7 +76,7 @@ export const peopleStyles = css`
   .person:focus-visible, .alarm:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
   .alarm {
     all: unset; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px 4px 8px; margin-left: 4px; cursor: pointer;
-    border-radius: 999px; font-size: 12px; white-space: nowrap; background: rgba(var(--ad-on-surface), 0.08);
+    border-radius: 999px; font-size: var(--ad-fs-s); white-space: nowrap; background: rgba(var(--ad-on-surface), 0.08);
   }
   .alarm ha-icon { --mdc-icon-size: 16px; }
   .alarm.success ha-icon { color: rgb(var(--ad-success)); }

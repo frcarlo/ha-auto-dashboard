@@ -30,29 +30,29 @@ export class AdHeader extends BaseCard<HeaderConfig> {
     :host { display: block; container-type: inline-size; }
     .wrap { display: flex; align-items: flex-end; gap: 12px; padding: 8px 4px 4px; }
     .text { flex: 1; min-width: 0; }
-    .eyebrow { font-size: 12px; opacity: 0.55; letter-spacing: 0.03em; }
-    h1 { margin: 2px 0 0; font-size: 28px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.15; }
+    .eyebrow { font-size: var(--ad-fs-s); opacity: var(--ad-o2); letter-spacing: 0.03em; }
+    h1 { margin: 2px 0 0; font-size: var(--ad-fs-xl); font-weight: 300; letter-spacing: -0.03em; line-height: 1.15; }
     /* A page's count sits under its title, as quiet as the date above the greeting */
-    .meta { margin-top: 4px; font-size: 13px; opacity: 0.55; font-variant-numeric: tabular-nums; }
-    .clock { font-size: 40px; font-weight: 200; letter-spacing: -0.05em; line-height: 1; }
-    .weather { display: flex; align-items: center; gap: 6px; font-size: 13px; opacity: 0.75; }
+    .meta { margin-top: 4px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
+    .clock { font-size: var(--ad-fs-2xl); font-weight: 200; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .weather { display: flex; align-items: center; gap: 6px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .weather ha-icon { --mdc-icon-size: 22px; }
     .right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
     .clockrow { display: flex; align-items: center; gap: 8px; }
-    .gear { all: unset; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; opacity: 0.55; transition: opacity 0.2s ease, background 0.2s ease; }
+    .gear { all: unset; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; opacity: var(--ad-o2); transition: opacity 0.2s ease, background 0.2s ease; }
     .gear:hover { opacity: 1; background: rgba(var(--ad-on-surface), 0.08); }
     .gear:focus-visible { outline: 2px solid rgb(var(--ad-primary)); opacity: 1; }
     .gear ha-icon { --mdc-icon-size: 20px; }
     .action {
       all: unset; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; cursor: pointer;
-      border-radius: 999px; background: var(--ad-surface); box-shadow: var(--ad-shadow); font-size: 13px;
+      border-radius: 999px; background: var(--ad-surface); box-shadow: var(--ad-shadow); font-size: var(--ad-fs-s);
     }
-    .action ha-icon { --mdc-icon-size: 17px; opacity: 0.7; }
+    .action ha-icon { --mdc-icon-size: 17px; opacity: var(--ad-o2); }
     .action:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     @container (max-width: 480px) {
-      h1 { font-size: 24px; }
-      .clock { font-size: 30px; }
-      .weather { font-size: 12px; }
+      h1 { font-size: var(--ad-fs-l); font-weight: 400; }
+      .clock { font-size: var(--ad-fs-xl); }
+      .weather { font-size: var(--ad-fs-s); }
       .weather .cond { display: none; }
     }
   `]

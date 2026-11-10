@@ -19,6 +19,16 @@ export const tokens = css`
     --ad-glass-blur: blur(30px) saturate(140%);
     --ad-glass-hi: rgba(255, 255, 255, 0.72);
     --ad-glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    /* Six type sizes, about a fourth apart: caption, secondary, body, heading, value, display */
+    --ad-fs-xs: 11px;
+    --ad-fs-s: 13px;
+    --ad-fs-m: 15px;
+    --ad-fs-l: 20px;
+    --ad-fs-xl: 28px;
+    --ad-fs-2xl: 44px;
+    /* Three text levels: full, secondary, quiet. Set as opacity, so they work on every color and on photos */
+    --ad-o2: 0.72;
+    --ad-o3: 0.52;
     color: rgb(var(--ad-on-surface));
     font-family: var(--ha-font-family-body, Roboto, system-ui, sans-serif);
     font-size: 14px;
@@ -40,6 +50,8 @@ export const tokens = css`
     /* On dark, depth comes from the surface and the hairline, not from a shadow */
     --ad-glass-shadow: 0 0 0 transparent;
   }
+  /* Frosted glass over a photo: the page shines through, so quieter text needs more ink to stay readable */
+  :host([glass]) { --ad-o2: 0.8; --ad-o3: 0.62; }
 
   .card {
     position: relative;
@@ -121,26 +133,26 @@ export const tokens = css`
   .btn[disabled] { opacity: 0.35; pointer-events: none; }
 
   .name {
-    font-size: 11px;
-    opacity: 0.6;
-    letter-spacing: 0.025em;
+    font-size: var(--ad-fs-s);
+    font-weight: 500;
+    opacity: var(--ad-o2);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Large values are thin with figures of equal width, so a clock or a temperature does not jump as it counts */
   .big {
-    font-size: 26px;
+    font-size: var(--ad-fs-xl);
     font-weight: 300;
     letter-spacing: -0.04em;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
-  .unit { font-size: 13px; opacity: 0.45; margin-left: 1px; letter-spacing: 0; }
+  .unit { font-size: var(--ad-fs-s); opacity: var(--ad-o3); margin-left: 1px; letter-spacing: 0; }
   .tag {
-    font-size: 10px;
+    font-size: var(--ad-fs-xs);
     font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    opacity: 0.3;
+    opacity: var(--ad-o3);
   }
   .tag.on { color: rgb(var(--ad-warning)); opacity: 0.9; }
 `

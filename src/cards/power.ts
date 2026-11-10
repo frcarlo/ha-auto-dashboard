@@ -29,17 +29,17 @@ export class AdPower extends BaseCard<PowerConfig> {
     :host { display: block; height: 100%; }
     .card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
     .head { display: flex; align-items: baseline; gap: 8px; }
-    .title { flex: 1; min-width: 0; font-size: 13px; opacity: 0.65; display: flex; align-items: center; gap: 6px; }
+    .title { flex: 1; min-width: 0; font-size: var(--ad-fs-s); opacity: var(--ad-o2); display: flex; align-items: center; gap: 6px; }
     .title ha-icon { --mdc-icon-size: 18px; }
-    .total { font-size: 28px; font-weight: 300; letter-spacing: -0.03em; white-space: nowrap; }
-    .total small, .w small { font-size: 13px; opacity: 0.6; margin-left: 2px; letter-spacing: 0; }
-    .top { font-size: 12px; opacity: 0.6; }
-    .flows { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+    .total { font-size: var(--ad-fs-xl); font-weight: 300; letter-spacing: -0.03em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .total small, .w small { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-left: 2px; letter-spacing: 0; }
+    .top { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .flows { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--ad-fs-s); }
     .flows span { display: inline-flex; align-items: center; gap: 4px; }
-    .flows ha-icon { --mdc-icon-size: 16px; opacity: 0.6; }
-    .flows small { font-size: 11px; opacity: 0.6; margin-left: 1px; }
+    .flows ha-icon { --mdc-icon-size: 16px; opacity: var(--ad-o2); }
+    .flows small { font-size: var(--ad-fs-xs); opacity: var(--ad-o2); margin-left: 1px; }
     .rows { display: flex; flex-direction: column; gap: 8px; }
-    .rowx { all: unset; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; cursor: pointer; font-size: 13px; }
+    .rowx { all: unset; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; cursor: pointer; font-size: var(--ad-fs-s); }
     .rowx:focus-visible { outline: 2px solid rgb(var(--ad-primary)); border-radius: 6px; }
     .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .w { white-space: nowrap; font-variant-numeric: tabular-nums; }

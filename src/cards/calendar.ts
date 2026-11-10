@@ -74,19 +74,19 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .card { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px; }
 
     .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .bar h2 { flex: 1; min-width: 0; margin: 0 0 0 8px; font-size: 20px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar h2 { flex: 1; min-width: 0; margin: 0 0 0 8px; font-size: var(--ad-fs-l); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .nav { display: flex; align-items: center; gap: 4px; }
     .nav .btn { width: 36px; height: 36px; }
-    .today-btn { all: unset; cursor: pointer; height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13px; font-weight: 500; background: rgba(var(--ad-on-surface), 0.08); }
+    .today-btn { all: unset; cursor: pointer; height: 36px; padding: 0 14px; border-radius: 18px; font-size: var(--ad-fs-s); font-weight: 500; background: rgba(var(--ad-on-surface), 0.08); }
     .today-btn:focus-visible, .seg button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .seg { display: inline-flex; padding: 2px; border-radius: 12px; background: rgba(var(--ad-on-surface), 0.08); }
-    .seg button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 10px; font-size: 13px; opacity: 0.7; }
+    .seg button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 10px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .seg button[aria-pressed=true] { background: var(--ad-surface); opacity: 1; font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
 
 
     /* Month: six weeks of days, each with its first events */
     .month { display: grid; grid-auto-rows: auto; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
-    .wd { padding: 8px 4px; font-size: 12px; opacity: 0.55; text-align: center; }
+    .wd { padding: 8px 4px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); text-align: center; }
     .cell {
       all: unset; box-sizing: border-box; min-height: var(--cell, 96px); padding: 4px; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-width: 0;
       border-top: 1px solid rgba(var(--ad-on-surface), 0.08);
@@ -95,51 +95,51 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     .cell:hover { background: rgba(var(--ad-on-surface), 0.03); }
     .cell:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: -2px; }
     .cell.other { opacity: 0.4; }
-    .num { align-self: flex-start; min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 12px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .num { align-self: flex-start; min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 12px; font-size: var(--ad-fs-s); font-variant-numeric: tabular-nums; }
     .cell.today .num { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); font-weight: 500; }
     .ev {
-      all: unset; display: flex; align-items: center; gap: 4px; min-width: 0; padding: 1px 4px; border-radius: 4px; font-size: 12px; line-height: 16px; cursor: pointer;
+      all: unset; display: flex; align-items: center; gap: 4px; min-width: 0; padding: 1px 4px; border-radius: 4px; font-size: var(--ad-fs-s); line-height: 16px; cursor: pointer;
     }
     .ev:focus-visible { outline: 2px solid rgb(var(--c)); }
     .events { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .ev { max-width: 100%; box-sizing: border-box; overflow: hidden; }
     .ev .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .ev .h { opacity: 0.6; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+    .ev .h { opacity: var(--ad-o2); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
     .ev.all { background: rgba(var(--c), 0.22); }
     .ev:not(.all)::before { content: ''; flex: 0 0 6px; height: 6px; border-radius: 50%; background: rgb(var(--c)); }
     .day-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-    .more { font-size: 11px; opacity: 0.6; padding: 0 4px; white-space: nowrap; }
+    .more { font-size: var(--ad-fs-xs); opacity: var(--ad-o2); padding: 0 4px; white-space: nowrap; }
 
     /* Week and day: the hours like a planner */
     .grid { display: grid; grid-template-columns: 56px repeat(var(--days), minmax(0, 1fr)); }
-    .head { padding: 4px; text-align: center; font-size: 12px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
+    .head { padding: 4px; text-align: center; font-size: var(--ad-fs-s); border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
     .head button { all: unset; cursor: pointer; display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
-    .head .wdn { opacity: 0.55; }
-    .head .num { align-self: center; font-size: 16px; min-width: 30px; height: 30px; border-radius: 15px; }
+    .head .wdn { opacity: var(--ad-o2); }
+    .head .num { align-self: center; font-size: var(--ad-fs-m); min-width: 30px; height: 30px; border-radius: 15px; }
     .head.today .num { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .alld { padding: 4px 2px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); min-width: 0; }
-    .alld-label { font-size: 11px; opacity: 0.5; padding: 6px 8px 6px 0; text-align: right; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
+    .alld-label { font-size: var(--ad-fs-xs); opacity: var(--ad-o3); padding: 6px 8px 6px 0; text-align: right; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
     .hours { position: relative; height: calc(var(--hours) * var(--hour)); }
-    .gutter span { position: absolute; right: 8px; font-size: 11px; opacity: 0.5; transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+    .gutter span { position: absolute; right: 8px; font-size: var(--ad-fs-xs); opacity: var(--ad-o3); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
     .col { position: relative; border-left: 1px solid rgba(var(--ad-on-surface), 0.06);
       background: repeating-linear-gradient(to bottom, rgba(var(--ad-on-surface), 0.06) 0 1px, transparent 1px var(--hour)); }
     .slot {
       all: unset; box-sizing: border-box; position: absolute; padding: 2px 6px; border-radius: 6px; overflow: hidden; cursor: pointer;
-      background: rgba(var(--c), 0.22); box-shadow: inset 3px 0 0 rgb(var(--c)); font-size: 12px; line-height: 16px;
+      background: rgba(var(--c), 0.22); box-shadow: inset 3px 0 0 rgb(var(--c)); font-size: var(--ad-fs-s); line-height: 16px;
     }
     .slot:focus-visible { outline: 2px solid rgb(var(--c)); }
     .slot b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .slot span { opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .slot span { opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
     .now { position: absolute; left: 0; right: 0; height: 2px; background: rgb(var(--ad-error)); pointer-events: none; }
     .now::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--ad-error)); }
 
     /* Phone week: the days as a list */
     .agenda { display: flex; flex-direction: column; gap: 12px; }
     .aday { display: flex; flex-direction: column; gap: 4px; }
-    .aday .dh { all: unset; cursor: pointer; font-size: 13px; opacity: 0.7; }
+    .aday .dh { all: unset; cursor: pointer; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .aday.today .dh { color: rgb(var(--ad-primary)); opacity: 1; font-weight: 500; }
-    .aday .ev { font-size: 14px; line-height: 20px; padding: 4px 8px; }
-    .empty { font-size: 13px; opacity: 0.5; padding: 4px 0; }
+    .aday .ev { font-size: var(--ad-fs-m); line-height: 20px; padding: 4px 8px; }
+    .empty { font-size: var(--ad-fs-s); opacity: var(--ad-o3); padding: 4px 0; }
 
     /* An event's details over the bottom of the card */
     .detail {
@@ -147,24 +147,24 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
       border-radius: 16px; background: var(--ad-surface); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(var(--ad-on-surface), 0.08);
     }
     .detail .top { display: flex; align-items: flex-start; gap: 12px; }
-    .detail h3 { flex: 1; margin: 0; font-size: 17px; font-weight: 500; }
-    .detail .line { display: flex; align-items: center; gap: 8px; font-size: 13px; opacity: 0.8; }
+    .detail h3 { flex: 1; margin: 0; font-size: var(--ad-fs-l); font-weight: 500; }
+    .detail .line { display: flex; align-items: center; gap: 8px; font-size: var(--ad-fs-s); opacity: 0.8; }
     .detail .line i { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--c)); }
-    .detail .line ha-icon { --mdc-icon-size: 16px; opacity: 0.6; }
-    .detail p { margin: 0; font-size: 13px; opacity: 0.75; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+    .detail .line ha-icon { --mdc-icon-size: 16px; opacity: var(--ad-o2); }
+    .detail p { margin: 0; font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 
     .detail .actions, .form .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-    .detail .confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+    .detail .confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--ad-fs-m); }
     .act {
       all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 18px;
-      font-size: 13px; font-weight: 500; background: rgba(var(--ad-on-surface), 0.08);
+      font-size: var(--ad-fs-s); font-weight: 500; background: rgba(var(--ad-on-surface), 0.08);
     }
     .act ha-icon { --mdc-icon-size: 18px; }
     .act:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .act.primary { background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .act.danger { background: rgba(var(--ad-error), 0.16); color: rgb(var(--ad-error)); }
     .act[disabled] { opacity: 0.5; pointer-events: none; }
-    .error { margin: 0; font-size: 13px; color: rgb(var(--ad-error)); }
+    .error { margin: 0; font-size: var(--ad-fs-s); color: rgb(var(--ad-error)); }
     .add ha-icon { --mdc-icon-size: 20px; }
     :host([editable]) .col, :host([editable]) .alld { cursor: cell; }
 
@@ -176,18 +176,18 @@ export class AdCalendar extends BaseCard<CalendarConfig> {
     }
     dialog.form::backdrop { background: rgba(0, 0, 0, 0.45); }
     .form form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
-    .form h3 { margin: 0 0 4px; font-size: 17px; font-weight: 500; }
+    .form h3 { margin: 0 0 4px; font-size: var(--ad-fs-l); font-weight: 500; }
     .form input:not([type=checkbox]), .form select, .form textarea {
-      box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: none; border-radius: 10px; font: inherit; font-size: 14px; line-height: 20px;
+      box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: none; border-radius: 10px; font: inherit; font-size: var(--ad-fs-m); line-height: 20px;
       color: inherit; background: rgba(var(--ad-on-surface), 0.06);
     }
     .form input:focus-visible, .form select:focus-visible, .form textarea:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 0; }
-    .form .name { font-size: 17px; }
+    .form .name { font-size: var(--ad-fs-l); }
     .form textarea { resize: vertical; }
-    .form .row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 112px; align-items: center; gap: 8px; font-size: 13px; }
+    .form .row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 112px; align-items: center; gap: 8px; font-size: var(--ad-fs-s); }
     .form .row.dates { grid-template-columns: 64px minmax(0, 1fr); }
-    .form .row > span { opacity: 0.6; }
-    .form .switch { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+    .form .row > span { opacity: var(--ad-o2); }
+    .form .switch { display: flex; align-items: center; gap: 8px; font-size: var(--ad-fs-m); cursor: pointer; }
     .form .switch input { width: 18px; height: 18px; margin: 0; accent-color: rgb(var(--ad-primary)); }
     .form .seg { align-self: flex-start; }
 

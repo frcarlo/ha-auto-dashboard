@@ -382,19 +382,22 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   // Admins also see HA itself: the server, repairs, failing integrations, the log, backups and updates.
   // HA answers these websocket calls for admins only, so others keep batteries and unavailable devices.
   const isAdmin = !!hass.user?.is_admin
-  const system = (source: string, title: string, icon: string): Section =>
-    ({ type: 'grid', column_span: 2, cards: [heading(title, icon), { type: 'custom:ad-system', source, ...look }] })
+  // The server's load runs across the page, the short blocks (backups, repairs, integrations, updates) share a row,
+  // batteries and unavailable devices take half each, and the long log runs across at the end. HA packs sections
+  // densely, so with two, three or four columns at most one column stays empty
+  const system = (source: string, title: string, icon: string, span = 1): Section =>
+    ({ type: 'grid', column_span: span, cards: [heading(title, icon), { type: 'custom:ad-system', source, ...look }] })
   const maintenanceView = subview('maintenance', t(hass, 'maintenance'), 'mdi:wrench-outline', [
     ...(isAdmin ? [
-      system('health', t(hass, 'sys.system'), 'mdi:server-outline'),
+      system('health', t(hass, 'sys.system'), 'mdi:server-outline', MAX_COLUMNS),
       system('backup', t(hass, 'sys.backups'), 'mdi:backup-restore'),
       system('repairs', t(hass, 'sys.repairs'), 'mdi:auto-fix'),
       system('integrations', t(hass, 'sys.integrations'), 'mdi:puzzle-outline'),
-      { type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'updates'), 'mdi:package-up'), { type: 'custom:ad-maintenance-list', source: 'updates', ...scopeOpts }] },
-      system('log', t(hass, 'sys.log'), 'mdi:text-box-search-outline'),
+      { type: 'grid' as const, column_span: 1, cards: [heading(t(hass, 'updates'), 'mdi:package-up'), { type: 'custom:ad-maintenance-list', source: 'updates', ...scopeOpts }] },
     ] : []),
     { type: 'grid', column_span: 2, cards: [heading(t(hass, 'batteries'), 'mdi:battery-50'), { type: 'custom:ad-maintenance-list', source: 'battery', ...scopeOpts }] },
     { type: 'grid', column_span: 2, cards: [heading(t(hass, 'status.unavailable'), 'mdi:lan-disconnect'), { type: 'custom:ad-maintenance-list', source: 'unavailable', ...scopeOpts }] },
+    ...(isAdmin ? [system('log', t(hass, 'sys.log'), 'mdi:text-box-search-outline', MAX_COLUMNS)] : []),
   ])
 
   const calendarView = subview('calendar', t(hass, 'calendar'), 'mdi:calendar-month-outline', [

@@ -39,21 +39,21 @@ export class AdActivity extends BaseCard<ActivityConfig> {
     button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .feed { padding: 16px 18px 8px; height: auto; display: flex; flex-direction: column; }
     .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-    .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
+    .label { font-size: var(--ad-fs-xs); font-weight: 600; opacity: var(--ad-o2); }
     .latest { display: block; width: 100%; padding: 14px 0 16px; border-bottom: 1px solid rgba(var(--ad-on-surface), 0.08); }
-    .where { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.6; min-width: 0; }
+    .where { display: flex; align-items: center; gap: 6px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); min-width: 0; }
     .where span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .where ha-icon { --mdc-icon-size: 15px; flex: none; }
-    .clock { font-size: 44px; font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .sentence { font-size: 16px; font-weight: 500; margin-top: 2px; }
+    .clock { font-size: var(--ad-fs-2xl); font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .sentence { font-size: var(--ad-fs-m); font-weight: 500; margin-top: 2px; }
     ul { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
     li + li { border-top: 1px solid rgba(var(--ad-on-surface), 0.06); }
     .row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 8px; width: 100%; padding: 10px 0; }
-    .row .at { font-size: 14px; opacity: 0.6; font-variant-numeric: tabular-nums; }
-    .row .what { font-size: 14px; }
+    .row .at { font-size: var(--ad-fs-m); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
+    .row .what { font-size: var(--ad-fs-m); }
     .row .where { grid-column: 2; }
     .on ha-icon { color: rgb(var(--ad-warning)); opacity: 1; }
-    .empty { padding: 16px 0; opacity: 0.55; font-size: 14px; }
+    .empty { padding: 16px 0; opacity: var(--ad-o2); font-size: var(--ad-fs-m); }
   `]
 
   getCardSize() {

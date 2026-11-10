@@ -80,13 +80,20 @@ describe('maintenance page', () => {
     const nav = (views[0] as any).sections.flatMap((s: any) => s.cards).find((c: any) => c.type === 'custom:ad-nav-bar')
     const view = views.find(v => v.path === 'maintenance') as any
     const sources = view.sections.flatMap((s: any) => s.cards).filter((c: any) => c.source).map((c: any) => c.source)
-    return { nav: nav.items.map((i: any) => i.path), sources }
+    const spans = view.sections.map((s: any) => s.column_span)
+    return { nav: nav.items.map((i: any) => i.path), sources, spans }
   }
 
   it('gives admins HA itself and a place in the bar', async () => {
     const { nav, sources } = await page(true)
     expect(nav).toContain('maintenance')
-    expect(sources).toEqual(['health', 'backup', 'repairs', 'integrations', 'updates', 'log', 'battery', 'unavailable'])
+    expect(sources).toEqual(['health', 'backup', 'repairs', 'integrations', 'updates', 'battery', 'unavailable', 'log'])
+  })
+
+  it('fills the rows: the load and the log across, four short blocks, then two halves', async () => {
+    const { spans } = await page(true)
+    // Between the page header and the bar
+    expect(spans.slice(1, -1)).toEqual([4, 1, 1, 1, 1, 2, 2, 4])
   })
 
   it('keeps batteries and unavailable devices for everyone else, reached through the chips', async () => {

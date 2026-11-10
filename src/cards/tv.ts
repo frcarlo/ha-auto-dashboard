@@ -36,10 +36,10 @@ export class AdTv extends BaseCard<TvCardConfig> {
     .head { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .info { all: unset; flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; cursor: pointer; }
     .info:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; border-radius: 8px; }
-    .info > ha-icon { --mdc-icon-size: 22px; opacity: 0.55; }
+    .info > ha-icon { --mdc-icon-size: 22px; opacity: var(--ad-o2); }
     .text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sub { font-size: 12px; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title { font-size: var(--ad-fs-m); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .power { width: 40px; height: 40px; }
     .power ha-icon { --mdc-icon-size: 20px; }
     .on .power { background: rgba(var(--ad-on-surface), 0.9); color: var(--ad-surface); }
@@ -63,7 +63,7 @@ export class AdTv extends BaseCard<TvCardConfig> {
     .ok {
       all: unset; position: absolute; inset: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
       background: var(--ad-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(var(--ad-on-surface), 0.1);
-      font-size: 13px; font-weight: 500; letter-spacing: 0.02em;
+      font-size: var(--ad-fs-s); font-weight: 500; letter-spacing: 0.02em;
       transition: background 0.15s ease, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .arrow:hover, .side .btn:hover, .nav .btn:hover { background: rgba(var(--ad-on-surface), 0.08); }
@@ -72,14 +72,14 @@ export class AdTv extends BaseCard<TvCardConfig> {
     .side { grid-column: 3; justify-self: start; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     .side .btn, .nav .btn { width: 40px; height: 40px; }
     .side .btn.muted { color: rgb(var(--ad-warning)); }
-    .level { font-size: 12px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+    .level { font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
     .nav { grid-column: 1 / -1; display: flex; justify-content: center; gap: 48px; }
-    .nav .btn { display: inline-flex; gap: 6px; width: auto; padding: 0 16px; border-radius: 20px; font-size: 13px; }
+    .nav .btn { display: inline-flex; gap: 6px; width: auto; padding: 0 16px; border-radius: 20px; font-size: var(--ad-fs-s); }
     .nav .btn ha-icon { --mdc-icon-size: 18px; }
     .apps { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; padding-top: 16px; border-top: 1px solid rgba(var(--ad-on-surface), 0.08); }
     .app {
       all: unset; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 20px; cursor: pointer; white-space: nowrap;
-      background: rgba(var(--ad-on-surface), 0.08); font-size: 13px; font-weight: 500;
+      background: rgba(var(--ad-on-surface), 0.08); font-size: var(--ad-fs-s); font-weight: 500;
       transition: background 0.15s ease, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .app ha-icon { --mdc-icon-size: 18px; }

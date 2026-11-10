@@ -41,7 +41,7 @@ const barStyles = css`
   }
   a {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border-radius: 20px;
-    color: rgba(var(--ad-on-surface), 0.55); text-decoration: none; font-size: 10px; letter-spacing: 0.02em;
+    color: rgba(var(--ad-on-surface), 0.55); text-decoration: none; font-size: var(--ad-fs-xs); letter-spacing: 0.02em;
     -webkit-tap-highlight-color: transparent;
   }
   a ha-icon { --mdc-icon-size: 22px; }
@@ -54,7 +54,7 @@ const barStyles = css`
     box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28), inset 0 1px 0 var(--ad-glass-hi);
   }
   :host([pos=top]) .sheet { bottom: auto; top: calc(100% + 8px); }
-  .sheet a { padding: 12px 0; font-size: 11px; }
+  .sheet a { padding: 12px 0; font-size: var(--ad-fs-xs); }
   a.more[aria-expanded=true] { color: rgb(var(--ad-on-surface)); background: rgba(var(--ad-on-surface), 0.1); }
 
   :host([pos=top]) { bottom: auto; top: calc(var(--header-height, 56px) + env(safe-area-inset-top) + 12px); }

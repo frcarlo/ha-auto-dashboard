@@ -40,18 +40,18 @@ export class AdAppliance extends BaseCard<ApplianceCardConfig> {
     .card { display: flex; flex-direction: column; gap: 12px; padding: 16px; cursor: pointer; }
     .card:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
 
-    .head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; }
-    .head ha-icon { --mdc-icon-size: 18px; opacity: 0.55; flex: 0 0 auto; }
+    .head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--ad-fs-m); }
+    .head ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); flex: 0 0 auto; }
     .head .title { font-weight: 500; white-space: nowrap; }
-    .head .program { opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .head .program { opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
     .body { display: flex; align-items: center; gap: 16px; }
     .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-    .state { font-size: 24px; font-weight: 400; line-height: 1.1; }
+    .state { font-size: var(--ad-fs-xl); font-weight: 400; line-height: 1.1; }
     .warning .state { color: rgb(var(--ad-warning)); }
     .success .state { color: rgb(var(--ad-success)); }
     .error .state { color: rgb(var(--ad-error)); }
-    .sub { font-size: 13px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+    .sub { font-size: var(--ad-fs-s); opacity: var(--ad-o2); font-variant-numeric: tabular-nums; }
 
     /* The time left inside an open ring that fills with the program */
     .ring { position: relative; width: 80px; height: 80px; flex: 0 0 80px; }
@@ -62,18 +62,18 @@ export class AdAppliance extends BaseCard<ApplianceCardConfig> {
     .warning .ring .arc { stroke: rgb(var(--ad-warning)); }
     .success .ring .arc { stroke: rgb(var(--ad-success)); }
     .ring .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
-    .ring .left { font-size: 20px; font-weight: 300; line-height: 1; }
-    .ring .left small { font-size: 11px; opacity: 0.6; margin-left: 1px; }
-    .ring .pct { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+    .ring .left { font-size: var(--ad-fs-l); font-weight: 300; line-height: 1; }
+    .ring .left small { font-size: var(--ad-fs-xs); opacity: var(--ad-o2); margin-left: 1px; }
+    .ring .pct { font-size: var(--ad-fs-xs); opacity: var(--ad-o3); margin-top: 2px; }
     .ring ha-icon { --mdc-icon-size: 28px; color: rgb(var(--ad-success)); }
 
     /* From start to end, the dot where the program is now */
     .timeline { display: flex; flex-direction: column; gap: 4px; }
     .track { position: relative; height: 4px; border-radius: 2px; background: rgba(var(--ad-on-surface), 0.1); }
     .track span { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: rgb(var(--ad-warning)); width: var(--p); transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
-    .times { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.5; font-variant-numeric: tabular-nums; }
+    .times { display: flex; justify-content: space-between; font-size: var(--ad-fs-s); opacity: var(--ad-o3); font-variant-numeric: tabular-nums; }
 
-    .notes { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+    .notes { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--ad-fs-s); }
     .note { display: inline-flex; align-items: center; gap: 4px; color: rgb(var(--ad-warning)); }
     .note ha-icon { --mdc-icon-size: 14px; }
 

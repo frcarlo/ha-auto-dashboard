@@ -187,12 +187,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     nav { display: flex; flex-direction: column; gap: 2px; }
     .nav {
       all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 14px; cursor: pointer;
-      font-size: 14px; font-weight: 500; color: rgba(var(--ad-on-surface), 0.7);
+      font-size: var(--ad-fs-m); font-weight: 500; color: rgba(var(--ad-on-surface), 0.7);
     }
     .nav:hover { background: rgba(var(--ad-on-surface), 0.05); }
     .nav[aria-current=true] { color: rgb(var(--ad-primary)); background: rgba(var(--ad-primary), 0.12); }
     .nav:focus-visible, .tile:focus-visible, .row:focus-visible, .lib:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: -2px; }
-    .lib-head { display: flex; align-items: center; gap: 8px; padding: 16px 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.5; }
+    .lib-head { display: flex; align-items: center; gap: 8px; padding: 16px 12px 6px; font-size: var(--ad-fs-xs); font-weight: 600; opacity: var(--ad-o3); }
     .lib-head ha-icon { --mdc-icon-size: 15px; }
     .libs { overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; }
     .lib { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 12px; cursor: pointer; }
@@ -200,13 +200,13 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .lib[aria-current=true] { background: rgba(var(--ad-primary), 0.12); }
     .lib .art { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; }
     .lib-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-    .lib-text span { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .lib-text small { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.5; }
+    .lib-text span { font-size: var(--ad-fs-s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lib-text small { display: flex; align-items: center; gap: 4px; font-size: var(--ad-fs-xs); opacity: var(--ad-o3); }
     .lib-text small ha-icon { --mdc-icon-size: 11px; }
     .home-head { display: flex; justify-content: flex-end; margin: -4px 0 14px; }
-    .chip.spotify { padding: 6px 12px; font-size: 13px; }
+    .chip.spotify { padding: 6px 12px; font-size: var(--ad-fs-s); }
     .chip.spotify ha-icon:first-child { color: #1db954; --mdc-icon-size: 16px; }
-    .pill.small { height: 30px; padding: 0 12px; font-size: 12px; }
+    .pill.small { height: 30px; padding: 0 12px; font-size: var(--ad-fs-s); }
 
     /* Artwork with an icon until the picture loads, and when it doesn't */
     .art { position: relative; overflow: hidden; display: grid; place-items: center; background: rgba(var(--ad-on-surface), 0.08); color: rgba(var(--ad-on-surface), 0.35); }
@@ -217,14 +217,14 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .glow-wrap { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: -1; }
     .glow { position: absolute; inset: 0 0 auto 0; height: 280px; background: center / cover; filter: blur(60px) saturate(160%); opacity: 0.32;
       -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent); }
-    h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+    h2 { margin: 0; font-size: var(--ad-fs-l); font-weight: 600; letter-spacing: -0.01em; }
     .section { margin-top: 26px; }
     .section:first-child { margin-top: 0; }
     .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .section-head h3 { margin: 0; font-size: 17px; font-weight: 600; }
-    .placeholder { padding: 48px 16px; text-align: center; opacity: 0.55; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-    .placeholder ha-icon { --mdc-icon-size: 48px; opacity: 0.5; }
-    .hint { margin: 0 0 16px; padding: 10px 14px; border-radius: 14px; font-size: 13px; background: rgba(var(--ad-info), 0.12); }
+    .section-head h3 { margin: 0; font-size: var(--ad-fs-l); font-weight: 600; }
+    .placeholder { padding: 48px 16px; text-align: center; opacity: var(--ad-o2); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .placeholder ha-icon { --mdc-icon-size: 48px; opacity: var(--ad-o3); }
+    .hint { margin: 0 0 16px; padding: 10px 14px; border-radius: 14px; font-size: var(--ad-fs-s); background: rgba(var(--ad-info), 0.12); }
     .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid rgba(var(--ad-primary), 0.25); border-top-color: rgb(var(--ad-primary)); animation: spin 0.8s linear infinite; }
     .spinner.small { width: 14px; height: 14px; border-width: 2px; }
     .center { display: grid; place-items: center; padding: 40px 0; }
@@ -235,7 +235,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .quick-item { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; height: 56px; padding-right: 10px; border-radius: 12px; overflow: hidden; cursor: pointer; background: rgba(var(--ad-on-surface), 0.06); }
     .quick-item:hover { background: rgba(var(--ad-on-surface), 0.1); }
     .quick-item .art { width: 56px; height: 56px; flex: 0 0 56px; }
-    .quick-item span { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .quick-item span { flex: 1; min-width: 0; font-size: var(--ad-fs-s); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .quick-item { position: relative; }
     .quick-item .play { position: absolute; right: 8px; top: 8px; opacity: 0; transition: opacity 0.15s; }
     .quick-item:hover .play, .quick-item:focus-within .play { opacity: 1; }
@@ -248,12 +248,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .tile:hover { background: rgba(var(--ad-on-surface), 0.05); }
     .tile .art { aspect-ratio: 1; width: 100%; border-radius: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
     .tile .art ha-icon { --mdc-icon-size: 32px; }
-    .tile .t { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tile .s { font-size: 12px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -4px; }
+    .tile .t { font-size: var(--ad-fs-s); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tile .s { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -4px; }
     .tile .play { position: absolute; right: 8px; bottom: 8px; opacity: 0; transform: translateY(4px); transition: opacity 0.15s, transform 0.15s; }
     .tile:hover .play, .tile:focus-within .play, .tile .play.busy { opacity: 1; transform: none; }
     .tile.on .art { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
-    .badge { position: absolute; left: 8px; top: 8px; display: flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: rgb(var(--ad-error)); color: #fff; }
+    .badge { position: absolute; left: 8px; top: 8px; display: flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; font-size: var(--ad-fs-xs); font-weight: 700; background: rgb(var(--ad-error)); color: #fff; }
     .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: pulse 1.4s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.3; } }
 
@@ -270,13 +270,13 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .rows { display: flex; flex-direction: column; }
     .row { display: grid; grid-template-columns: 28px 40px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 12px; cursor: pointer; position: relative; }
     .row:hover { background: rgba(var(--ad-on-surface), 0.05); }
-    .row .n { text-align: center; font-size: 13px; opacity: 0.5; font-variant-numeric: tabular-nums; display: grid; place-items: center; }
+    .row .n { text-align: center; font-size: var(--ad-fs-s); opacity: var(--ad-o3); font-variant-numeric: tabular-nums; display: grid; place-items: center; }
     .row .art { width: 40px; height: 40px; border-radius: 8px; }
     .row .art ha-icon { --mdc-icon-size: 16px; }
-    .row .t { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row .s { font-size: 12px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .t { font-size: var(--ad-fs-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .s { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .row.on .t { color: rgb(var(--ad-primary)); font-weight: 600; }
-    .row .dur { font-size: 12px; opacity: 0.5; font-variant-numeric: tabular-nums; }
+    .row .dur { font-size: var(--ad-fs-s); opacity: var(--ad-o3); font-variant-numeric: tabular-nums; }
     .icon-btn { all: unset; box-sizing: border-box; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: rgba(var(--ad-on-surface), 0.6); }
     .icon-btn:hover { background: rgba(var(--ad-on-surface), 0.08); }
     .icon-btn:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
@@ -291,28 +291,28 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .menu.up { top: auto; bottom: calc(100% + 4px); }
     .pop { top: auto; bottom: calc(100% + 10px); min-width: 280px; max-width: min(360px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; }
     .menu button, .pop .item {
-      all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-size: 13px;
+      all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-size: var(--ad-fs-s);
     }
     .menu button:hover, .pop .item:hover { background: rgba(var(--ad-on-surface), 0.07); }
     .menu button:focus-visible, .pop .item:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
-    .menu ha-icon, .pop .item ha-icon { --mdc-icon-size: 18px; opacity: 0.7; }
-    .pop-head { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.5; }
+    .menu ha-icon, .pop .item ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
+    .pop-head { padding: 8px 12px 4px; font-size: var(--ad-fs-xs); font-weight: 600; opacity: var(--ad-o3); }
     .pop .q { display: flex; align-items: center; gap: 12px; padding: 6px 12px; }
     .pop .q .art { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 8px; }
     .pop .q .text { min-width: 0; flex: 1; }
-    .pop .q .t { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .pop .q .s { font-size: 12px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .pop .note { padding: 6px 12px 10px; font-size: 12px; opacity: 0.55; }
+    .pop .q .t { font-size: var(--ad-fs-s); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pop .q .s { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pop .note { padding: 6px 12px 10px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
 
     /* Detail: a playlist, album or artist */
-    .back { all: unset; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; opacity: 0.7; cursor: pointer; margin-bottom: 14px; padding: 4px 8px 4px 4px; border-radius: 999px; }
+    .back { all: unset; display: inline-flex; align-items: center; gap: 6px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); cursor: pointer; margin-bottom: 14px; padding: 4px 8px 4px 4px; border-radius: 999px; }
     .back:hover { opacity: 1; background: rgba(var(--ad-on-surface), 0.06); }
     .hero { display: flex; align-items: flex-end; gap: 22px; margin-bottom: 20px; }
     .hero .art { width: 168px; height: 168px; flex: 0 0 168px; border-radius: 16px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35); }
     .hero .art ha-icon { --mdc-icon-size: 56px; }
-    .hero .type { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+    .hero .type { font-size: var(--ad-fs-xs); font-weight: 700; opacity: var(--ad-o2); }
     .hero h1 { margin: 6px 0 8px; font-size: clamp(24px, 4cqw, 40px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
-    .hero .meta { font-size: 13px; opacity: 0.6; }
+    .hero .meta { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .actions { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 
     /* Big player: the cover large, the lyrics beside it */
@@ -322,10 +322,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .now-track .art { width: 100%; max-width: 380px; aspect-ratio: 1; border-radius: 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
     .now-track .art ha-icon { --mdc-icon-size: 72px; }
     .now-text { min-width: 0; }
-    .now .type { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+    .now .type { font-size: var(--ad-fs-xs); font-weight: 700; opacity: var(--ad-o2); }
     .now h1 { margin: 6px 0; font-size: clamp(22px, 3.4cqw, 38px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; overflow-wrap: anywhere; }
-    .now-artist { font-size: 16px; opacity: 0.8; }
-    .now-album { font-size: 13px; opacity: 0.55; margin-top: 2px; }
+    .now-artist { font-size: var(--ad-fs-m); opacity: 0.8; }
+    .now-album { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-top: 2px; }
     .now-text .chip { margin-top: 14px; max-width: 100%; }
     .lyrics { display: flex; flex-direction: column; min-width: 0; border-radius: 20px; background: rgba(var(--ad-on-surface), 0.04); box-shadow: inset 0 0 0 1px rgba(var(--ad-on-surface), 0.06); }
     .lyr { position: relative; height: var(--lyr-h); overflow-y: auto; box-sizing: border-box; padding: calc(var(--lyr-h) / 2 - 24px) 26px; scrollbar-width: none;
@@ -335,13 +335,13 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       opacity: 0.4; transition: opacity 0.35s, color 0.35s; overflow-wrap: anywhere; }
     .line.past { opacity: 0.22; }
     .line.on { opacity: 1; color: rgb(var(--ad-on-surface)); }
-    .line:hover { opacity: 0.75; }
+    .line:hover { opacity: var(--ad-o2); }
     .line[disabled] { cursor: default; }
     .line:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; border-radius: 6px; }
-    .lyr.plain { padding: 24px 26px; white-space: pre-line; font-size: 17px; line-height: 1.7; opacity: 0.85; -webkit-mask-image: none; mask-image: none; }
-    .lyr-empty { height: var(--lyr-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; opacity: 0.5; font-size: 14px; }
+    .lyr.plain { padding: 24px 26px; white-space: pre-line; font-size: var(--ad-fs-l); line-height: 1.7; opacity: 0.85; -webkit-mask-image: none; mask-image: none; }
+    .lyr-empty { height: var(--lyr-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; opacity: var(--ad-o3); font-size: var(--ad-fs-m); }
     .lyr-empty ha-icon { --mdc-icon-size: 40px; }
-    .lyr-foot { padding: 10px 20px 14px; font-size: 11px; opacity: 0.5; }
+    .lyr-foot { padding: 10px 20px 14px; font-size: var(--ad-fs-xs); opacity: var(--ad-o3); }
     .lyr-foot a { color: inherit; }
     @media (prefers-reduced-motion: reduce) { .line { transition: none; } }
     /* The cover in the bar opens the big player */
@@ -356,9 +356,9 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .search { display: flex; gap: 8px; margin-bottom: 22px; }
     .search label { flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 46px; border-radius: 999px; background: rgba(var(--ad-on-surface), 0.07); }
     .search label:focus-within { outline: 2px solid rgb(var(--ad-primary)); }
-    .search input { all: unset; flex: 1; min-width: 0; font-size: 15px; }
+    .search input { all: unset; flex: 1; min-width: 0; font-size: var(--ad-fs-m); }
     .search input::placeholder { color: rgba(var(--ad-on-surface), 0.45); }
-    .pill { all: unset; box-sizing: border-box; padding: 0 18px; height: 46px; border-radius: 999px; display: inline-flex; align-items: center; cursor: pointer; font-weight: 600; font-size: 14px;
+    .pill { all: unset; box-sizing: border-box; padding: 0 18px; height: 46px; border-radius: 999px; display: inline-flex; align-items: center; cursor: pointer; font-weight: 600; font-size: var(--ad-fs-m);
       background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .pill[disabled] { opacity: 0.4; pointer-events: none; }
     .pill.quiet { height: 36px; background: rgba(var(--ad-on-surface), 0.08); color: inherit; }
@@ -377,17 +377,17 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .player .icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgba(var(--ad-on-surface), 0.08); }
     .player.playing .icon { background: rgba(var(--ad-primary), 0.18); color: rgb(var(--ad-primary)); }
     .player .icon.spotify { color: #1db954; }
-    .player .name { font-size: 15px; font-weight: 600; opacity: 1; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .player .area { font-size: 12px; opacity: 0.55; }
-    .player .np { font-size: 12px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 16px; }
+    .player .name { font-size: var(--ad-fs-m); font-weight: 600; opacity: 1; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player .area { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .player .np { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 16px; }
     .player .foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .player .foot input { flex: 1; }
-    .chip { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    .chip { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: var(--ad-fs-s); font-weight: 600; cursor: pointer; white-space: nowrap;
       background: rgba(var(--ad-on-surface), 0.08); }
     .chip ha-icon { --mdc-icon-size: 14px; }
     .chip.on { background: rgba(var(--ad-primary), 0.16); color: rgb(var(--ad-primary)); }
     .chip:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
-    .sub-head { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.55; }
+    .sub-head { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; font-size: var(--ad-fs-s); font-weight: 600; opacity: var(--ad-o2); }
     .sub-head:first-child { margin-top: 0; }
     .sub-head ha-icon { --mdc-icon-size: 15px; }
 
@@ -403,9 +403,9 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .track { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .track .art { width: 56px; height: 56px; flex: 0 0 56px; border-radius: 12px; }
     .track .text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .track .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .track .s { font-size: 12px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .who { all: unset; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: rgb(var(--ad-primary)); cursor: pointer; max-width: 100%; }
+    .track .t { font-size: var(--ad-fs-m); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track .s { font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .who { all: unset; display: inline-flex; align-items: center; gap: 4px; font-size: var(--ad-fs-xs); font-weight: 600; color: rgb(var(--ad-primary)); cursor: pointer; max-width: 100%; }
     .who span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .who ha-icon { --mdc-icon-size: 13px; }
     .center-col { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
@@ -418,15 +418,15 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .ctrl.on { color: rgb(var(--ad-primary)); }
     .ctrl.main { width: 42px; height: 42px; background: rgb(var(--ad-on-surface)); color: var(--ad-surface); }
     .ctrl[disabled] { opacity: 0.3; pointer-events: none; }
-    .progress { display: flex; align-items: center; gap: 10px; width: 100%; font-size: 11px; opacity: 0.85; font-variant-numeric: tabular-nums; }
-    .progress span { width: 40px; opacity: 0.6; }
+    .progress { display: flex; align-items: center; gap: 10px; width: 100%; font-size: var(--ad-fs-xs); opacity: 0.85; font-variant-numeric: tabular-nums; }
+    .progress span { width: 40px; opacity: var(--ad-o2); }
     .progress span:first-child { text-align: right; }
     .progress input { flex: 1; }
     .right { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
     .right .vol { width: 110px; }
     input[type=range] { accent-color: rgb(var(--ad-primary)); height: 4px; min-width: 0; cursor: pointer; margin: 0; }
     input[type=range][disabled] { opacity: 0.35; cursor: default; }
-    .message { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; font-size: 12px; white-space: nowrap;
+    .message { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; font-size: var(--ad-fs-s); white-space: nowrap;
       background: rgb(var(--ad-on-surface)); color: var(--ad-surface); }
 
     /* Narrow cards: tabs instead of the side, the bar in two lines */
@@ -434,7 +434,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       .music { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'side' 'main' 'bar'; }
       .side { position: static; max-height: none; padding: 6px; }
       nav { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
-      .nav { flex: 1; justify-content: center; gap: 6px; padding: 8px 10px; font-size: 13px; white-space: nowrap; }
+      .nav { flex: 1; justify-content: center; gap: 6px; padding: 8px 10px; font-size: var(--ad-fs-s); white-space: nowrap; }
       .lib-head, .libs { display: none; }
       .main { padding: 14px 14px 20px; min-height: 0; }
       .hero { flex-direction: column; align-items: flex-start; gap: 14px; }

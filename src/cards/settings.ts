@@ -61,27 +61,27 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     :host { display: block; container-type: inline-size; }
     button { all: unset; box-sizing: border-box; cursor: pointer; }
     button:focus-visible, input:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
-    .intro { font-size: 14px; opacity: 0.65; }
+    .intro { font-size: var(--ad-fs-m); opacity: var(--ad-o2); }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
     @container (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
     .panel { padding: 18px 20px 20px; height: auto; display: flex; flex-direction: column; gap: 18px; }
     .panel.wide { grid-row: span 2; }
-    h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-    .hint { font-size: 12px; opacity: 0.6; line-height: 1.4; }
+    h2 { margin: 0; font-size: var(--ad-fs-l); font-weight: 600; letter-spacing: -0.01em; }
+    .hint { font-size: var(--ad-fs-s); opacity: var(--ad-o2); line-height: 1.4; }
     .field { display: flex; flex-direction: column; gap: 8px; }
-    .label { font-size: 13px; font-weight: 600; opacity: 0.8; }
+    .label { font-size: var(--ad-fs-s); font-weight: 600; opacity: 0.8; }
 
     .seg { display: inline-flex; flex-wrap: wrap; align-self: flex-start; padding: 3px; gap: 2px; border-radius: 12px; background: rgba(var(--ad-on-surface), 0.07); }
-    .seg button { padding: 7px 14px; border-radius: 9px; font-size: 13px; }
+    .seg button { padding: 7px 14px; border-radius: 9px; font-size: var(--ad-fs-s); }
     .seg button[aria-pressed=true] { background: rgb(var(--ad-primary)); color: #fff; font-weight: 600; }
 
     .colors { display: flex; flex-wrap: wrap; gap: 10px; }
     .swatch { width: 30px; height: 30px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); }
     .swatch[aria-pressed=true] { box-shadow: 0 0 0 2px var(--ad-surface), 0 0 0 4px rgb(var(--ad-on-surface)); }
 
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; padding: 2px 0; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--ad-fs-m); padding: 2px 0; }
     .row .what { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .row ha-icon { --mdc-icon-size: 20px; opacity: 0.7; }
+    .row ha-icon { --mdc-icon-size: 20px; opacity: var(--ad-o2); }
     .switch { position: relative; flex: none; width: 42px; height: 24px; border-radius: 12px; background: rgba(var(--ad-on-surface), 0.18); transition: background 0.2s ease; }
     .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; }
     .switch[aria-checked=true] { background: rgb(var(--ad-primary)); }
@@ -91,37 +91,37 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     .favs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
     .favs li { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
     .favs li + li { border-top: 1px solid rgba(var(--ad-on-surface), 0.07); }
-    .favs ha-icon { --mdc-icon-size: 20px; opacity: 0.7; flex: none; }
-    .name { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; }
+    .favs ha-icon { --mdc-icon-size: 20px; opacity: var(--ad-o2); flex: none; }
+    .name { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: var(--ad-fs-m); }
     .name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .name .area { font-size: 12px; opacity: 0.55; }
+    .name .area { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
     .icon-btn { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; }
     .icon-btn:hover { background: rgba(var(--ad-on-surface), 0.08); }
     .icon-btn[disabled] { opacity: 0.25; pointer-events: none; }
     .icon-btn ha-icon { --mdc-icon-size: 18px; opacity: 0.8; }
-    .empty { font-size: 14px; opacity: 0.55; }
+    .empty { font-size: var(--ad-fs-m); opacity: var(--ad-o2); }
     input[type=search] {
-      all: unset; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 14px;
+      all: unset; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: 12px; font-size: var(--ad-fs-m);
       background: rgba(var(--ad-on-surface), 0.07);
     }
     .results { display: flex; flex-direction: column; }
     .result { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; }
     .result:hover { background: rgba(var(--ad-on-surface), 0.06); }
-    .result ha-icon { --mdc-icon-size: 20px; opacity: 0.7; }
+    .result ha-icon { --mdc-icon-size: 20px; opacity: var(--ad-o2); }
     .result .add { --mdc-icon-size: 18px; color: rgb(var(--ad-primary)); opacity: 1; }
 
     /* Above the panels, where the nav bar never covers it, whether it floats at the bottom or the top */
     .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; margin: 0 0 16px; }
     .actions .intro { margin: 0 auto 0 0; }
-    .actions .state { font-size: 13px; opacity: 0.65; }
-    .actions .error { flex-basis: 100%; font-size: 13px; color: rgb(var(--ad-error)); }
-    .primary { padding: 10px 20px; border-radius: 12px; background: rgb(var(--ad-primary)); color: #fff; font-weight: 600; font-size: 14px; }
+    .actions .state { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .actions .error { flex-basis: 100%; font-size: var(--ad-fs-s); color: rgb(var(--ad-error)); }
+    .primary { padding: 10px 20px; border-radius: 12px; background: rgb(var(--ad-primary)); color: #fff; font-weight: 600; font-size: var(--ad-fs-m); }
     .primary[disabled] { opacity: 0.4; pointer-events: none; }
-    .link { padding: 10px 12px; border-radius: 12px; font-size: 14px; color: rgb(var(--ad-primary)); }
+    .link { padding: 10px 12px; border-radius: 12px; font-size: var(--ad-fs-m); color: rgb(var(--ad-primary)); }
     .link:hover { background: rgba(var(--ad-primary), 0.1); }
 
     select {
-      all: unset; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: 12px; font-size: 14px; cursor: pointer;
+      all: unset; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: 12px; font-size: var(--ad-fs-m); cursor: pointer;
       background: rgba(var(--ad-on-surface), 0.07);
     }
     select option { color: #111; }
