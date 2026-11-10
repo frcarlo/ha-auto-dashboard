@@ -44,15 +44,17 @@ const fullWidth = (cards: Card[]): Section => ({ type: 'grid', column_span: MAX_
 /**
  * Own cards at the top or the bottom of a page, each in a section of its own, so they sit side by side where there is
  * room and stack on a phone. `column_span` on a card (1 to 4) sets how wide its section is; it is taken off the card.
+ * A horizontal stack already puts its cards side by side, so without a column_span it gets the whole width.
  * The card fills its section unless it brings its own grid_options: stacks and many custom cards would take
  * only part of it otherwise.
  */
 export function ownSections(cards: Card[] | undefined, span?: number): Section[] {
   return (cards ?? []).map(card => {
     const { column_span, ...rest } = card
-    const width = Math.min(MAX_COLUMNS, Math.max(1, Math.round(Number(column_span) || span || 1)))
+    const preset = column_span ?? (rest.type === 'horizontal-stack' ? MAX_COLUMNS : span)
+    const width = Math.min(MAX_COLUMNS, Math.max(1, Math.round(Number(preset) || 1)))
     const filled = rest.grid_options || rest.layout_options ? rest : { ...rest, grid_options: { columns: 'full' } }
-    return { type: 'grid', ...(column_span !== undefined || span ? { column_span: width } : {}), cards: [filled] }
+    return { type: 'grid', ...(preset !== undefined ? { column_span: width } : {}), cards: [filled] }
   })
 }
 

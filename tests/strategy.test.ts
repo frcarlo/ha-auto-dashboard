@@ -669,6 +669,11 @@ describe('own cards side by side', () => {
     ])
   })
 
+  it('gives a horizontal stack the whole width unless it says otherwise', () => {
+    expect(ownSections([{ type: 'horizontal-stack', cards: [] }, { type: 'horizontal-stack', cards: [], column_span: 2 }], 2).map(s => s.column_span)).toEqual([4, 2])
+    expect(ownSections([{ type: 'horizontal-stack', cards: [] }])[0]!.column_span).toBe(4)
+  })
+
   it('puts several cards next to each other below the header', async () => {
     const pages = { maintenance: { cards: { top: [{ type: 'gauge' }, { type: 'markdown', content: 'x' }] } } }
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', pages } as any, createHass(true))
