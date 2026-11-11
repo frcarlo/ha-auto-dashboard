@@ -37,6 +37,16 @@ describe('generateDashboard', () => {
     expect(sections.some(s => s.cards[0]?.heading === 'Obergeschoss')).toBe(false)
   })
 
+  it('opens on the start floor when it is one of the tabs', async () => {
+    const tabsOf = async (floor_start: string) => {
+      const { views } = await generateDashboard({ type: 'custom:auto-dashboard', floor_tabs: true, floor_start }, createHass(true))
+      return (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).find(c => c.type === 'custom:ad-floor-tabs')!
+    }
+    expect((await tabsOf('eg')).start).toBe('eg')
+    expect((await tabsOf('no_floor')).floors.at(-1).id).toBe('no_floor')
+    expect((await tabsOf('dach')).start).toBeUndefined()
+  })
+
   it('keeps one floor as it is, tabs or not', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', floor_tabs: true, floors: ['og'] }, createHass(true))
     const cards = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)

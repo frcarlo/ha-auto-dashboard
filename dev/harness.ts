@@ -56,6 +56,8 @@ const config: StrategyConfig = {
   nav_position: (params.get('nav') ?? undefined) as StrategyConfig['nav_position'],
   // ?tabs shows the floors as tabs
   floor_tabs: params.has('tabs') || undefined,
+  // ?tabs=eg opens on that floor every time
+  floor_start: params.get('tabs') || undefined,
   // ?face=analog&after=3 shows that face after three seconds without a touch
   face: params.has('face') ? { after: Number(params.get('after') ?? 3), style: (params.get('face') || 'clock') as NonNullable<StrategyConfig['face']>['style'] } : undefined,
   // ?as=leni&users={"leni":{"access":"read_only"}} views the dashboard as a non-admin with that rule

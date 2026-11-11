@@ -1,5 +1,6 @@
 // The rooms on Home one floor at a time, with the floors as tabs above them, for houses where all floors
-// at once push the rooms of the lower ones out of view. The tab picked last stays picked on this device.
+// at once push the rooms of the lower ones out of view. Home opens on the start floor if one is set,
+// otherwise on the one picked last on this device.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
@@ -16,6 +17,8 @@ interface FloorTab {
 
 interface FloorTabsConfig extends BaseConfig {
   floors: FloorTab[]
+  /** The floor to open on every load, instead of the one picked last */
+  start?: string
 }
 
 const storageKey = () => `ad-floor-tab:${location.pathname.split('/')[1] ?? ''}`
@@ -70,7 +73,7 @@ export class AdFloorTabs extends BaseCard<FloorTabsConfig> {
 
   private get selected(): FloorTab {
     const floors = this.config!.floors
-    return floors.find(f => f.id === (this.current ?? stored())) ?? floors[0]!
+    return floors.find(f => f.id === (this.current ?? this.config!.start ?? stored())) ?? floors[0]!
   }
 
   private pick(id: string) {

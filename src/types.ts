@@ -203,6 +203,8 @@ export interface StrategyConfig extends Look {
   nav_position?: NavPosition
   /** Home shows one floor at a time, the floors as tabs above the rooms; per user in the settings */
   floor_tabs?: boolean
+  /** With floor_tabs, the floor Home opens on (a floor id); unset = the one picked last on this device */
+  floor_start?: string
   /** Pages left out for everyone, admins included; per user under users */
   hide_pages?: PagePath[]
   users?: Record<string, UserRule>

@@ -14,14 +14,14 @@ interface SettingsConfig extends BaseConfig {
   /** The dashboard's url path: settings are kept per dashboard */
   dashboard: string
   /** What the dashboard has set, before the user's own settings */
-  base: Required<Pick<PersonalSettings, 'theme' | 'glass' | 'nav_position' | 'favorites'>> & { primary_color?: string; face: FaceConfig | false; floor_tabs?: boolean }
+  base: Required<Pick<PersonalSettings, 'theme' | 'glass' | 'nav_position' | 'favorites'>> & { primary_color?: string; face: FaceConfig | false; floor_tabs?: boolean; floor_start?: string }
   /** The pages of the nav bar the user may switch off */
   pages: { path: string; icon: string; label: string }[]
   /** The admin switched the face off for this user */
   face_locked?: boolean
   areas?: string[]
-  /** More than one floor on Home, so floor tabs make sense */
-  many_floors?: boolean
+  /** The floors on Home, when there is more than one, so floor tabs make sense */
+  floors?: { id: string; name: string }[]
   /** The rooms shown on this dashboard, in their order, for favorite rooms */
   rooms?: string[]
   hide_domains?: string[]
@@ -212,9 +212,23 @@ export class AdSettings extends BaseCard<SettingsConfig> {
       ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
         [['bottom', this.l('ed.nav_bottom')], ['top', this.l('ed.nav_top')], ['left', this.l('ed.nav_left')], ['right', this.l('ed.nav_right')]],
         d.nav_position ?? 'bottom', nav_position => this.set({ nav_position })))}
-      ${this.config!.many_floors ? this.switchRow(html`${this.l('ed.floor_tabs')}`, !!d.floor_tabs, this.l('ed.floor_tabs'), floor_tabs => this.set({ floor_tabs })) : nothing}
+      ${this.renderFloors(d)}
       ${this.renderFace(d)}
     </section>`
+  }
+
+  /** Floors as tabs, and which one Home opens on */
+  private renderFloors(d: PersonalSettings) {
+    const floors = this.config!.floors
+    if (!floors?.length) return nothing
+    const start = floors.some(f => f.id === d.floor_start) ? d.floor_start! : ''
+    return html`
+      ${this.switchRow(html`${this.l('ed.floor_tabs')}`, !!d.floor_tabs, this.l('ed.floor_tabs'), floor_tabs => this.set({ floor_tabs }))}
+      ${d.floor_tabs ? this.field(this.l('set.floor_start'), this.seg<string>(
+        [['', this.l('set.floor_last')], ...floors.map(f => [f.id, f.name] as [string, string])], start,
+        // "Last picked" over a dashboard that sets a floor needs '' to say so; otherwise nothing is stored
+        id => this.set({ floor_start: id || (this.config!.base.floor_start ? '' : undefined) })),
+        this.l('set.floor_start_hint')) : nothing}`
   }
 
   private renderFace(d: PersonalSettings) {

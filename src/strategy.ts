@@ -25,6 +25,8 @@ type Section = { type: 'grid'; column_span?: number; cards: Card[] }
 type View = Record<string, unknown>
 
 const MAX_COLUMNS = 4
+/** The tab of the rooms without a floor */
+const NO_FLOOR = 'no_floor'
 
 const areaPath = (areaId: string) => `area-${areaId}`
 const dashboardPath = () => (typeof location === 'undefined' ? undefined : location.pathname.split('/')[1]) || 'lovelace'
@@ -93,6 +95,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   }
   const floors = floorsWithAreas(hass, config)
   const areas = floors.flatMap(f => f.areas)
+  // The floors as the tabs and the settings name them
+  const floorTabs = floors.map(g => ({ id: g.floor?.floor_id ?? NO_FLOOR, name: g.floor?.name ?? t(hass, 'other_rooms') }))
   // areas/floors narrow the whole dashboard, e.g. to one room for a wall tablet
   const scoped = !!(config.areas?.length || config.floors?.length)
   if (scoped && !areas.length) {
@@ -375,8 +379,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       // Floors as tabs: one floor at a time across the page
       ...(!singleRoom && config.floor_tabs && floors.length > 1 ? [fullWidth([{
         type: 'custom:ad-floor-tabs', ...look,
+        ...(config.floor_start && floorTabs.some(f => f.id === config.floor_start) ? { start: config.floor_start } : {}),
         floors: floors.map(group => ({
-          id: group.floor?.floor_id ?? '', name: group.floor?.name ?? t(hass, 'other_rooms'),
+          id: group.floor?.floor_id ?? NO_FLOOR, name: group.floor?.name ?? t(hass, 'other_rooms'),
           icon: group.floor ? group.floor.icon || floorIcon(group.floor.level) : 'mdi:home-outline',
           rooms: group.areas.map(roomCard),
         })),
@@ -438,13 +443,13 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       base: {
         theme: baseConfig.theme ?? 'auto', glass: !!baseConfig.glass, primary_color: isHexColor(baseConfig.primary_color) ? baseConfig.primary_color : undefined,
         nav_position: baseConfig.nav_position ?? 'bottom', face: faceFor(baseConfig, rule) ?? false, favorites: baseConfig.favorites ?? [],
-        floor_tabs: !!baseConfig.floor_tabs,
+        floor_tabs: !!baseConfig.floor_tabs, ...(baseConfig.floor_start ? { floor_start: baseConfig.floor_start } : {}),
       },
       pages: navItems.filter(i => i.path !== 'home').map(({ path, icon, label }) => ({ path, icon, label })),
       ...(rule?.face === false ? { face_locked: true } : {}),
       ...(areaIds ? { areas: areaIds } : {}), ...hideOpts,
       rooms: areas.map(a => a.area_id),
-      ...(floors.length > 1 ? { many_floors: true } : {}),
+      ...(floors.length > 1 ? { floors: floorTabs } : {}),
     }]),
   ])
 

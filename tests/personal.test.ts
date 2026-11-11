@@ -29,6 +29,9 @@ describe('own settings', () => {
   it('let the user show the floors as tabs or not, whatever the dashboard says', () => {
     expect(withPersonal({ ...base, floor_tabs: true }, { floor_tabs: false }).floor_tabs).toBe(false)
     expect(withPersonal(base, { floor_tabs: true }).floor_tabs).toBe(true)
+    // '' picks the floor last chosen on the device, over the dashboard's start floor
+    expect(withPersonal({ ...base, floor_start: 'eg' }, { floor_start: '' }).floor_start).toBe('')
+    expect(withPersonal({ ...base, floor_start: 'eg' }, { floor_start: 'og' }).floor_start).toBe('og')
   })
 
   it('the admin switching the face off wins; otherwise the user may switch it off or change it', () => {
