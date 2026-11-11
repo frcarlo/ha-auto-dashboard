@@ -9,6 +9,8 @@ export interface PersonalSettings {
   glass?: boolean
   primary_color?: string
   nav_position?: NavPosition
+  /** The floors on Home as tabs, one at a time */
+  floor_tabs?: boolean
   /** The face for this user; false switches it off */
   face?: FaceConfig | false
   /** Pages this user doesn't need, on top of what the dashboard hides */
@@ -49,7 +51,7 @@ export function withPersonal(config: StrategyConfig, personal?: PersonalSettings
   const pick = <K extends keyof PersonalSettings>(key: K) => (personal[key] !== undefined ? { [key]: personal[key] } : {})
   return {
     ...config,
-    ...pick('theme'), ...pick('glass'), ...pick('primary_color'), ...pick('nav_position'), ...pick('favorites'),
+    ...pick('theme'), ...pick('glass'), ...pick('primary_color'), ...pick('nav_position'), ...pick('floor_tabs'), ...pick('favorites'),
     ...(personal.pages ? { pages: mergePages(config.pages, personal.pages) } : {}),
   }
 }

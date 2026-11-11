@@ -201,6 +201,8 @@ export interface StrategyConfig extends Look {
   /** Only areas on these floors */
   floors?: string[]
   nav_position?: NavPosition
+  /** Home shows one floor at a time, the floors as tabs above the rooms; per user in the settings */
+  floor_tabs?: boolean
   /** Pages left out for everyone, admins included; per user under users */
   hide_pages?: PagePath[]
   users?: Record<string, UserRule>

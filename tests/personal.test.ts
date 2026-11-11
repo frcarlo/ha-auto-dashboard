@@ -26,6 +26,11 @@ describe('own settings', () => {
     expect(withPersonal(base, undefined)).toBe(base)
   })
 
+  it('let the user show the floors as tabs or not, whatever the dashboard says', () => {
+    expect(withPersonal({ ...base, floor_tabs: true }, { floor_tabs: false }).floor_tabs).toBe(false)
+    expect(withPersonal(base, { floor_tabs: true }).floor_tabs).toBe(true)
+  })
+
   it('the admin switching the face off wins; otherwise the user may switch it off or change it', () => {
     expect(faceFor(base, { face: false }, { face: { style: 'analog' } })).toBeUndefined()
     expect(faceFor(base, undefined, { face: false })).toBeUndefined()

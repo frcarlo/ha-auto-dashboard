@@ -40,6 +40,9 @@ function heading(text: string, icon?: string | null, navigateTo?: string, style:
 }
 
 const fullWidth = (cards: Card[]): Section => ({ type: 'grid', column_span: MAX_COLUMNS, cards })
+/** HA's own floor icons by level, for floors without an icon of their own */
+const floorIcon = (level?: number | null) =>
+  level === undefined || level === null ? 'mdi:layers-outline' : level < 0 ? 'mdi:home-floor-negative-1' : `mdi:home-floor-${Math.min(3, level)}`
 
 /**
  * Own cards at the top or the bottom of a page, each in a section of its own, so they sit side by side where there is
@@ -369,8 +372,17 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       ...(singleRoom ? [] : favoritesSection(homeFavorites)),
       // One room: its content right on the home page instead of a single room card
       ...(singleRoom ? roomSections(singleRoom) : []),
+      // Floors as tabs: one floor at a time across the page
+      ...(!singleRoom && config.floor_tabs && floors.length > 1 ? [fullWidth([{
+        type: 'custom:ad-floor-tabs', ...look,
+        floors: floors.map(group => ({
+          id: group.floor?.floor_id ?? '', name: group.floor?.name ?? t(hass, 'other_rooms'),
+          icon: group.floor ? group.floor.icon || floorIcon(group.floor.level) : 'mdi:home-outline',
+          rooms: group.areas.map(roomCard),
+        })),
+      }])] : []),
       // Span 2: room cards (6 columns) sit 4-up on wide screens and 2-up on phones
-      ...(singleRoom ? [] : floors).map((group): Section => ({
+      ...(singleRoom || (config.floor_tabs && floors.length > 1) ? [] : floors).map((group): Section => ({
         type: 'grid',
         column_span: 2,
         cards: [
@@ -426,11 +438,13 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       base: {
         theme: baseConfig.theme ?? 'auto', glass: !!baseConfig.glass, primary_color: isHexColor(baseConfig.primary_color) ? baseConfig.primary_color : undefined,
         nav_position: baseConfig.nav_position ?? 'bottom', face: faceFor(baseConfig, rule) ?? false, favorites: baseConfig.favorites ?? [],
+        floor_tabs: !!baseConfig.floor_tabs,
       },
       pages: navItems.filter(i => i.path !== 'home').map(({ path, icon, label }) => ({ path, icon, label })),
       ...(rule?.face === false ? { face_locked: true } : {}),
       ...(areaIds ? { areas: areaIds } : {}), ...hideOpts,
       rooms: areas.map(a => a.area_id),
+      ...(floors.length > 1 ? { many_floors: true } : {}),
     }]),
   ])
 

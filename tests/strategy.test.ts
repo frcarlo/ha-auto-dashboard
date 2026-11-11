@@ -23,6 +23,27 @@ describe('generateDashboard', () => {
     expect(new Set(rooms).size).toBe(rooms.length)
   })
 
+  it('with floor_tabs puts the floors as tabs into one card across the page instead', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', floor_tabs: true }, createHass(true))
+    const sections = views[0]!.sections as { column_span?: number; cards: Record<string, any>[] }[]
+    const tabs = sections.filter(s => s.cards.some(c => c.type === 'custom:ad-floor-tabs'))
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0]!.column_span).toBe(4)
+    const floors = tabs[0]!.cards[0]!.floors as { name: string; icon: string; rooms: { type: string }[] }[]
+    expect(floors.map(f => [f.name, f.icon])).toEqual([
+      ['Obergeschoss', 'mdi:home-floor-1'], ['Erdgeschoss', 'mdi:home-floor-0'], ['Keller', 'mdi:home-floor-b'], ['Weitere Räume', 'mdi:home-outline'],
+    ])
+    expect(floors.every(f => f.rooms.length && f.rooms.every(r => r.type === 'custom:ad-room-card'))).toBe(true)
+    expect(sections.some(s => s.cards[0]?.heading === 'Obergeschoss')).toBe(false)
+  })
+
+  it('keeps one floor as it is, tabs or not', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', floor_tabs: true, floors: ['og'] }, createHass(true))
+    const cards = (views[0]!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards)
+    expect(cards.some(c => c.type === 'custom:ad-floor-tabs')).toBe(false)
+    expect(cards.some(c => c.type === 'custom:ad-room-card')).toBe(true)
+  })
+
   it('shows the climate page as one card per room with its thermostat and readings', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const cards = (views.find(v => v.path === 'climate')!.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])

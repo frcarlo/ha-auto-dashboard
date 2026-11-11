@@ -1,7 +1,7 @@
 // Keeps the saved strategy config as small as hand-written YAML: no defaults, no empty lists.
 import type { PopupRule, RoomSettings, StrategyConfig, UserRule } from './types'
 
-const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', ha_colors: true, forecast_days: 3 }
+const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', floor_tabs: false, ha_colors: true, forecast_days: 3 }
 const RULE_DEFAULTS: Partial<Record<string, unknown>> = { access: 'full', settings: true }
 
 const isEmpty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)
