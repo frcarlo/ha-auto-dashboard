@@ -47,8 +47,14 @@ export class AdFloorTabs extends BaseCard<FloorTabsConfig> {
     .tab:hover { background: rgba(var(--ad-on-surface), 0.12); }
     .tab:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
     .tab ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
-    .tab[aria-selected=true] { background: rgb(var(--ad-primary)); color: #fff; }
-    .tab[aria-selected=true] ha-icon { opacity: 1; }
+    /*
+     * Tinted like the nav bar's current page, not filled: a light accent (yellow, mint) would glare and swallow
+     * the name. The ring keeps it apart from the others on a busy background picture.
+     */
+    .tab[aria-selected=true] {
+      background: rgba(var(--ad-primary), 0.22); box-shadow: inset 0 0 0 1.5px rgba(var(--ad-primary), 0.6); font-weight: 600;
+    }
+    .tab[aria-selected=true] ha-icon { opacity: 1; color: rgb(var(--ad-primary)); }
     /* Lights on somewhere on that floor */
     .lit { width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--ad-warning)); box-shadow: 0 0 6px rgba(var(--ad-warning), 0.8); }
     /* The same sizes HA gives the room cards in a floor section: two to a column, two rows high */
