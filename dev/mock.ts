@@ -272,6 +272,15 @@ const deviceDefs: DeviceDef[] = [
       ['sensor.galaxy_a35_battery_level', '12', { friendly_name: 'Galaxy A35 Battery level', device_class: 'battery', unit_of_measurement: '%' }],
     ],
   },
+  // Gas and water meters read by an optical sensor, with their flow
+  {
+    id: 'dev-meters', name: 'Zähler', area: 'waschkeller', platform: 'esphome', entities: [
+      ['sensor.gaszahler_verbrauch', '5359.96', { friendly_name: 'Gaszähler Verbrauch', device_class: 'gas', state_class: 'total_increasing', unit_of_measurement: 'm³' }],
+      ['sensor.gaszahler_durchfluss', '0.42', { friendly_name: 'Gaszähler Durchfluss', device_class: 'volume_flow_rate', state_class: 'measurement', unit_of_measurement: 'm³/h' }],
+      ['sensor.wasserzahler_verbrauch', '714.357', { friendly_name: 'Wasserzähler Verbrauch', device_class: 'water', state_class: 'total_increasing', unit_of_measurement: 'm³' }],
+      ['sensor.wasserzahler_durchfluss', '0', { friendly_name: 'Wasserzähler Durchfluss', device_class: 'volume_flow_rate', state_class: 'measurement', unit_of_measurement: 'L/min' }],
+    ],
+  },
   // Parcel Aggregator: one list per kind, the parcels in an attribute; the UPS integration lists its own parcel again
   {
     id: 'dev-parcels', name: 'Parcel Aggregator', area: '', platform: 'parcel_aggregator', entities: [
@@ -600,6 +609,8 @@ export function createHass(dark: boolean): HomeAssistant {
         energy_sources: [
           { type: 'grid', stat_rate: 'sensor.netz_leistung' },
           { type: 'solar', stat_rate: 'sensor.pv_leistung' },
+          { type: 'gas', stat_energy_from: 'sensor.gaszahler_verbrauch', stat_rate: 'sensor.gaszahler_durchfluss', number_energy_price: 0.9 },
+          { type: 'water', stat_energy_from: 'sensor.wasserzahler_verbrauch', stat_rate: 'sensor.wasserzahler_durchfluss', number_energy_price: null },
         ],
       } as T
       if (msg.type === 'config/label_registry/list') return [
@@ -822,9 +833,26 @@ function systemResponse(msg: Record<string, unknown>): unknown {
   return undefined
 }
 
-/** Hourly means of the last day: a slow wave around the current value, a little noise on top */
+/** Hourly means of the last day: a slow wave around the current value, a little noise on top. Meters: their change per hour or month */
 function statistics(msg: Record<string, unknown>, states: Record<string, { state: string }>) {
   const start = Date.parse(String(msg.start_time))
+  if ((msg.types as string[]).includes('change')) {
+    const out: Record<string, { start: number; end: number; change: number }[]> = {}
+    for (const id of msg.statistic_ids as string[]) {
+      const water = id.includes('wasser')
+      if (msg.period === 'month') { out[id] = [{ start, end: Date.now(), change: water ? 3.84 : 41.2 }]; continue }
+      const hours = Math.max(1, Math.ceil((Date.now() - start) / 3600_000))
+      out[id] = Array.from({ length: hours }, (_, i) => {
+        const at = new Date(start + i * 3600_000)
+        const h = at.getHours()
+        // Heating mornings and evenings; water at breakfast, lunch and the evening
+        const change = water ? ([7, 8, 12, 19, 20].includes(h) ? 0.02 + (h % 3) * 0.015 : h > 6 && h < 23 && i % 4 === 0 ? 0.005 : 0)
+          : h >= 6 && h <= 9 ? 0.35 + (h - 6) * 0.05 : h >= 17 && h <= 22 ? 0.25 : h < 5 ? 0.04 : 0.12
+        return { start: at.getTime(), end: at.getTime() + 3600_000, change }
+      })
+    }
+    return out
+  }
   const out: Record<string, { start: number; end: number; mean: number }[]> = {}
   for (const id of msg.statistic_ids as string[]) {
     const now = Number(states[id]?.state)

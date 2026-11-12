@@ -63,6 +63,8 @@ export interface HomeAssistant {
   language: string
   locale?: { language: string }
   user?: { id: string; name: string; is_admin?: boolean }
+  /** HA's core settings; the currency for prices */
+  config?: { currency?: string }
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>
   callWS?<T>(msg: Record<string, unknown>): Promise<T>
   /** HA's REST API, e.g. calendar events */

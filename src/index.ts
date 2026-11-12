@@ -1,6 +1,7 @@
 import { generateDashboard } from './strategy'
 import { AdTile } from './cards/tile'
 import { AdRoomCard } from './cards/room-card'
+import { AdMeters } from './cards/meters'
 import { AdFloorTabs } from './cards/floor-tabs'
 import { AdStatusBar } from './cards/status-bar'
 import { AdActivity } from './cards/activity'
@@ -65,6 +66,7 @@ define(`ll-strategy-dashboard-${STRATEGY_TYPE}`, class extends HTMLElement {
 
 define('ad-tile', AdTile)
 define('ad-room-card', AdRoomCard)
+define('ad-meters', AdMeters)
 define('ad-floor-tabs', AdFloorTabs)
 define('ad-status-bar', AdStatusBar)
 define('ad-header', AdHeader)

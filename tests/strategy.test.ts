@@ -279,13 +279,23 @@ describe('groups by function and now playing', () => {
 describe('energy, maintenance, cameras and lists', () => {
   const cards = (view: Record<string, unknown>) => (view.sections as { cards: Record<string, any>[] }[]).flatMap(s => s.cards).flatMap(c => c.type === 'custom:ad-row' ? c.cards : [c])
 
-  it('adds energy and maintenance pages, linked from Home but not in the nav', async () => {
+  it('adds energy and maintenance pages, energy in the nav and both linked from Home', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     expect(views.map(v => v.path)).toEqual(expect.arrayContaining(['energy', 'maintenance']))
     const home = cards(views[0]!)
-    expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).not.toContain('energy')
+    expect(home.find(c => c.type === 'custom:ad-nav-bar')!.items.map((i: any) => i.path)).toContain('energy')
     expect(home.find(c => c.type === 'custom:ad-status-bar')!.links).toMatchObject({ battery: 'maintenance', unavailable: 'maintenance' })
     expect(home.find(c => c.type === 'custom:ad-house-info')!.links).toMatchObject({ energy: 'energy', climate: 'climate' })
+  })
+
+  it('takes gas and water from the energy settings, for Home and the energy page', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const meters = [
+      { kind: 'gas', meters: ['sensor.gaszahler_verbrauch'], rates: ['sensor.gaszahler_durchfluss'], price: 0.9 },
+      { kind: 'water', meters: ['sensor.wasserzahler_verbrauch'], rates: ['sensor.wasserzahler_durchfluss'] },
+    ]
+    expect(cards(views[0]!).find(c => c.type === 'custom:ad-house-info')!.meters).toEqual(meters)
+    expect(cards(views.find(v => v.path === 'energy')!).find(c => c.type === 'custom:ad-meters')!.meters).toEqual(meters)
   })
 
   it('energy shows each room with a 24-hour history of all its power sensors', async () => {

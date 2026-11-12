@@ -13,6 +13,7 @@ import { findCameras } from './cameras'
 import { findSchools, schoolIds, type School } from './school'
 import { co2Sensors, findEventSources } from './events'
 import { resolvePopups } from './popups'
+import { meterSources } from './meters'
 import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
@@ -174,7 +175,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
   const sources = powerSources(hass, prefs)
   const sourceOpts = sources ? { power_sources: sources } : {}
-  const hasEnergy = pageAllowed('energy') && (all.some(isPower) || !!sources)
+  // Gas and water: the meters HA's energy settings name, used today on Home, more on the energy page
+  const meters = config.hide_domains?.includes('sensor') ? [] : meterSources(hass, prefs)
+  const hasPower = all.some(isPower) || !!sources
+  const hasEnergy = pageAllowed('energy') && (hasPower || meters.length > 0)
   const hasMaintenance = pageAllowed('maintenance')
   // The weather card takes over outside (and the weather next to the clock); inside stays a tile next to power
   const weather = weatherEntity(hass, config)
@@ -251,6 +255,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(hasMusic ? [{ path: 'music', icon: 'mdi:music', label: t(hass, 'music') }] : []),
     ...(calendars.length ? [{ path: 'calendar', icon: 'mdi:calendar-month-outline', label: t(hass, 'calendar') }] : []),
     ...(hasLists ? [{ path: 'lists', icon: 'mdi:clipboard-list-outline', label: t(hass, 'todos') }] : []),
+    ...(hasEnergy ? [{ path: 'energy', icon: 'mdi:lightning-bolt-outline', label: t(hass, 'energy') }] : []),
     // Admins reach maintenance from the bar; others through the battery and unavailable chips
     ...(hasMaintenance && hass.user?.is_admin ? [{ path: 'maintenance', icon: 'mdi:wrench-outline', label: t(hass, 'maintenance') }] : []),
   ]
@@ -360,7 +365,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           }] : []),
           ...(showClimate || hasEnergy ? [{
             type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outsideTile.length ? { outdoor: outsideTile } : {}), ...hideOpts, ...look,
-            ...sourceOpts, links: { climate: has('climate'), energy: hasEnergy ? 'energy' : undefined },
+            ...sourceOpts, ...(meters.length ? { meters } : {}), links: { climate: has('climate'), energy: hasEnergy && !ownHidden.has('energy') ? 'energy' : undefined },
           }] : []),
         ], { widths: [2, 1] }),
         // Now playing hides itself while nothing plays
@@ -457,7 +462,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const powerOpts = { ...hideOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
     // The house sum spans the whole page, however many columns the floors below get
-    fullWidth([{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }]),
+    ...(hasPower ? [fullWidth([{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }])] : []),
+    // Gas and water side by side: today, this month, the cost, the flow and the last day per hour
+    ...(meters.length ? [fullWidth([heading(t(hass, 'meter.heading'), 'mdi:gauge'), { type: 'custom:ad-meters', meters, ...look }])] : []),
     ...floors.map((group): Section => {
       const cards = group.areas.flatMap(area => {
         const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)

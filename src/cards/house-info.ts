@@ -1,10 +1,13 @@
-// House at a glance on Home: indoor climate (average of the rooms), outdoor climate (outdoor areas), current power.
+// House at a glance on Home: indoor climate (average of the rooms), outdoor climate (outdoor areas), current power,
+// and gas and water used today.
 // Each tile leads to the page with the details.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
 import { averageClimate, entityIndex, hideOf, housePower, roomPower, sourceIds, type PowerSources } from '../model'
+import { formatVolume, loadUsage, meterFlow, meterUnit, usageFresh, usageOf, type Meter } from '../meters'
 import { tokens } from '../styles/tokens'
+import { METER_ICONS } from './meters'
 import type { AreaRegistryEntry } from '../types'
 
 interface HouseInfoConfig extends BaseConfig {
@@ -15,6 +18,8 @@ interface HouseInfoConfig extends BaseConfig {
   hide_labels?: string[]
   hide_entities?: string[]
   power_sources?: PowerSources
+  /** Gas and water from HA's energy settings */
+  meters?: Meter[]
   /** View paths the tiles open */
   links?: { climate?: string; energy?: string }
 }
@@ -69,7 +74,27 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
     return this.areas([...this.config!.areas, ...(this.config!.outdoor ?? [])]).flatMap(area => [
       ...(index.get(area.area_id) ?? []),
       ...[area.temperature_entity_id, area.humidity_entity_id].filter((id): id is string => !!id),
-    ]).concat(sourceIds(this.config!.power_sources))
+    ]).concat(sourceIds(this.config!.power_sources), (this.config!.meters ?? []).flatMap(m => [...m.meters, ...(m.rates ?? [])]))
+  }
+
+  private get meterIds() {
+    return (this.config!.meters ?? []).flatMap(m => m.meters)
+  }
+
+  protected updated() {
+    if (!this.meterIds.length || usageFresh(this.meterIds)) return
+    void loadUsage(this.hass!, this.meterIds).then(() => this.requestUpdate())
+  }
+
+  /** Used today, and the flow while something runs */
+  private meter(meter: Meter) {
+    const usage = usageOf(meter.meters)
+    if (!usage) return nothing
+    const lang = this.hass!.locale?.language ?? this.hass!.language
+    const v = formatVolume(usage.today, meterUnit(this.hass!, meter), meter.kind, lang)
+    const flow = meterFlow(this.hass!, meter)
+    return this.tile(METER_ICONS[meter.kind], t(this.hass, `meter.${meter.kind}_today`), html`${v.value}<small>${v.unit}</small>${flow && flow.value > 0
+      ? html`<span class="hum">${new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(flow.value)} ${flow.unit}</span>` : nothing}`, this.config!.links?.energy)
   }
 
   private tile(icon: string, label: string, value: unknown, link?: string) {
@@ -98,6 +123,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
       ${this.climate('mdi:home-thermometer-outline', t(this.hass, 'inside'), c.areas, c.links?.climate)}
       ${c.outdoor?.length ? this.climate('mdi:tree-outline', t(this.hass, 'outside'), c.outdoor) : nothing}
       ${rooms.length || house ? this.tile('mdi:flash', t(this.hass, 'power'), html`${power.value}<small>${power.unit}</small>`, c.links?.energy) : nothing}
+      ${(c.meters ?? []).map(m => this.meter(m))}
     </div>`
   }
 }
