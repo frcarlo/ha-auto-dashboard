@@ -24,6 +24,13 @@ export interface HouseOptions {
   onFloor?: (floorId: string) => void
   floorPressed?: (floorId: string) => boolean
   outsideLabel: string
+  /**
+   * The tool in use: only its mark is drawn in full, the others as small icons. Otherwise a room picked
+   * with one tool looks just as picked under every other tool.
+   */
+  active?: RoomMark
+  /** Rooms the dashboard leaves out anyway, because other rooms or floors are shown alone: drawn faded */
+  faded?: (areaId: string) => boolean
 }
 
 function storeys(hass: HomeAssistant) {
@@ -39,10 +46,12 @@ export function house(o: HouseOptions): TemplateResult {
   const { inside, outside } = storeys(o.hass)
   const room = (area: AreaRegistryEntry) => {
     const marks = o.marks(area.area_id)
+    const full = o.active ? marks.filter(m => m === o.active) : marks
+    const faded = !!o.faded?.(area.area_id)
     const spoken = marks.map(o.markLabel).join(', ')
-    return html`<button class="room ${marks.join(' ')}" aria-pressed=${marks.length > 0}
+    return html`<button class="room ${full.join(' ')} ${faded ? 'faded' : ''}" aria-pressed=${full.length > 0}
       aria-label=${spoken ? `${area.name}: ${spoken}` : area.name} @click=${() => o.onRoom(area.area_id)}>
-      ${marks.map(m => MARK_ICONS[m] ? html`<ha-icon icon=${MARK_ICONS[m]}></ha-icon>` : nothing)}${area.name}
+      ${marks.map(m => MARK_ICONS[m] ? html`<ha-icon class=${full.includes(m) ? '' : 'aside'} icon=${MARK_ICONS[m]}></ha-icon>` : nothing)}${area.name}
     </button>`
   }
   const name = (floor: FloorRegistryEntry) => o.onFloor
@@ -77,6 +86,10 @@ export const houseStyles = css`
     border: 1px solid var(--ad-line); background: var(--card-background-color, transparent);
   }
   .room ha-icon { --mdc-icon-size: 15px; }
+  /* A mark set with another tool: there, but not what this tool changes */
+  .room ha-icon.aside { opacity: 0.55; }
+  /* Not on the dashboard, because other rooms or floors are shown alone */
+  .room.faded:not(.only) { opacity: 0.45; }
   .room:hover { border-color: color-mix(in srgb, var(--primary-text-color, #e5e7eb) 45%, transparent); }
   .room:focus-visible, .storey-name:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 2px; }
   .room.hidden { border-style: dashed; background: transparent; color: var(--secondary-text-color, #94a3b8); text-decoration: line-through; }

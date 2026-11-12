@@ -45,6 +45,7 @@ const TABS: [Tab, Key][] = [['look', 'ed.look'], ['home', 'ed.home'], ['house', 
 /** Room roles set in the house drawing, and the config list each one writes */
 type Tool = 'hide' | 'outdoor' | 'only'
 const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide: 'hide_areas', outdoor: 'outdoor_areas', only: 'areas' }
+const TOOL_MARKS: Record<Tool, RoomMark> = { hide: 'hidden', outdoor: 'outdoor', only: 'only' }
 
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
 const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'battery', 'unavailable', 'presence', 'school',
@@ -156,6 +157,9 @@ export class AdStrategyEditor extends LitElement {
     .tab[aria-selected=true] { color: var(--ad-accent); border-bottom-color: var(--ad-accent); }
     .tab:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: -2px; }
     .tool-hint { min-height: 2.8em; }
+    .summary { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: 13px; }
+    .summary > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .summary b { font-weight: 600; }
     .appliance { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 12px; font-size: 13px; padding: 12px 0; border-bottom: 1px solid var(--ad-line); }
     .appliance .link { grid-column: 2; justify-self: end; }
     .sensors { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 12px; font-size: 13px; }
@@ -440,6 +444,24 @@ export class AdStrategyEditor extends LitElement {
 
   private markLabel = (mark: RoomMark) => this.l(`ed.mark_${mark}` as Key)
 
+  /** What the house tools have set, in words, each with a way to undo it at once */
+  private houseSummary() {
+    const c = this.config
+    const hass = this.hass!
+    const rows: [Key, 'areas' | 'floors' | 'hide_areas' | 'outdoor_areas', string[]][] = [
+      ['ed.sum_only', 'areas', (c.areas ?? []).map(id => hass.areas[id]?.name ?? id)],
+      ['ed.sum_floors', 'floors', (c.floors ?? []).map(id => hass.floors?.[id]?.name ?? id)],
+      ['ed.sum_hidden', 'hide_areas', (c.hide_areas ?? []).map(id => hass.areas[id]?.name ?? id)],
+      ['ed.sum_outdoor', 'outdoor_areas', (c.outdoor_areas ?? []).map(id => hass.areas[id]?.name ?? id)],
+    ]
+    const set = rows.filter(([, , names]) => names.length)
+    if (!set.length) return html`<span class="hint">${this.l('ed.sum_none')}</span>`
+    return html`<div class="summary">${set.map(([label, key, names]) => html`<div>
+      <span><b>${this.l(label)}:</b> ${names.join(', ')}</span>
+      <button class="link" @click=${() => this.change({ [key]: undefined })}>${this.l('ed.sum_clear')}</button>
+    </div>`)}</div>`
+  }
+
   private renderRoomPages() {
     const area = this.hass!.areas[this.roomArea] ? this.roomArea : Object.values(this.hass!.areas).sort((a, b) => a.name.localeCompare(b.name))[0]?.area_id ?? ''
     return html`
@@ -550,6 +572,8 @@ export class AdStrategyEditor extends LitElement {
     }
     const key = TOOL_KEYS[this.tool]
     const toggleIn = (list: string[] | undefined, id: string) => (list ?? []).includes(id) ? (list ?? []).filter(x => x !== id) : [...(list ?? []), id]
+    const faded = (id: string) => !!(c.areas?.length && !c.areas.includes(id))
+      || !!(c.floors?.length && !c.floors.includes(this.hass!.areas[id]?.floor_id ?? ''))
     const marks = (id: string): RoomMark[] => [
       ...(c.areas?.includes(id) ? ['only' as const] : []),
       ...(c.hide_areas?.includes(id) ? ['hidden' as const] : []),
@@ -561,11 +585,13 @@ export class AdStrategyEditor extends LitElement {
           <span class="hint tool-hint">${this.l(`ed.tool_${this.tool}_hint` as Key)}</span>
           ${house({
             hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel, marks,
+            active: TOOL_MARKS[this.tool], faded,
             onRoom: id => this.change({ [key]: toggleIn(c[key], id) }),
             // Storeys narrow the dashboard to whole floors, whatever tool is active
             onFloor: id => this.change({ floors: toggleIn(c.floors, id) }),
             floorPressed: id => !!c.floors?.includes(id),
-          })}`)}
+          })}
+          ${this.houseSummary()}`)}
         ${this.field(this.l('ed.hide_domains'), this.chips(
           DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
         ${this.field(this.l('ed.hide_pages'), this.chips(
