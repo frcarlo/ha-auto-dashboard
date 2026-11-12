@@ -225,6 +225,53 @@ const deviceDefs: DeviceDef[] = [
       ['sensor.waste_collection_schedule_biotonne', 'morgen', { friendly_name: 'Waste Collection Schedule Biotonne', [dateKey(1)]: 'Biotonne', [dateKey(8)]: 'Biotonne', icon: 'mdi:trash-can' }],
     ],
   },
+  // Companion app: Frank's phone, his iPhone and watch, Leni's phone; the persons list their trackers
+  {
+    id: 'dev-pixel', name: 'Pixel 8', model: 'Pixel 8', area: '', platform: 'mobile_app', entities: [
+      ['device_tracker.pixel_8', 'home', { friendly_name: 'Pixel 8', source_type: 'gps' }],
+      ['sensor.pixel_8_battery_level', '64', { friendly_name: 'Pixel 8 Battery level', device_class: 'battery', unit_of_measurement: '%' }],
+      ['sensor.pixel_8_battery_state', 'charging', { friendly_name: 'Pixel 8 Battery state' }],
+      ['binary_sensor.pixel_8_is_charging', 'on', { friendly_name: 'Pixel 8 Is charging', device_class: 'battery_charging' }],
+      ['sensor.pixel_8_charger_type', 'wireless', { friendly_name: 'Pixel 8 Charger type' }],
+      ['sensor.pixel_8_battery_health', 'good', { friendly_name: 'Pixel 8 Battery health' }],
+      ['sensor.pixel_8_battery_cycle_count', '707', { friendly_name: 'Pixel 8 Battery cycle count' }],
+      ['sensor.pixel_8_geocoded_location', 'Klosterstraße 52, 45481 Mülheim an der Ruhr', { friendly_name: 'Pixel 8 Geocoded location' }],
+      ['sensor.pixel_8_next_alarm', at(1, 6, 0).toISOString(), { friendly_name: 'Pixel 8 Next alarm', device_class: 'timestamp' }],
+      ['sensor.pixel_8_daily_steps', '2217', { friendly_name: 'Pixel 8 Daily steps', unit_of_measurement: 'steps' }],
+      ['sensor.pixel_8_wifi_connection', 'Carlo-WLAN', { friendly_name: 'Pixel 8 Wifi connection' }],
+      ['sensor.pixel_8_network_type', 'wifi', { friendly_name: 'Pixel 8 Network type' }],
+      ['sensor.pixel_8_os_version', '17', { friendly_name: 'Pixel 8 OS version' }],
+    ],
+  },
+  {
+    id: 'dev-iphone', name: 'iPhone 15', model: 'iPhone15,4', area: '', platform: 'mobile_app', entities: [
+      ['device_tracker.iphone_15', 'not_home', { friendly_name: 'iPhone 15', source_type: 'gps' }],
+      ['sensor.iphone_15_battery_level_2', '41', { friendly_name: 'iPhone 15 Battery level', device_class: 'battery', unit_of_measurement: '%' }],
+      ['sensor.iphone_15_battery_state', 'Not Charging', { friendly_name: 'iPhone 15 Battery state' }],
+      ['sensor.iphone_15_geocoded_location', 'Schloßstraße 1, Mülheim an der Ruhr', { friendly_name: 'iPhone 15 Geocoded location' }],
+      ['sensor.iphone_15_steps', '0', { friendly_name: 'iPhone 15 Steps', unit_of_measurement: 'steps' }],
+      ['sensor.iphone_15_health_steps', '451', { friendly_name: 'iPhone 15 Health steps', unit_of_measurement: 'steps' }],
+      ['sensor.iphone_15_ssid', 'Not Connected', { friendly_name: 'iPhone 15 SSID' }],
+      ['sensor.iphone_15_bssid', 'Not Connected', { friendly_name: 'iPhone 15 BSSID' }],
+      ['sensor.iphone_15_connection_type', 'Cellular', { friendly_name: 'iPhone 15 Connection type' }],
+      ['sensor.iphone_15_app_version', '2026.10.3', { friendly_name: 'iPhone 15 App version' }],
+    ],
+  },
+  {
+    id: 'dev-watch', name: 'Pixel Watch 4', model: 'Pixel Watch 4', area: '', platform: 'mobile_app', entities: [
+      ['device_tracker.pixel_watch_4', 'unknown', { friendly_name: 'Pixel Watch 4' }],
+      ['sensor.pixel_watch_4_battery_level', '87', { friendly_name: 'Pixel Watch 4 Battery level', device_class: 'battery', unit_of_measurement: '%' }],
+      ['sensor.pixel_watch_4_battery_state', 'discharging', { friendly_name: 'Pixel Watch 4 Battery state' }],
+      // Battery Notes adds its own sensors to the device
+      ['sensor.pixel_watch_4_battery_plus', '87.0', { friendly_name: 'Pixel Watch 4 Battery+', device_class: 'battery' }, 'battery_notes'],
+    ],
+  },
+  {
+    id: 'dev-leni-phone', name: 'Galaxy A35', model: 'SM-A356B', area: '', platform: 'mobile_app', entities: [
+      ['device_tracker.galaxy_a35', 'not_home', { friendly_name: 'Galaxy A35' }],
+      ['sensor.galaxy_a35_battery_level', '12', { friendly_name: 'Galaxy A35 Battery level', device_class: 'battery', unit_of_measurement: '%' }],
+    ],
+  },
   // Parcel Aggregator: one list per kind, the parcels in an attribute; the UPS integration lists its own parcel again
   {
     id: 'dev-parcels', name: 'Parcel Aggregator', area: '', platform: 'parcel_aggregator', entities: [
@@ -359,8 +406,8 @@ const extras: HassEntity[] = [
   { entity_id: 'update.zigbee_router', state: 'on', attributes: { friendly_name: 'Zigbee Router Firmware', installed_version: '1.2.0', latest_version: '1.3.1' } },
   { entity_id: 'sensor.netz_leistung', state: '1.42', attributes: { friendly_name: 'Netz Leistung', device_class: 'power', unit_of_measurement: 'kW' } },
   { entity_id: 'sensor.pv_leistung', state: '860', attributes: { friendly_name: 'PV Leistung', device_class: 'power', unit_of_measurement: 'W' } },
-  { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo' } },
-  { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni' } },
+  { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo', device_trackers: ['device_tracker.pixel_8', 'device_tracker.iphone_15', 'device_tracker.pixel_watch_4'] } },
+  { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni', device_trackers: ['device_tracker.galaxy_a35'] } },
   { entity_id: 'alarm_control_panel.haus', state: 'armed_home', attributes: { friendly_name: 'Alarmanlage' } },
   {
     entity_id: 'weather.home', state: 'partlycloudy', attributes: {

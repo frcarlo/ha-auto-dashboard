@@ -39,7 +39,7 @@ export function visibleOf(hass: HomeAssistant, options: PeopleOptions, domain: s
 export const peopleIds = (hass: HomeAssistant, options: PeopleOptions) =>
   [...visibleOf(hass, options, 'person'), ...visibleOf(hass, options, 'alarm_control_panel')].map(e => e.entity_id)
 
-export function renderPeople(hass: HomeAssistant, options: PeopleOptions, open: (entityId: string) => void) {
+export function renderPeople(hass: HomeAssistant, options: PeopleOptions, open: (entityId: string) => void, current?: string | null) {
   const people = visibleOf(hass, options, 'person')
   const alarm = visibleOf(hass, options, 'alarm_control_panel')[0]
   if (!people.length && !alarm) return nothing
@@ -50,6 +50,7 @@ export function renderPeople(hass: HomeAssistant, options: PeopleOptions, open: 
       const name = entityName(p)
       const where = home ? t(hass, 'home_state') : p.state === 'not_home' ? t(hass, 'away') : hass.formatEntityState?.(p) ?? p.state
       return html`<button class="person ${home ? '' : 'away'}" title="${name}: ${where}" aria-label="${name}: ${where}"
+        aria-expanded=${current === `person:${p.entity_id}`}
         style=${picture ? `background-image:url('${picture}')` : ''} @click=${() => open(p.entity_id)}>
         ${picture ? nothing : name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
       </button>`
@@ -73,6 +74,8 @@ export const peopleStyles = css`
     background: rgb(var(--ad-success)); box-shadow: 0 0 0 2px var(--ad-bg);
   }
   .person.away::after { background: rgba(var(--ad-on-surface), 0.4); }
+  /* Their devices are open beneath */
+  .person[aria-expanded=true] { box-shadow: 0 0 0 2px var(--ad-bg), 0 0 0 4px rgb(var(--ad-primary)); }
   .person:focus-visible, .alarm:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
   .alarm {
     all: unset; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px 4px 8px; margin-left: 4px; cursor: pointer;

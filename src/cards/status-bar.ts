@@ -6,6 +6,8 @@ import { allEntities, batteryEntities, deviceName, entityAreaId, entityIndex, hi
 import { entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import { peopleIds, peopleStyles, renderPeople } from './people'
+import { personPanelStyles, renderPersonPanel } from './person-panel'
+import { personPhones } from '../phones'
 import { schoolIds, schoolNotes, type School, type SchoolNote } from '../school'
 import {
   applianceChipIcon, binColor, birthdays, currentWarnings, finishedAppliances, stuffyRooms, trackedParcels, wastePickup, warningName,
@@ -104,8 +106,11 @@ const COLORS: Record<StatusKey, string> = {
 }
 
 export class AdStatusBar extends BaseCard<StatusBarConfig> {
-  static properties = { ...BaseCard.properties, open: { state: true }, now: { state: true } }
-  open: StatusKey | SchoolChip | EventKey | null = null
+  static properties = { ...BaseCard.properties, open: { state: true }, now: { state: true }, phone: { state: true } }
+  /** The open list: a chip's, or a person's devices as "person:<entity id>" */
+  open: StatusKey | SchoolChip | EventKey | `person:${string}` | null = null
+  /** The device whose details show in an open person's list */
+  phone?: string
   /** Ticks every minute: bins show from the afternoon before, calendars are fetched again */
   now = Date.now()
   private timer?: number
@@ -127,7 +132,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     if (calendars.length) void todaysEvents(this.hass, calendars, this.now).then(changed => changed && this.requestUpdate())
   }
 
-  static styles = [tokens, peopleStyles, css`
+  static styles = [tokens, peopleStyles, personPanelStyles, css`
     :host { display: block; }
     .chips { display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
     /* People first, then a hairline, then what is going on */
@@ -177,7 +182,21 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
 
   protected watched() {
     const { areas, hide_labels: labels, hide_entities: hidden } = this.config!
-    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id), ...(this.config!.people === false ? [] : peopleIds(this.hass!, this.config!)), ...schoolIds(this.config!.schools ?? []), ...this.eventIds()]
+    return [...entityIndex(this.hass!, labels).all, ...batteryEntities(this.hass!, areas, labels, hidden).map(e => e.entity_id), ...(this.config!.people === false ? [] : peopleIds(this.hass!, this.config!)), ...schoolIds(this.config!.schools ?? []), ...this.eventIds(), ...this.openPhones.flatMap(p => p.entities)]
+  }
+
+  /** The devices of the person whose list is open */
+  private get openPhones() {
+    const id = typeof this.open === 'string' && this.open.startsWith('person:') ? this.open.slice(7) : undefined
+    return id ? personPhones(this.hass!, this.hass!.states[id]) : []
+  }
+
+  /** A tap on a person: their phones and watches when the Companion app knows them, else HA's own dialog */
+  private openPerson(id: string) {
+    if (!id.startsWith('person.') || !personPhones(this.hass!, this.hass!.states[id]).length) return this.moreInfo(id)
+    const key = `person:${id}` as const
+    this.open = this.open === key ? null : key
+    this.phone = undefined
   }
 
   private eventIds() {
@@ -343,9 +362,11 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     const openEvent = events.find(c => c.key === this.open)
     const openItem = items.find(i => i.key === this.open)
     const link = openItem && this.config!.links?.[openItem.key]
+    const phones = this.openPhones
+    const openPerson = phones.length ? this.hass!.states[(this.open as string).slice(7)] : undefined
     return html`
       <div class="chips">
-        ${this.config!.people === false ? nothing : renderPeople(this.hass!, this.config!, id => this.moreInfo(id))}
+        ${this.config!.people === false ? nothing : renderPeople(this.hass!, this.config!, id => this.openPerson(id), this.open)}
         <span class="sep"></span>
         ${events.filter(c => c.key === 'warning').map(c => this.eventChip(c))}
         ${school ? [this.schoolChip('cancelled', school.cancelled), this.schoolChip('changed', school.changed)] : nothing}
@@ -360,6 +381,10 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       </div>
       ${openSchool?.length ? this.schoolList(this.open as SchoolChip, openSchool) : nothing}
       ${openEvent ? this.eventList(openEvent) : nothing}
+      ${openPerson && phones.length ? renderPersonPanel(this.hass!, openPerson, phones, {
+        open: this.phone, now: this.now, moreInfo: id => this.moreInfo(id),
+        pick: id => { this.phone = this.phone === id ? undefined : id },
+      }) : nothing}
       ${openItem ? html`<div class="list card">
         ${openItem.entities.map(e => {
           const area = this.areaName(e)
