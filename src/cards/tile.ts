@@ -10,6 +10,7 @@ import { isAwning, isOutlet } from '../model'
 import { domainOf, entityIcon, entityName, hvacColor, isActive, isUnavailable, shortName, stateColor } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
+import { hasSpark, loadSpark, sparkFresh, sparkPath, sparkPoints } from '../sparkline'
 import type { HassEntity } from '../types'
 
 interface TileConfig extends BaseConfig {
@@ -19,6 +20,8 @@ interface TileConfig extends BaseConfig {
   /** A socket's own power and energy sensors, shown on its row */
   power?: string
   energy?: string
+  /** false: no line of the last day behind a sensor's value */
+  spark?: boolean
 }
 
 const LARGE = ['light', 'climate', 'cover', 'media_player', 'sensor']
@@ -87,6 +90,10 @@ export class AdTile extends BaseCard<TileConfig> {
     .ctl { display: flex; align-items: center; gap: 4px; }
     .btn { width: 30px; height: 30px; }
     .unavailable { opacity: 0.45; }
+    /* A sensor's last day: the line between the name and the value, never through the digits; its fill reaches down behind the value */
+    .spark { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 70%; z-index: 0; pointer-events: none; overflow: visible; }
+    .spark .line { fill: none; stroke: rgba(var(--ad-primary), 0.75); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+    .spark .area { fill: rgba(var(--ad-primary), 0.1); stroke: none; }
 
     /*
      * Light: a small square. Light rises from the bottom as high as it is bright, with a clear edge where it ends;
@@ -245,6 +252,13 @@ export class AdTile extends BaseCard<TileConfig> {
     if (entity && this.lastState !== undefined && entity.state !== this.lastState) this.fresh = entity.state
     this.lastState = entity?.state
     if (entity && domainOf(entity.entity_id) === 'cover') this.countTo(this.position(entity))
+  }
+
+  /** A sensor's last day, fetched with the other tiles on the page and drawn once it is in */
+  protected updated() {
+    const entity = this.entity
+    if (this.config?.spark === false || !hasSpark(entity) || sparkFresh(entity!.entity_id)) return
+    void loadSpark(this.hass!, entity!.entity_id).then(() => this.requestUpdate())
   }
 
   disconnectedCallback() {
@@ -530,10 +544,13 @@ export class AdTile extends BaseCard<TileConfig> {
   private renderSensor(entity: HassEntity, off: string) {
     const { value, unit } = this.value(entity)
     const level = unit === '%' ? Number(entity.state) : NaN
+    const spark = this.config!.spark !== false && hasSpark(entity) ? sparkPath(sparkPoints(entity), 100, 28, 64) : undefined
     return this.wrap(`sensor ${off}`, html`
+      ${spark ? html`<svg class="spark" viewBox="0 0 100 64" preserveAspectRatio="none" aria-hidden="true">
+        <path class="area" d=${spark.area}></path><path class="line" d=${spark.line}></path></svg>` : nothing}
       <div class="top"><span class="name">${this.label}</span></div>
       <div class="bottom"><span class="big">${value}${unit ? html`<small>${unit}</small>` : nothing}</span></div>
-      ${Number.isFinite(level) ? html`<div class="level"><span style="--level:${clamp(level, 0, 100)}%"></span></div>` : nothing}
+      ${Number.isFinite(level) && !spark ? html`<div class="level"><span style="--level:${clamp(level, 0, 100)}%"></span></div>` : nothing}
     `)
   }
 

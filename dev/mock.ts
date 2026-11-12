@@ -491,6 +491,13 @@ export function createHass(dark: boolean): HomeAssistant {
       entities[entity_id] = { entity_id, device_id: d.id, platform: platform ?? d.platform, labels: [], ...(translationKey ? { translation_key: translationKey } : {}) }
     }
   }
+  // Readings HA keeps hourly statistics for, as real sensors declare it
+  const MEASURED = ['temperature', 'humidity', 'carbon_dioxide', 'power', 'pressure', 'illuminance', 'battery']
+  for (const e of Object.values(states)) {
+    if (e.entity_id.startsWith('sensor.') && MEASURED.includes(e.attributes.device_class) && Number.isFinite(Number(e.state)) && !e.attributes.state_class) {
+      e.attributes = { ...e.attributes, state_class: 'measurement' }
+    }
+  }
   for (const e of extras) {
     states[e.entity_id] = e
     entities[e.entity_id] = { entity_id: e.entity_id, entity_category: e.entity_id.startsWith('sensor.') ? 'diagnostic' : null }
@@ -587,6 +594,7 @@ export function createHass(dark: boolean): HomeAssistant {
         try { msg.value == null ? localStorage.removeItem(`mock:${msg.key}`) : localStorage.setItem(`mock:${msg.key}`, JSON.stringify(msg.value)) } catch { /* tests: no storage */ }
         return null as T
       }
+      if (msg.type === 'recorder/statistics_during_period') return statistics(msg, latest ?? states) as T
       if (msg.type === 'history/history_during_period') return cameraHistory(Date.parse(String(msg.start_time)), msg.entity_ids as string[]) as T
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [
@@ -812,4 +820,21 @@ function systemResponse(msg: Record<string, unknown>): unknown {
     return { backup_job_id: 'job1' }
   }
   return undefined
+}
+
+/** Hourly means of the last day: a slow wave around the current value, a little noise on top */
+function statistics(msg: Record<string, unknown>, states: Record<string, { state: string }>) {
+  const start = Date.parse(String(msg.start_time))
+  const out: Record<string, { start: number; end: number; mean: number }[]> = {}
+  for (const id of msg.statistic_ids as string[]) {
+    const now = Number(states[id]?.state)
+    if (!Number.isFinite(now)) continue
+    const seed = [...id].reduce((n, c) => n + c.charCodeAt(0), 0)
+    const swing = Math.max(0.5, Math.abs(now) * 0.08)
+    out[id] = Array.from({ length: 24 }, (_, h) => ({
+      start: start + h * 3600_000, end: start + (h + 1) * 3600_000,
+      mean: now + swing * Math.sin((h + seed) / 3.8) + swing * 0.25 * Math.sin(h * 1.7 + seed),
+    }))
+  }
+  return out
 }
