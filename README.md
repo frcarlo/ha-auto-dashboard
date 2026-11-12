@@ -36,7 +36,7 @@ The dashboard speaks German and English and follows the language set in Home Ass
 - **Weather warnings** from DWD (the current level, not the advance one) or NINA, e.g. "Frost", red for severe ones; `weather_warnings` picks the entities instead.
 - **Bins** from Waste Collection Schedule: "Gelbe Tonne tomorrow" from 15:00 the day before until 9:00 on the day, with the bin's colour, every bin of the day on one chip.
 - **Birthdays** from all-day or timed events in any calendar whose title says "Geburtstag", "birthday" or 🎂: "Margit's birthday".
-- **Parcels** due today from a parcel service's calendar (DHL, DPD, Hermes, parcel trackers; found by "delivery", "Zustellung", "parcel" or "Paket" in its id or name).
+- **Parcels** due today from a parcel service's calendar (DHL, DPD, Hermes, parcel trackers; found by "delivery", "Zustellung", "parcel" or "Paket" in its id or name). With the Parcel Aggregator integration or one of its carrier integrations, its sensors give one chip for all parcels, named after the most pressing: "Parcel today" (out for delivery or planned for today, with the time window), "Parcel ready for pickup", or a quieter "Parcel on its way". Its list shows every parcel with sender, carrier and status, each once even when several sensors list it; delivered and outgoing parcels are left out.
 - **Appliances done**: "Washer done" while a washer, dryer or dishwasher waits to be emptied.
 - **Stuffy rooms**: "Air the office" when a CO₂ sensor (ppm) reads 1200 or more (`co2_limit`). The room's page shows the chip too.
 

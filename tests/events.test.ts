@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  binColor, birthdayName, birthdays, co2Sensors, currentWarnings, findEventSources, finishedAppliances, stuffyRooms, wastePickup, warningName,
+  binColor, birthdayName, birthdays, co2Sensors, currentWarnings, findEventSources, finishedAppliances, stuffyRooms, trackedParcels, wastePickup, warningName,
 } from '../src/events'
 import { findAppliances } from '../src/appliances'
 import { generateDashboard } from '../src/strategy'
@@ -122,7 +122,9 @@ describe('sources', () => {
     // The current DWD level, not the advance one; NINA's slots
     expect(sources.warnings).toEqual(expect.arrayContaining(['sensor.dwd_aktuelle_warnstufe', 'binary_sensor.warning_mulheim_1']))
     expect(sources.warnings).not.toContain('sensor.dwd_vorwarnstufe')
+    // Parcel Aggregator's calendar is left to its sensors
     expect(sources.parcels).toEqual(['calendar.dhl_zustellungen'])
+    expect(sources.parcel_sensors).toEqual(['sensor.parcel_aggregator_incoming_parcels', 'sensor.parcel_aggregator_awaiting_pickup', 'sensor.ups_incoming_parcels'])
     expect(sources.birthdays).toContain('calendar.familie')
     expect(sources.birthdays).not.toContain('calendar.dhl_zustellungen')
     expect(finishedAppliances(hass, sources.appliances).map(a => a.name)).toEqual(['Waschmaschine'])
@@ -134,6 +136,29 @@ describe('sources', () => {
     expect(sources.waste).toBeUndefined()
     expect(sources.birthdays).toBeUndefined()
     expect(sources.warnings).toEqual(['binary_sensor.warning_mulheim_2'])
+  })
+})
+
+describe('parcels', () => {
+  it('lists each parcel once, the most pressing first, without delivered or sent ones', () => {
+    const hass = createHass(true)
+    const ids = findEventSources(hass)!.parcel_sensors
+    const parcels = trackedParcels(hass, ids, Date.now())
+    expect(parcels.map(p => [p.stage, p.carrier, p.sender])).toEqual([['today', 'DHL', 'Thalia'], ['pickup', 'Hermes', 'Zalando'], ['transit', 'UPS', undefined]])
+    expect(new Date(parcels[0]!.from!).getHours()).toBe(10)
+  })
+
+  it('counts a parcel planned for today as due, and one planned later as on its way', () => {
+    const hass = createHass(true)
+    const today = new Date()
+    today.setHours(15, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    hass.states['sensor.parcel_aggregator_incoming_parcels']!.attributes.parcels = [
+      { carrier: 'GLS', barcode: 'a', status: 'in_transit', planned_from: today.toISOString() },
+      { carrier: 'DPD', barcode: 'b', status: 'in_transit', planned_from: tomorrow.toISOString() },
+    ]
+    expect(trackedParcels(hass, ['sensor.parcel_aggregator_incoming_parcels'], today.getTime()).map(p => p.stage)).toEqual(['today', 'transit'])
   })
 })
 

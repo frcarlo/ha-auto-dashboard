@@ -8,9 +8,11 @@ import { tokens } from '../styles/tokens'
 import { peopleIds, peopleStyles, renderPeople } from './people'
 import { schoolIds, schoolNotes, type School, type SchoolNote } from '../school'
 import {
-  applianceChipIcon, binColor, birthdays, currentWarnings, finishedAppliances, stuffyRooms, wastePickup, warningName,
-  type CalendarHit, type EventKey, type EventSources,
+  applianceChipIcon, binColor, birthdays, currentWarnings, finishedAppliances, stuffyRooms, trackedParcels, wastePickup, warningName,
+  type CalendarHit, type EventKey, type EventSources, type Parcel, type ParcelStage,
 } from '../events'
+
+const PARCEL_ICONS: Record<ParcelStage, string> = { today: 'mdi:truck-delivery-outline', pickup: 'mdi:store-outline', transit: 'mdi:package-variant-closed' }
 import { applianceEntities } from '../appliances'
 import type { ApiEvent } from '../calendar'
 import type { HassEntity, HomeAssistant, StatusChip } from '../types'
@@ -41,7 +43,7 @@ type SchoolChip = 'cancelled' | 'changed'
 interface EventChip {
   key: EventKey
   icon: string
-  color: 'primary' | 'warning' | 'error' | 'success'
+  color: 'primary' | 'warning' | 'error' | 'success' | 'muted'
   /** The bin's own colour for its icon */
   tint?: string
   label: string
@@ -182,7 +184,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     const ev = this.config!.events
     if (!ev) return []
     return [
-      ...(ev.waste ?? []), ...(ev.warnings ?? []), ...(ev.co2 ?? []), ...(ev.birthdays ?? []), ...(ev.parcels ?? []),
+      ...(ev.waste ?? []), ...(ev.warnings ?? []), ...(ev.co2 ?? []), ...(ev.birthdays ?? []), ...(ev.parcels ?? []), ...(ev.parcel_sensors ?? []),
       ...(ev.appliances ?? []).flatMap(a => applianceEntities(this.hass!, a)),
     ]
   }
@@ -269,12 +271,24 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       })
     }
 
+    // One chip for all parcels, named after the most pressing: due today, then waiting at a shop, then on the way
     const parcels = hitsOf(ev.parcels, now)
-    if (parcels.length) {
+    const tracked = trackedParcels(hass, ev.parcel_sensors, now)
+    if (parcels.length || tracked.length) {
+      const count = (stage: ParcelStage) => tracked.filter(p => p.stage === stage).length
+      const today = parcels.length + count('today')
+      const [stage, n] = today ? ['today', today] as const : count('pickup') ? ['pickup', count('pickup')] as const : ['transit', count('transit')] as const
+      const window = (p: Parcel) => p.from ? `${this.time(p.from)}${p.to ? `–${this.time(p.to)}` : ''}` : ''
       out.push({
-        key: 'parcel', icon: 'mdi:package-variant-closed', color: 'primary',
-        label: parcels.length === 1 ? t(hass, 'event.parcel_one') : t(hass, 'event.parcels', { n: parcels.length }),
-        rows: parcels.map(p => ({ icon: 'mdi:package-variant-closed', text: p.title || t(hass, 'event.parcel_one'), sub: entityName(hass.states[p.calendar]), entity: p.calendar })),
+        key: 'parcel', icon: PARCEL_ICONS[stage], color: stage === 'transit' ? 'muted' : 'primary',
+        label: t(hass, n === 1 ? `event.parcel_${stage}_one` : `event.parcel_${stage}`, { n }),
+        rows: [
+          ...parcels.map(p => ({ icon: PARCEL_ICONS.today, text: p.title || t(hass, 'event.parcel_today_one'), sub: entityName(hass.states[p.calendar]), entity: p.calendar })),
+          ...tracked.map(p => ({
+            icon: PARCEL_ICONS[p.stage], text: p.sender || p.carrier || t(hass, 'event.parcel'),
+            sub: [p.sender ? p.carrier : '', t(hass, `event.stage_${p.stage}`), window(p)].filter(Boolean).join(' · '), entity: p.entity,
+          })),
+        ],
       })
     }
 

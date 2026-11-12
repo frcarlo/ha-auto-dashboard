@@ -21,12 +21,20 @@ export interface EventSources {
   birthdays?: string[]
   /** Calendars of parcel services: today's deliveries */
   parcels?: string[]
+  /** Parcel Aggregator's sensors (and its carriers'), each with a list of parcels: incoming, awaiting pickup */
+  parcel_sensors?: string[]
   appliances?: Appliance[]
 }
 
 export type { EventKey } from './types'
 
 const PARCEL = /zustell|deliver|parcel|paket|sendung|lieferung|package|dhl|dpd|hermes|ups\b|gls/i
+// Parcel Aggregator and its carrier integrations: incoming parcels, those on their way to a shop and those waiting
+// there; not what was sent or already delivered
+const PARCEL_SENSOR = /incoming|awaiting_pickup|en_route_to_pickup|eingehend|abhol/i
+const PARCEL_NOT = /outgoing|ausgehend|delivered|zugestellt/i
+const isParcelSensor = (hass: HomeAssistant, id: string) =>
+  domainOf(id) === 'sensor' && Array.isArray(hass.states[id]?.attributes.parcels) && PARCEL_SENSOR.test(id) && !PARCEL_NOT.test(id)
 const WASTE = /waste|abfall|m(ü|u|ue)ll|tonne|bin\b/i
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 
@@ -62,13 +70,18 @@ export function findEventSources(
   const off = (key: EventKey) => opts.hidden?.includes(key)
   const ids = entityIndex(hass, hide.labels).all.filter(id => !hide.entities?.includes(id) && hass.states[id])
   const calendars = hide.domains?.includes('calendar') ? [] : ids.filter(id => domainOf(id) === 'calendar' && !opts.skipCalendars?.has(id))
+  const parcelSensors = ids.filter(id => isParcelSensor(hass, id))
+  // The sensors know every parcel the calendar of the same integration would show today, and more
+  const sensorPlatforms = new Set(parcelSensors.map(id => hass.entities[id]?.platform).filter(Boolean))
   const parcels = calendars.filter(id => PARCEL.test(`${id} ${entityName(hass.states[id])}`))
+  const parcelCalendars = parcels.filter(id => !sensorPlatforms.has(hass.entities[id]?.platform))
   const out: EventSources = {
     waste: off('waste') ? [] : ids.filter(id => isWasteSensor(hass, id)),
     warnings: off('warning') ? [] : opts.warnings?.length ? opts.warnings.filter(id => hass.states[id]) : ids.filter(id => isCurrentWarning(hass, id)),
     co2: off('co2') ? [] : opts.co2 ?? [],
     birthdays: off('birthday') ? [] : calendars.filter(id => !parcels.includes(id)),
-    parcels: off('parcel') ? [] : parcels,
+    parcels: off('parcel') ? [] : parcelCalendars,
+    parcel_sensors: off('parcel') ? [] : parcelSensors,
     appliances: off('appliance') ? [] : opts.appliances ?? [],
   }
   const kept = Object.fromEntries(Object.entries(out).filter(([, v]) => Array.isArray(v) && v.length)) as EventSources
@@ -162,6 +175,62 @@ export function birthdayName(title: string): string | undefined {
 /** Today's birthdays from the calendars' events, each name once */
 export function birthdays(hits: CalendarHit[]): string[] {
   return [...new Set(hits.map(h => birthdayName(h.title)).filter((n): n is string => !!n))]
+}
+
+/** A parcel as Parcel Aggregator and its carrier integrations list it in a sensor's parcels attribute */
+interface TrackedParcel {
+  carrier?: string
+  barcode?: string
+  sender?: string | null
+  status?: string | null
+  delivered?: boolean
+  planned_from?: string | null
+  planned_to?: string | null
+}
+
+export type ParcelStage = 'today' | 'pickup' | 'transit'
+
+export interface Parcel {
+  stage: ParcelStage
+  carrier: string
+  sender?: string
+  /** The planned delivery window today, as times */
+  from?: number
+  to?: number
+  entity: string
+}
+
+const STAGE_RANK: Record<ParcelStage, number> = { today: 0, pickup: 1, transit: 2 }
+
+/**
+ * Parcels not yet delivered, each once however many sensors list it (the aggregator's and its carrier's):
+ * due today (out for delivery or planned for today), waiting at a shop, or still on its way. Most pressing first.
+ */
+export function trackedParcels(hass: HomeAssistant, ids: string[] = [], now: number): Parcel[] {
+  const today = midnight(now)
+  const found = new Map<string, Parcel>()
+  for (const id of ids) {
+    const list = hass.states[id]?.attributes.parcels
+    if (!Array.isArray(list)) continue
+    const waiting = /awaiting_pickup|abhol/i.test(id) && !/en_route/i.test(id)
+    for (const p of list as TrackedParcel[]) {
+      if (!p || p.delivered || p.status === 'delivered') continue
+      const from = p.planned_from ? Date.parse(p.planned_from) : NaN
+      const to = p.planned_to ? Date.parse(p.planned_to) : NaN
+      const stage: ParcelStage = waiting || p.status === 'awaiting_pickup' || p.status === 'ready_for_pickup' ? 'pickup'
+        : p.status === 'out_for_delivery' || (Number.isFinite(from) && midnight(from) === today) ? 'today' : 'transit'
+      const parcel: Parcel = {
+        stage, carrier: p.carrier || '', entity: id,
+        ...(p.sender ? { sender: p.sender } : {}),
+        ...(stage === 'today' && Number.isFinite(from) ? { from } : {}),
+        ...(stage === 'today' && Number.isFinite(to) ? { to } : {}),
+      }
+      const key = `${p.carrier ?? ''}|${p.barcode ?? found.size}`
+      const before = found.get(key)
+      if (!before || STAGE_RANK[stage] < STAGE_RANK[before.stage]) found.set(key, parcel)
+    }
+  }
+  return [...found.values()].sort((a, b) => STAGE_RANK[a.stage] - STAGE_RANK[b.stage])
 }
 
 export interface Co2Room {

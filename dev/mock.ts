@@ -225,6 +225,32 @@ const deviceDefs: DeviceDef[] = [
       ['sensor.waste_collection_schedule_biotonne', 'morgen', { friendly_name: 'Waste Collection Schedule Biotonne', [dateKey(1)]: 'Biotonne', [dateKey(8)]: 'Biotonne', icon: 'mdi:trash-can' }],
     ],
   },
+  // Parcel Aggregator: one list per kind, the parcels in an attribute; the UPS integration lists its own parcel again
+  {
+    id: 'dev-parcels', name: 'Parcel Aggregator', area: '', platform: 'parcel_aggregator', entities: [
+      ['sensor.parcel_aggregator_incoming_parcels', '2', { friendly_name: 'Parcel Aggregator Incoming parcels', unit_of_measurement: 'parcels', parcels: [
+        { carrier: 'DHL', barcode: '00340434', sender: 'Thalia', status: 'out_for_delivery', delivered: false, planned_from: at(0, 10, 0).toISOString(), planned_to: at(0, 13, 0).toISOString() },
+        { carrier: 'UPS', barcode: '1Z999', sender: null, status: 'in_transit', delivered: false, planned_from: null, planned_to: null },
+      ] }],
+      ['sensor.parcel_aggregator_awaiting_pickup', '1', { friendly_name: 'Parcel Aggregator Awaiting pickup', unit_of_measurement: 'parcels', parcels: [
+        { carrier: 'Hermes', barcode: 'H123', sender: 'Zalando', status: 'awaiting_pickup', delivered: false },
+      ] }],
+      ['sensor.parcel_aggregator_delivered_parcels', '1', { friendly_name: 'Parcel Aggregator Delivered parcels', unit_of_measurement: 'parcels', parcels: [
+        { carrier: 'DHL', barcode: '155', sender: 'BESTSECRET', status: 'delivered', delivered: true },
+      ] }],
+      ['sensor.parcel_aggregator_outgoing_parcels', '1', { friendly_name: 'Parcel Aggregator Outgoing parcels', unit_of_measurement: 'parcels', parcels: [
+        { carrier: 'DHL', barcode: 'R1', status: 'in_transit', delivered: false },
+      ] }],
+      ['calendar.parcel_aggregator_deliveries', 'off', { friendly_name: 'Parcel Aggregator Deliveries' }],
+    ],
+  },
+  {
+    id: 'dev-ups', name: 'UPS', area: '', platform: 'ups', entities: [
+      ['sensor.ups_incoming_parcels', '1', { friendly_name: 'UPS Incoming parcels', unit_of_measurement: 'parcels', parcels: [
+        { carrier: 'UPS', barcode: '1Z999', sender: null, status: 'in_transit', delivered: false },
+      ] }],
+    ],
+  },
   // DWD: the current warnings of the region, ?warn=on adds frost
   {
     id: 'dev-dwd', name: 'DWD Mülheim', area: '', platform: 'dwd_weather_warnings', entities: [
