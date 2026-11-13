@@ -474,6 +474,41 @@ function cameraHistory(since: number, ids: string[]) {
   return out
 }
 
+// Heating plans as HA's schedule helpers keep them; the Bäder plan belongs to the bathroom, the others to no room
+const WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+type MockBlock = { from: string; to: string }
+type MockSchedule = { id: string; name: string; icon: string } & Partial<Record<(typeof WEEK)[number], MockBlock[]>>
+const everyDay = (blocks: MockBlock[], weekend = blocks) => Object.fromEntries(WEEK.map((d, i) => [d, i < 5 ? blocks : weekend]))
+const scheduleItems: MockSchedule[] = [
+  { id: 'heizplan_wohnbereich', name: 'Heizplan Wohnbereich', icon: 'mdi:sofa', ...everyDay([{ from: '07:30:00', to: '22:30:00' }]) },
+  { id: 'heizplan_bader', name: 'Heizplan Bäder', icon: 'mdi:shower',
+    ...everyDay([{ from: '05:30:00', to: '08:00:00' }, { from: '19:00:00', to: '21:30:00' }], [{ from: '07:00:00', to: '10:00:00' }, { from: '19:00:00', to: '21:30:00' }]) },
+  { id: 'heizplan_boost_morgen', name: 'Heizplan Boost Morgen', icon: 'mdi:rocket-launch-outline', ...everyDay([{ from: '05:30:00', to: '08:00:00' }], []) },
+]
+const SCHEDULE_AREAS: Record<string, string> = { heizplan_bader: 'bad' }
+
+/** On inside a block; the next start or end as next_event */
+function scheduleState(item: MockSchedule, now = new Date()) {
+  const minutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h! * 60 + m! }
+  const at = (offset: number, m: number) => { const d = new Date(now); d.setDate(d.getDate() + offset); d.setHours(0, m, 0, 0); return d }
+  const today = (now.getDay() + 6) % 7
+  const nowM = now.getHours() * 60 + now.getMinutes()
+  const blocksOn = (offset: number) => (item[WEEK[(today + offset) % 7]!] ?? []).map(b => [minutes(b.from), minutes(b.to)] as const)
+  const on = blocksOn(0).some(([f, t]) => f <= nowM && nowM < t)
+  for (let offset = 0; offset < 8; offset++) {
+    for (const [f, t] of blocksOn(offset)) {
+      const edge = on ? t : f
+      if (offset > 0 || edge > nowM) return { state: on ? 'on' : 'off', next_event: at(offset, edge).toISOString() }
+    }
+  }
+  return { state: on ? 'on' : 'off', next_event: undefined }
+}
+
+function scheduleEntity(item: MockSchedule): HassEntity {
+  const { state, next_event } = scheduleState(item)
+  return { entity_id: `schedule.${item.id}`, state, attributes: { friendly_name: item.name, icon: item.icon, editable: true, ...(next_event ? { next_event } : {}) } }
+}
+
 export function createHass(dark: boolean): HomeAssistant {
   const states: Record<string, HassEntity> = {}
   const entities: HomeAssistant['entities'] = {}
@@ -506,6 +541,10 @@ export function createHass(dark: boolean): HomeAssistant {
     if (e.entity_id.startsWith('sensor.') && MEASURED.includes(e.attributes.device_class) && Number.isFinite(Number(e.state)) && !e.attributes.state_class) {
       e.attributes = { ...e.attributes, state_class: 'measurement' }
     }
+  }
+  for (const item of scheduleItems) {
+    states[`schedule.${item.id}`] = scheduleEntity(item)
+    entities[`schedule.${item.id}`] = { entity_id: `schedule.${item.id}`, area_id: SCHEDULE_AREAS[item.id] ?? null, labels: [] }
   }
   for (const e of extras) {
     states[e.entity_id] = e
@@ -613,6 +652,17 @@ export function createHass(dark: boolean): HomeAssistant {
           { type: 'water', stat_energy_from: 'sensor.wasserzahler_verbrauch', stat_rate: 'sensor.wasserzahler_durchfluss', number_energy_price: null },
         ],
       } as T
+      if (msg.type === 'schedule/list') return structuredClone(scheduleItems) as T
+      if (msg.type === 'schedule/update') {
+        await new Promise(r => setTimeout(r, 300))
+        const { type: _type, schedule_id, ...fields } = msg
+        const index = scheduleItems.findIndex(i => i.id === schedule_id)
+        if (index < 0) throw new Error('Schedule not found')
+        scheduleItems[index] = { id: String(schedule_id), ...fields } as MockSchedule
+        const e = scheduleEntity(scheduleItems[index]!)
+        if (latest) latest[e.entity_id] = e
+        return structuredClone(scheduleItems[index]) as T
+      }
       if (msg.type === 'config/label_registry/list') return [
         { label_id: 'ad_hide', name: 'ad_hide' },
         { label_id: 'technik', name: 'Technik' },

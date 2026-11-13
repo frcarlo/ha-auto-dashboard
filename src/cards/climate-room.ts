@@ -5,6 +5,7 @@ import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { roomSummary } from '../model'
+import { scheduleStatus } from '../schedules'
 import { domainOf, entityIcon, entityName, hvacColor, isUnavailable, shortName } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
@@ -16,6 +17,8 @@ interface ClimateRoomConfig extends BaseConfig {
   entities: string[]
   /** Room page to open from the name */
   path?: string
+  /** Heating plans that belong to the room */
+  schedules?: string[]
 }
 
 const HVAC_ACTIONS = ['heating', 'cooling', 'drying', 'fan', 'idle', 'off']
@@ -80,6 +83,8 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     .reading .v { font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
     .reading .v small { font-weight: 400; opacity: var(--ad-o2); margin-left: 2px; }
     .reading.off { opacity: 0.45; }
+    .reading.schedule .v { font-weight: 400; }
+    .reading.schedule.on .v { color: rgb(var(--ad-warning)); font-weight: 500; }
   `]
 
   getGridOptions() {
@@ -97,7 +102,7 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
   }
 
   protected watched() {
-    return this.config!.entities
+    return [...this.config!.entities, ...(this.config!.schedules ?? [])]
   }
 
   private get entities() {
@@ -197,6 +202,18 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     </button>`
   }
 
+  /** A plan of the room: when it switches next */
+  private renderSchedule(id: string, areaName?: string) {
+    const entity = this.hass!.states[id]
+    if (!entity) return nothing
+    const status = scheduleStatus(this.hass!, id)
+    return html`<button class="reading schedule ${status.on ? 'on' : ''}" title=${entityName(entity)} @click=${() => this.moreInfo(id)}>
+      <ha-icon icon=${String(entity.attributes.icon ?? 'mdi:calendar-clock')}></ha-icon>
+      <span class="n">${shortName(entityName(entity), areaName)}</span>
+      <span class="v">${status.text}</span>
+    </button>`
+  }
+
   protected render() {
     const area = this.hass!.areas[this.config!.area]
     const entities = this.entities
@@ -207,6 +224,7 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     const readings = entities.filter(e => domainOf(e.entity_id) !== 'climate' && e !== main)
     const single = thermostats.length === 1 ? this.action(thermostats[0]!) : undefined
     const path = this.config!.path
+    const plans = this.config!.schedules ?? []
     return html`<div class="card">
       <div class="head">
         <button class="room" ?disabled=${!path} @click=${() => path && this.navigate(path)}>
@@ -218,7 +236,9 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
       </div>
       ${thermostats.map(c => this.renderDial(c, thermostats.length > 1 ? shortName(entityName(c), area?.name) : undefined))}
       ${main ? this.renderMain(main) : nothing}
-      ${readings.length ? html`<div class="readings">${readings.map(e => this.renderReading(e, area?.name))}</div>` : nothing}
+      ${readings.length || plans.length ? html`<div class="readings">
+        ${readings.map(e => this.renderReading(e, area?.name))}${plans.map(id => this.renderSchedule(id, area?.name))}
+      </div>` : nothing}
     </div>`
   }
 }

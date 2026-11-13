@@ -288,6 +288,17 @@ describe('energy, maintenance, cameras and lists', () => {
     expect(home.find(c => c.type === 'custom:ad-house-info')!.links).toMatchObject({ energy: 'energy', climate: 'climate' })
   })
 
+  it("puts the heating plans on the climate page, a room's plan also on its room card", async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const climate = cards(views.find(v => v.path === 'climate')!)
+    expect(climate.find(c => c.type === 'custom:ad-schedules')!.entities)
+      .toEqual(expect.arrayContaining(['schedule.heizplan_wohnbereich', 'schedule.heizplan_bader', 'schedule.heizplan_boost_morgen']))
+    expect(climate.find(c => c.type === 'custom:ad-climate-room' && c.area === 'bad')!.schedules).toEqual(['schedule.heizplan_bader'])
+    expect(climate.find(c => c.type === 'custom:ad-climate-room' && c.area === 'schlafzimmer')!.schedules).toBeUndefined()
+    const hidden = await generateDashboard({ type: 'custom:auto-dashboard', hide_domains: ['schedule'] }, createHass(true))
+    expect(cards(hidden.views.find(v => v.path === 'climate')!).some(c => c.type === 'custom:ad-schedules')).toBe(false)
+  })
+
   it('takes gas and water from the energy settings, for Home and the energy page', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const meters = [

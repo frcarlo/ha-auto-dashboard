@@ -185,6 +185,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const outsideTile = weather ? [] : outdoor
   const showClimate = averageClimate(hass, indoor, hide).temperature !== undefined || outsideTile.length > 0
 
+  // Heating plans: HA's schedule helpers, house-wide like the calendars, edited on the climate page
+  const schedules = config.hide_domains?.includes('schedule') ? [] : allEntities(hass, hide).filter(ofDomain('schedule')).map(e => e.entity_id)
+  const roomSchedules = (areaId: string) => schedules.filter(id => entityAreaId(hass, id) === areaId)
+
   // Domain pages: which entities, and how the header counts and acts on them
   const domainPages = [
     {
@@ -201,8 +205,14 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       counts: (e: HassEntity) => groupOf(e) === 'climate',
       // One card per room: the thermostat in the middle, all readings of the room beneath
       roomCard: (area: AreaRegistryEntry, entities: HassEntity[]): Card => ({
-        type: 'custom:ad-climate-room', area: area.area_id, path: areaPath(area.area_id), entities: entities.map(e => e.entity_id), ...look,
+        type: 'custom:ad-climate-room', area: area.area_id, path: areaPath(area.area_id), entities: entities.map(e => e.entity_id),
+        ...(roomSchedules(area.area_id).length ? { schedules: roomSchedules(area.area_id) } : {}), ...look,
       }),
+      // The week of each plan beneath the rooms, a day to change on a tap
+      after: (): Section[] => schedules.length ? [fullWidth([
+        heading(t(hass, 'sched.heading'), 'mdi:calendar-clock'),
+        { type: 'custom:ad-schedules', entities: schedules, ...look },
+      ])] : [],
     },
     {
       path: 'covers', icon: 'mdi:window-shutter', title: t(hass, 'covers'),
@@ -547,6 +557,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     const content: Section[] = page.whole ? [fullWidth(page.whole())] : [
       ...floorSections,
       ...(rest.length ? [{ type: 'grid' as const, column_span: 2, cards: [heading(t(hass, 'other_rooms')), ...rest.map(e => tile(e))] }] : []),
+      ...('after' in page && page.after ? page.after() : []),
     ]
     // With today's changes beside them, the floors go into one section two columns wide and the list takes the third.
     // Phones stack them: the tiles first, the list beneath.
