@@ -17,6 +17,7 @@ import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import { accessOf } from './access'
 import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, OwnCardsPage, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
+import { scrollRow } from './scroll-row'
 
 interface HaUser {
   id: string
@@ -426,7 +427,7 @@ export class AdStrategyEditor extends LitElement {
       look: () => this.renderLook(), home: () => this.renderHome(), house: () => this.renderHouse(),
       rooms: () => this.renderRoomPages(), users: () => this.renderUsers(),
     }
-    return html`<div class="tabs" role="tablist" @keydown=${this.onTabKey}>
+    return html`<div class="tabs" ${scrollRow()} role="tablist" @keydown=${this.onTabKey}>
         ${TABS.map(([tab, label]) => html`<button class="tab" role="tab" id="tab-${tab}" aria-selected=${this.tab === tab}
           aria-controls="panel" tabindex=${this.tab === tab ? 0 : -1} @click=${() => (this.tab = tab)}>${this.l(label)}</button>`)}
       </div>

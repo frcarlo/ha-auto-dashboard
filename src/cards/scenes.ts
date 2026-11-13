@@ -6,6 +6,7 @@ import { t } from '../i18n'
 import { domainOf, entityIcon, entityName, isUnavailable } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
+import { scrollRow } from '../scroll-row'
 
 interface ScenesConfig extends BaseConfig {
   entities: string[]
@@ -107,7 +108,7 @@ export class AdScenes extends BaseCard<ScenesConfig> {
 
   protected render() {
     const entities = this.config!.entities.map(id => this.hass!.states[id]).filter((e): e is HassEntity => !!e)
-    return html`<div class="row">
+    return html`<div class="row" ${scrollRow()}>
       ${entities.map(entity => {
         const feedback = this.feedback[entity.entity_id]
         const icon = feedback === 'ok' ? 'mdi:check' : feedback === 'error' ? 'mdi:alert-circle-outline'

@@ -6,6 +6,7 @@ import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
 import { areaEntities, hideOf } from '../model'
 import { tokens } from '../styles/tokens'
+import { scrollRow } from '../scroll-row'
 
 interface FloorTab {
   id: string
@@ -116,7 +117,7 @@ export class AdFloorTabs extends BaseCard<FloorTabsConfig> {
     const floors = this.config!.floors
     const selected = this.selected
     return html`
-      <div class="tabs" role="tablist" aria-label=${t(this.hass, 'floors')} @keydown=${this.keys}>
+      <div class="tabs" ${scrollRow()} role="tablist" aria-label=${t(this.hass, 'floors')} @keydown=${this.keys}>
         ${floors.map(f => html`<button class="tab" role="tab" aria-selected=${f === selected} tabindex=${f === selected ? 0 : -1}
           @click=${() => this.pick(f.id)}>
           ${f.icon ? html`<ha-icon icon=${f.icon}></ha-icon>` : nothing}<span>${f.name}</span>${this.lit(f) ? html`<span class="lit"></span>` : nothing}

@@ -9,6 +9,7 @@ import { domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
+import { scrollRow } from '../scroll-row'
 
 interface RoomHeaderConfig extends BaseConfig {
   area: string
@@ -265,7 +266,7 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
         <div class="name">${this.renderName(area.name, summary, !!climate)}</div>
         <img class="pic" src=${area.picture} alt="">
       </div>` : html`<div class="top">${this.renderName(area.name, summary, !!climate)}</div>`}
-      ${climate || quick.length ? html`<div class="row">
+      ${climate || quick.length ? html`<div class="row" ${scrollRow()}>
         ${climate ? this.renderThermostat(climate) : nothing}
         ${quick.map(group => this.renderQuick(group.key, group.entities))}
       </div>` : nothing}

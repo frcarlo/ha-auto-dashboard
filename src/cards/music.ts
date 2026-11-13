@@ -10,6 +10,7 @@ import {
 } from '../music'
 import { tokens } from '../styles/tokens'
 import type { HassEntity, NavPosition } from '../types'
+import { scrollRow } from '../scroll-row'
 
 interface MusicCardConfig extends BaseConfig {
   players: MusicPlayer[]
@@ -1057,13 +1058,13 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
           @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.open(item)}>
           ${this.art(item.image, 'mdi:playlist-music')}<span>${item.name}</span>${this.playButton(item)}
         </div>`)}</div></div>` : nothing}
-      ${shelves.map(shelf => this.section(shelf.folder.name, html`<div class="tiles">${shelf.items.slice(0, 12).map(i => this.tile(i))}</div>`,
+      ${shelves.map(shelf => this.section(shelf.folder.name, html`<div class="tiles" ${scrollRow()}>${shelf.items.slice(0, 12).map(i => this.tile(i))}</div>`,
         shelf.items.length > 6 ? () => this.open(shelf.folder) : undefined))}
       ${shelves.length && ma ? html`<div class="sub-head" style="margin-top:30px"><ha-icon icon="mdi:music-circle"></ha-icon>${t(this.hass, 'mu.ma_players')}</div>` : nothing}
-      ${lib.recent.length ? this.section(t(this.hass, 'mu.recent'), html`<div class="tiles">${lib.recent.map(i => this.tile(i))}</div>`) : nothing}
-      ${lib.artists.length ? this.section(t(this.hass, 'mu.artists'), html`<div class="tiles">${lib.artists.map(i => this.tile(i))}</div>`) : nothing}
+      ${lib.recent.length ? this.section(t(this.hass, 'mu.recent'), html`<div class="tiles" ${scrollRow()}>${lib.recent.map(i => this.tile(i))}</div>`) : nothing}
+      ${lib.artists.length ? this.section(t(this.hass, 'mu.artists'), html`<div class="tiles" ${scrollRow()}>${lib.artists.map(i => this.tile(i))}</div>`) : nothing}
       ${lib.tracks.length ? this.section(t(this.hass, 'mu.tracks'), html`<div class="rows">${lib.tracks.map((i, n) => this.row(i, n + 1))}</div>`) : nothing}
-      ${lib.radio.length ? this.section(t(this.hass, 'mu.radio'), html`<div class="tiles">${lib.radio.slice(0, 12).map(i => this.tile(i))}</div>`) : nothing}
+      ${lib.radio.length ? this.section(t(this.hass, 'mu.radio'), html`<div class="tiles" ${scrollRow()}>${lib.radio.slice(0, 12).map(i => this.tile(i))}</div>`) : nothing}
     `
   }
 
@@ -1091,7 +1092,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
         : !any ? html`<div class="placeholder"><ha-icon icon="mdi:music-off"></ha-icon>${t(this.hass, 'mu.no_results')}</div>`
         : html`
           ${r.tracks?.length ? this.section(t(this.hass, 'mu.type.tracks'), html`<div class="rows">${r.tracks.slice(0, 10).map((i, n) => this.row(i, n + 1))}</div>`) : nothing}
-          ${groups.map(([key, label]) => r[key]?.length ? this.section(t(this.hass, label), html`<div class="tiles">${r[key]!.map(i => this.tile(i))}</div>`) : nothing)}
+          ${groups.map(([key, label]) => r[key]?.length ? this.section(t(this.hass, label), html`<div class="tiles" ${scrollRow()}>${r[key]!.map(i => this.tile(i))}</div>`) : nothing)}
         `}
     `
   }
@@ -1357,7 +1358,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const playlists = [...(this.shelves?.find(s => s.key === 'current_user_playlists')?.items ?? []), ...(this.lib?.playlists ?? [])]
     return html`<div class="music ${this.fit ? 'fit' : ''}" style=${this.fit ? `--fit:${this.fit}px` : ''}>
       <aside class="side card">
-        <nav>${views.map(([view, icon, label]) => html`<button class="nav" aria-current=${current === view && this.view !== 'detail'} @click=${() => go(view)}>
+        <nav ${scrollRow()}>${views.map(([view, icon, label]) => html`<button class="nav" aria-current=${current === view && this.view !== 'detail'} @click=${() => go(view)}>
           <ha-icon icon=${icon}></ha-icon><span>${t(this.hass, label)}</span></button>`)}</nav>
         ${playlists.length ? html`
           <div class="lib-head"><ha-icon icon="mdi:bookshelf"></ha-icon>${t(this.hass, 'mu.library')}<span style="margin-left:auto">${playlists.length}</span></div>

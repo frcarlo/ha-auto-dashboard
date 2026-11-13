@@ -18,6 +18,7 @@ const PARCEL_ICONS: Record<ParcelStage, string> = { today: 'mdi:truck-delivery-o
 import { applianceEntities } from '../appliances'
 import type { ApiEvent } from '../calendar'
 import type { HassEntity, HomeAssistant, StatusChip } from '../types'
+import { scrollRow } from '../scroll-row'
 
 interface StatusBarConfig extends BaseConfig {
   hide_domains?: string[]
@@ -365,7 +366,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     const phones = this.openPhones
     const openPerson = phones.length ? this.hass!.states[(this.open as string).slice(7)] : undefined
     return html`
-      <div class="chips">
+      <div class="chips" ${scrollRow()}>
         ${this.config!.people === false ? nothing : renderPeople(this.hass!, this.config!, id => this.openPerson(id), this.open)}
         <span class="sep"></span>
         ${events.filter(c => c.key === 'warning').map(c => this.eventChip(c))}

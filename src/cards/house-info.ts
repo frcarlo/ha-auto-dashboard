@@ -9,6 +9,7 @@ import { formatVolume, loadUsage, meterFlow, meterUnit, usageFresh, usageOf, typ
 import { tokens } from '../styles/tokens'
 import { METER_ICONS } from './meters'
 import type { AreaRegistryEntry } from '../types'
+import { scrollRow } from '../scroll-row'
 
 interface HouseInfoConfig extends BaseConfig {
   /** Indoor rooms */
@@ -125,7 +126,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
     const house = housePower(this.hass!, c.power_sources)
     const watts = house?.total ?? rooms.reduce((sum, room) => sum + room.total, 0)
     const power = formatWatts(watts, this.hass!.locale?.language ?? this.hass!.language)
-    return html`<div class="row">
+    return html`<div class="row" ${scrollRow()}>
       ${this.climate('mdi:home-thermometer-outline', t(this.hass, 'inside'), c.areas, c.links?.climate)}
       ${c.outdoor?.length ? this.climate('mdi:tree-outline', t(this.hass, 'outside'), c.outdoor) : nothing}
       ${rooms.length || house ? this.tile('mdi:flash', t(this.hass, 'power'), html`${power.value}<small>${power.unit}</small>`, c.links?.energy) : nothing}
