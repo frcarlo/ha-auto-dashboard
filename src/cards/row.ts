@@ -29,7 +29,7 @@ export class AdRow extends BaseCard<RowConfig> {
     @container (min-width: ${SIDE_BY_SIDE}px) {
       .row { flex-direction: row; align-items: var(--align, stretch); }
       /* Cards that can stack their parts (inside and power) do so beside a larger card */
-      .row > * { flex: var(--share, 1) 1 0; --ad-beside: column; --ad-beside-height: 100%; }
+      .row > * { flex: var(--share, 1) 1 0; --ad-beside: column; --ad-beside-height: 100%; --ad-beside-wrap: wrap; --ad-beside-basis: calc(50% - 4px); }
     }
   `
 

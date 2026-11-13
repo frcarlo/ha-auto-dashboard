@@ -32,7 +32,7 @@ export function formatWatts(watts: number, lang: string) {
 
 export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
   static styles = [tokens, css`
-    :host { display: block; height: 100%; }
+    :host { display: block; height: 100%; container-type: inline-size; }
     /* Beside the weather (a row says so) the tiles stack and share its height */
     .row {
       display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; box-sizing: border-box;
@@ -51,6 +51,12 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
     .value { font-size: var(--ad-fs-l); font-weight: 300; letter-spacing: -0.03em; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .value small { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-left: 2px; letter-spacing: 0; }
     .value .hum { font-size: var(--ad-fs-s); opacity: var(--ad-o2); margin-left: 8px; letter-spacing: 0; }
+    /* On a large screen the column beside the weather is wide enough for two tiles side by side: four tiles take
+       two rows instead of four, and the weather no longer stretches to their height */
+    @container (min-width: 400px) {
+      .row { flex-flow: row var(--ad-beside-wrap, nowrap); }
+      .tile { flex-basis: var(--ad-beside-basis, auto); }
+    }
   `]
 
   getGridOptions() {
