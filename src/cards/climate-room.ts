@@ -9,6 +9,7 @@ import { scheduleStatus } from '../schedules'
 import { domainOf, entityIcon, entityName, hvacColor, isUnavailable, shortName } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
+import { vthermOf, type Vtherm } from '../vtherm'
 import type { HassEntity } from '../types'
 
 interface ClimateRoomConfig extends BaseConfig {
@@ -22,6 +23,8 @@ interface ClimateRoomConfig extends BaseConfig {
 }
 
 const HVAC_ACTIONS = ['heating', 'cooling', 'drying', 'fan', 'idle', 'off']
+/** Presets with a name of our own; others take HA's translation */
+const PRESETS = ['frost', 'eco', 'comfort', 'boost', 'away', 'home', 'sleep', 'activity']
 
 /** Taps on −/+ are collected and sent as one set_temperature after this pause. */
 const SEND_DELAY = 700
@@ -30,9 +33,11 @@ const SEND_DELAY = 700
 const degree = (unit: string) => (/^°[CF]$/.test(unit) ? '°' : unit)
 
 export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
-  static properties = { ...BaseCard.properties, pending: { state: true } }
+  static properties = { ...BaseCard.properties, pending: { state: true }, pendingPreset: { state: true } }
   /** Targets tapped in but not yet confirmed by HA, per thermostat */
   pending = new Map<string, number>()
+  /** Presets tapped but not yet confirmed by HA, per thermostat */
+  pendingPreset = new Map<string, string>()
   private timers = new Map<string, number>()
 
   static styles = [tokens, materials, css`
@@ -51,6 +56,7 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     .mode { margin-left: auto; font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; }
     .mode.warning { color: rgb(var(--ad-warning)); opacity: 1; }
     .mode.info { color: rgb(var(--ad-info)); opacity: 1; }
+    .mode.error { color: rgb(var(--ad-error)); opacity: 1; }
 
     /* The thermostat: the room's one large number. It takes the free height, so a short card next to a tall one stays balanced. */
     .dial { flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0 4px; }
@@ -85,6 +91,24 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     .reading.off { opacity: 0.45; }
     .reading.schedule .v { font-weight: 400; }
     .reading.schedule.on .v { color: rgb(var(--ad-warning)); font-weight: 500; }
+    .reading.alert .v, .reading.alert ha-icon { color: rgb(var(--ad-warning)); opacity: 1; }
+    .reading.toggle[disabled] { cursor: default; }
+    .reading.toggle.waiting .switch { opacity: 0.55; }
+    .switch { position: relative; flex: none; width: 36px; height: 20px; border-radius: 10px; background: rgba(var(--ad-on-surface), 0.18); transition: background 0.2s ease; }
+    .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; }
+    .reading[aria-checked=true] .switch { background: rgb(var(--ad-primary)); }
+    .reading[aria-checked=true] .switch::after { transform: translateX(16px); }
+
+    /* Versatile Thermostat presets: the active one stands out without a color of its own, heating keeps the only color */
+    .presets { display: flex; gap: 2px; align-self: stretch; margin-top: 12px; padding: 3px; border-radius: 12px; background: rgba(var(--ad-on-surface), 0.06); }
+    .presets button {
+      all: unset; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+      padding: 5px 2px; border-radius: 9px; cursor: pointer; opacity: var(--ad-o2); line-height: 1.2;
+    }
+    .presets button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ad-fs-s); }
+    .presets button small { font-size: var(--ad-fs-xs); opacity: 0.8; font-variant-numeric: tabular-nums; }
+    .presets button[aria-pressed=true] { background: rgba(var(--ad-on-surface), 0.16); opacity: 1; font-weight: 600; }
+    .presets button:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 1px; }
   `]
 
   getGridOptions() {
@@ -102,19 +126,41 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
   }
 
   protected watched() {
-    return [...this.config!.entities, ...(this.config!.schedules ?? [])]
+    // The follow switch of a Versatile Thermostat is no entity of the room list, but shows on the card
+    const follow = this.thermostats.map(c => vthermOf(this.hass!, c)?.follow).filter((id): id is string => !!id)
+    return [...this.config!.entities, ...(this.config!.schedules ?? []), ...follow]
   }
 
   private get entities() {
     return this.config!.entities.map(id => this.hass!.states[id]).filter((e): e is HassEntity => !!e)
   }
 
+  private get thermostats() {
+    return this.entities.filter(e => domainOf(e.entity_id) === 'climate')
+  }
+
   protected willUpdate() {
     super.willUpdate()
-    // HA caught up with a tapped target
+    // HA caught up with a tapped target or preset
     for (const [id, value] of this.pending) {
       if (!this.timers.has(id) && this.hass!.states[id]?.attributes.temperature === value) this.pending.delete(id)
     }
+    for (const [id, mode] of this.pendingPreset) {
+      if (this.hass!.states[id]?.attributes.preset_mode === mode) this.pendingPreset.delete(id)
+    }
+  }
+
+  private setPreset(climate: HassEntity, mode: string) {
+    const id = climate.entity_id
+    this.pendingPreset = new Map(this.pendingPreset).set(id, mode)
+    Promise.resolve(this.call('climate', 'set_preset_mode', id, { preset_mode: mode })).catch(() => {
+      this.pendingPreset.delete(id)
+      this.requestUpdate()
+    })
+  }
+
+  private presetLabel(climate: HassEntity, mode: string) {
+    return PRESETS.includes(mode) ? t(this.hass, `preset.${mode}` as Key) : this.hass!.formatEntityAttributeValue?.(climate, 'preset_mode', mode) ?? mode
   }
 
   private nudge(climate: HassEntity, direction: number) {
@@ -141,7 +187,58 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     return { color, label }
   }
 
-  private renderDial(climate: HassEntity, label?: string) {
+  /** The head: a stopped Versatile Thermostat says why, otherwise what the thermostat does */
+  private status(climate: HassEntity, vt?: Vtherm) {
+    if (vt?.safety) return { color: 'error', label: t(this.hass, 'vt.safety') }
+    if (vt?.window === 'open') return { color: 'warning', label: t(this.hass, 'window_open') }
+    return this.action(climate)
+  }
+
+  private renderPresets(climate: HassEntity, vt: Vtherm) {
+    const id = climate.entity_id
+    const active = this.pendingPreset.get(id) ?? vt.preset
+    return html`<div class="presets" role="group" aria-label=${t(this.hass, 'vt.presets')}>
+      ${vt.presets.map(p => html`<button aria-pressed=${p.mode === active} @click=${() => p.mode !== active && this.setPreset(climate, p.mode)}>
+        <span>${this.presetLabel(climate, p.mode)}</span>
+        ${p.temp !== undefined ? html`<small>${this.number(p.temp, Number.isInteger(p.temp) ? 0 : 1)}°</small>` : nothing}
+      </button>`)}
+    </div>`
+  }
+
+  /** What a Versatile Thermostat adds beneath the dial: window, regulation, trend and the follow switch */
+  private renderVtherm(climate: HassEntity, vt: Vtherm) {
+    const follow = vt.follow ? this.hass!.states[vt.follow] : undefined
+    const slope = vt.slope
+    const sign = slope === undefined ? '' : slope > 0.05 ? '+' : slope < -0.05 ? '−' : '±'
+    const trendIcon = !sign || sign === '±' ? 'mdi:trending-neutral' : sign === '+' ? 'mdi:trending-up' : 'mdi:trending-down'
+    const open = vt.window === 'open'
+    const followOn = follow?.state === 'on'
+    const canFollow = !!follow && !isUnavailable(follow) && this.canControl(follow.entity_id)
+    return html`
+      ${vt.window ? html`<button class="reading ${open ? 'alert' : ''}" @click=${() => this.moreInfo(climate.entity_id)}>
+        <ha-icon icon=${open ? 'mdi:window-open-variant' : 'mdi:window-closed-variant'}></ha-icon>
+        <span class="n">${t(this.hass, 'vt.window')}</span>
+        <span class="v">${t(this.hass, open ? 'open' : 'closed')}</span>
+      </button>` : nothing}
+      ${vt.regulated !== undefined ? html`<button class="reading" title=${t(this.hass, 'vt.regulated_hint')} @click=${() => this.moreInfo(climate.entity_id)}>
+        <ha-icon icon="mdi:valve"></ha-icon>
+        <span class="n">${t(this.hass, 'vt.regulated')}</span>
+        <span class="v">${this.number(vt.regulated, Number.isInteger(vt.regulated) ? 0 : 1)}<small>°</small></span>
+      </button>` : nothing}
+      ${slope !== undefined ? html`<button class="reading" @click=${() => this.moreInfo(climate.entity_id)}>
+        <ha-icon icon=${trendIcon}></ha-icon>
+        <span class="n">${t(this.hass, 'vt.slope')}</span>
+        <span class="v">${sign}${this.number(Math.abs(slope))}<small>°/h</small></span>
+      </button>` : nothing}
+      ${follow ? html`<button class="reading toggle ${this.waiting(follow.entity_id) ? 'waiting' : ''}" role="switch" aria-checked=${followOn}
+          ?disabled=${!canFollow} title=${t(this.hass, 'vt.follow_hint')} @click=${() => canFollow && this.toggle(follow)}>
+        <ha-icon icon="mdi:sync"></ha-icon>
+        <span class="n">${t(this.hass, 'vt.follow')}</span>
+        <span class="switch" aria-hidden="true"></span>
+      </button>` : nothing}`
+  }
+
+  private renderDial(climate: HassEntity, label?: string, vt?: Vtherm) {
     const a = climate.attributes
     const id = climate.entity_id
     const current = a.current_temperature as number | undefined
@@ -162,6 +259,7 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
         ${adjustable ? html`<button class="btn" aria-label="+" @click=${() => this.nudge(climate, 1)}><ha-icon icon="mdi:plus"></ha-icon></button>` : nothing}
       </div>
       ${current !== undefined ? this.renderScale(current, min, max, target, color === 'warning' || color === 'info' ? color : undefined) : nothing}
+      ${vt?.presets.length && adjustable ? this.renderPresets(climate, vt) : nothing}
     </div>`
   }
 
@@ -218,13 +316,19 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
     const area = this.hass!.areas[this.config!.area]
     const entities = this.entities
     const thermostats = entities.filter(e => domainOf(e.entity_id) === 'climate')
+    const vtherms = new Map(thermostats.map(c => [c.entity_id, vthermOf(this.hass!, c)]))
+    // A Versatile Thermostat's own sensors (EMA, regulated, energy) show as its rows, not as room readings
+    const vthermDevices = new Set([...vtherms.values()].map(vt => vt?.device).filter(Boolean))
     const summary = roomSummary(entities, area, this.hass!.states)
     // The middle: the thermostats, or the room's temperature sensor when there is none
     const main = thermostats.length ? undefined : summary.temperature?.entity
-    const readings = entities.filter(e => domainOf(e.entity_id) !== 'climate' && e !== main)
-    const single = thermostats.length === 1 ? this.action(thermostats[0]!) : undefined
+    const readings = entities.filter(e => domainOf(e.entity_id) !== 'climate' && e !== main &&
+      !vthermDevices.has(this.hass!.entities[e.entity_id]?.device_id ?? undefined))
+    const single = thermostats.length === 1 ? this.status(thermostats[0]!, vtherms.get(thermostats[0]!.entity_id)) : undefined
     const path = this.config!.path
     const plans = this.config!.schedules ?? []
+    const vthermRows = thermostats.map(c => { const vt = vtherms.get(c.entity_id); return vt ? this.renderVtherm(c, vt) : nothing })
+    const hasVthermRows = [...vtherms.values()].some(vt => vt && (vt.window || vt.regulated !== undefined || vt.slope !== undefined || vt.follow))
     return html`<div class="card">
       <div class="head">
         <button class="room" ?disabled=${!path} @click=${() => path && this.navigate(path)}>
@@ -234,10 +338,10 @@ export class AdClimateRoom extends BaseCard<ClimateRoomConfig> {
         </button>
         ${single ? html`<span class="mode ${single.color}">${single.label}</span>` : nothing}
       </div>
-      ${thermostats.map(c => this.renderDial(c, thermostats.length > 1 ? shortName(entityName(c), area?.name) : undefined))}
+      ${thermostats.map(c => this.renderDial(c, thermostats.length > 1 ? shortName(entityName(c), area?.name) : undefined, vtherms.get(c.entity_id)))}
       ${main ? this.renderMain(main) : nothing}
-      ${readings.length || plans.length ? html`<div class="readings">
-        ${readings.map(e => this.renderReading(e, area?.name))}${plans.map(id => this.renderSchedule(id, area?.name))}
+      ${readings.length || plans.length || hasVthermRows ? html`<div class="readings">
+        ${vthermRows}${readings.map(e => this.renderReading(e, area?.name))}${plans.map(id => this.renderSchedule(id, area?.name))}
       </div>` : nothing}
     </div>`
   }

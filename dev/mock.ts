@@ -39,7 +39,6 @@ const defs: Def[] = [
   ['light.flur', 'off', { friendly_name: 'Flur', supported_color_modes: ['onoff'] }, 'flur'],
 
   ['light.schlafzimmer', 'off', { friendly_name: 'Schlafzimmer Licht', supported_color_modes: ['brightness'] }, 'schlafzimmer'],
-  ['climate.schlafzimmer', 'heat', { friendly_name: 'Schlafzimmer Thermostat', current_temperature: 18.2, temperature: 18.5, hvac_action: 'idle' }, 'schlafzimmer'],
   ['binary_sensor.schlafzimmer_fenster', 'off', { friendly_name: 'Schlafzimmer Fenster', device_class: 'window' }, 'schlafzimmer'],
   ['sensor.schlafzimmer_luftfeuchte', '55', { friendly_name: 'Schlafzimmer Luftfeuchte', device_class: 'humidity', unit_of_measurement: '%' }, 'schlafzimmer'],
   ['cover.schlafzimmer', 'closed', { friendly_name: 'Schlafzimmer Rollo', current_position: 0 }, 'schlafzimmer'],
@@ -399,6 +398,22 @@ const deviceDefs: DeviceDef[] = [
       ['sensor.steckdose_kaffeemaschine_spannung', '231', { friendly_name: 'Steckdose Kaffeemaschine Spannung', device_class: 'voltage', unit_of_measurement: 'V' }],
     ],
   },
+  // Versatile Thermostat over a radiator valve: presets, regulation, window and the follow switch
+  {
+    id: 'dev-vtherm-schlafzimmer', name: 'VThermostat Schlafzimmer', area: 'schlafzimmer', platform: 'versatile_thermostat', entities: [
+      ['climate.vthermostat_schlafzimmer', 'heat', {
+        friendly_name: 'Heizung', current_temperature: 18.2, temperature: 21, hvac_action: 'heating', hvac_mode: 'heat', target_temp_step: 0.5, min_temp: 7, max_temp: 30,
+        preset_modes: ['none', 'frost', 'eco', 'comfort', 'boost'], preset_mode: 'comfort', ema_temp: 18.3,
+        preset_temperatures: { frost_temp: 7, eco_temp: 19, comfort_temp: 21, boost_temp: 24 },
+        is_over_climate: true, regulated_target_temperature: 23, is_window_configured: true,
+        window_manager: { window_state: 'off', window_auto_state: 'unavailable' }, safety_manager: { safety_state: 'off' },
+        specific_states: { temperature_slope: 0.39 },
+      }],
+      ['sensor.vthermostat_schlafzimmer_ema_temperatur', '18.3', { friendly_name: 'Heizung EMA-Temperatur', device_class: 'temperature', unit_of_measurement: '°C' }],
+      ['sensor.vthermostat_schlafzimmer_geregelte_temperatur', '23.0', { friendly_name: 'Heizung Geregelte Temperatur', device_class: 'temperature', unit_of_measurement: '°C' }],
+      ['switch.vthermostat_schlafzimmer_follow_underlying_temp_change', 'on', { friendly_name: 'Heizung Follow underlying temp change' }],
+    ],
+  },
   // The same TV over ADB, which the dashboard leaves out
   {
     id: 'dev-tv-adb', name: 'TV-Wohnzimmer (ADB)', area: 'wohnzimmer', platform: 'androidtv', entities: [
@@ -728,6 +743,13 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
     if (domain === 'light' && data.brightness_pct) { state = 'on'; attributes.brightness = Math.round(data.brightness_pct * 2.55) }
     if (domain === 'light' && service === 'turn_on' && !attributes.brightness) attributes.brightness = 255
     if (domain === 'climate' && data.temperature !== undefined) attributes.temperature = data.temperature
+    // A preset brings its own target; setting a target by hand leaves the preset
+    if (domain === 'climate' && service === 'set_preset_mode') {
+      attributes.preset_mode = data.preset_mode
+      const temp = attributes.preset_temperatures?.[`${data.preset_mode}_temp`]
+      if (temp !== undefined) attributes.temperature = temp
+    }
+    if (domain === 'climate' && service === 'set_temperature' && attributes.preset_modes) attributes.preset_mode = 'none'
     if (domain === 'cover') {
       if (service === 'open_cover') { state = 'open'; attributes.current_position = 100 }
       if (service === 'close_cover') { state = 'closed'; attributes.current_position = 0 }
