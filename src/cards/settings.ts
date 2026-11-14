@@ -14,7 +14,7 @@ interface SettingsConfig extends BaseConfig {
   /** The dashboard's url path: settings are kept per dashboard */
   dashboard: string
   /** What the dashboard has set, before the user's own settings */
-  base: Required<Pick<PersonalSettings, 'theme' | 'glass' | 'nav_position' | 'favorites'>> & { primary_color?: string; face: FaceConfig | false; floor_tabs?: boolean; floor_start?: string }
+  base: Required<Pick<PersonalSettings, 'theme' | 'glass' | 'nav_position' | 'favorites'>> & { primary_color?: string; face: FaceConfig | false; floor_tabs?: boolean; floor_start?: string; page_floors?: boolean }
   /** The pages of the nav bar the user may switch off */
   pages: { path: string; icon: string; label: string }[]
   /** The admin switched the face off for this user */
@@ -228,7 +228,8 @@ export class AdSettings extends BaseCard<SettingsConfig> {
         [['', this.l('set.floor_last')], ...floors.map(f => [f.id, f.name] as [string, string])], start,
         // "Last picked" over a dashboard that sets a floor needs '' to say so; otherwise nothing is stored
         id => this.set({ floor_start: id || (this.config!.base.floor_start ? '' : undefined) })),
-        this.l('set.floor_start_hint')) : nothing}`
+        this.l('set.floor_start_hint')) : nothing}
+      ${this.switchRow(html`${this.l('ed.page_floors')}`, d.page_floors !== false, this.l('ed.page_floors'), page_floors => this.set({ page_floors }))}`
   }
 
   private renderFace(d: PersonalSettings) {

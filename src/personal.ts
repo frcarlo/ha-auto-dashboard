@@ -13,6 +13,8 @@ export interface PersonalSettings {
   floor_tabs?: boolean
   /** The floor Home opens on; '' = the one picked last, over the dashboard's */
   floor_start?: string
+  /** false: the pages list the rooms without floor headings */
+  page_floors?: boolean
   /** The face for this user; false switches it off */
   face?: FaceConfig | false
   /** Pages this user doesn't need, on top of what the dashboard hides */
@@ -53,7 +55,7 @@ export function withPersonal(config: StrategyConfig, personal?: PersonalSettings
   const pick = <K extends keyof PersonalSettings>(key: K) => (personal[key] !== undefined ? { [key]: personal[key] } : {})
   return {
     ...config,
-    ...pick('theme'), ...pick('glass'), ...pick('primary_color'), ...pick('nav_position'), ...pick('floor_tabs'), ...pick('floor_start'), ...pick('favorites'),
+    ...pick('theme'), ...pick('glass'), ...pick('primary_color'), ...pick('nav_position'), ...pick('floor_tabs'), ...pick('floor_start'), ...pick('page_floors'), ...pick('favorites'),
     ...(personal.pages ? { pages: mergePages(config.pages, personal.pages) } : {}),
   }
 }

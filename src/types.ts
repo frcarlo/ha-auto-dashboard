@@ -208,6 +208,8 @@ export interface StrategyConfig extends Look {
   floor_tabs?: boolean
   /** With floor_tabs, the floor Home opens on (a floor id); unset = the one picked last on this device */
   floor_start?: string
+  /** false: lights, climate, covers, security and energy list the rooms without floor headings; per user in the settings */
+  page_floors?: boolean
   /** Pages left out for everyone, admins included; per user under users */
   hide_pages?: PagePath[]
   users?: Record<string, UserRule>

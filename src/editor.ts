@@ -559,6 +559,7 @@ export class AdStrategyEditor extends LitElement {
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
           c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}
         ${this.toggle(this.l('ed.floor_tabs'), !!c.floor_tabs, floor_tabs => this.change({ floor_tabs }))}
+        ${this.toggle(this.l('ed.page_floors'), c.page_floors !== false, on => this.change({ page_floors: on ? undefined : false }))}
         ${this.field(this.l('ed.face'), this.faceFields(c.face, face => this.change({ face: face || undefined }), false), this.l('ed.face_hint'))}`
   }
 

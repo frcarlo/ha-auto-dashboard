@@ -458,7 +458,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       base: {
         theme: baseConfig.theme ?? 'auto', glass: !!baseConfig.glass, primary_color: isHexColor(baseConfig.primary_color) ? baseConfig.primary_color : undefined,
         nav_position: baseConfig.nav_position ?? 'bottom', face: faceFor(baseConfig, rule) ?? false, favorites: baseConfig.favorites ?? [],
-        floor_tabs: !!baseConfig.floor_tabs, ...(baseConfig.floor_start ? { floor_start: baseConfig.floor_start } : {}),
+        floor_tabs: !!baseConfig.floor_tabs, page_floors: baseConfig.page_floors !== false, ...(baseConfig.floor_start ? { floor_start: baseConfig.floor_start } : {}),
       },
       pages: navItems.filter(i => i.path !== 'home').map(({ path, icon, label }) => ({ path, icon, label })),
       ...(rule?.face === false ? { face_locked: true } : {}),
@@ -468,6 +468,16 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     }]),
   ])
 
+  // The pages' groups: the floors with their names, or with page_floors: false only the rooms, in two halves
+  // side by side so a wide screen still fills up. Pages with today's changes beside them join the halves again.
+  const pageGroups = (has: (area: AreaRegistryEntry) => boolean): { title?: string; areas: AreaRegistryEntry[] }[] => {
+    if (config.page_floors !== false) return floors.map(g => ({ title: g.floor?.name ?? t(hass, 'other_rooms'), areas: g.areas.filter(has) }))
+    const list = areas.filter(has)
+    const half = Math.ceil(list.length / 2)
+    return [{ areas: list.slice(0, half) }, { areas: list.slice(half) }]
+  }
+  const titled = (title: string | undefined, cards: Card[]) => (cards.length && title ? [heading(title), ...cards] : cards)
+
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
   const powerOpts = { ...hideOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
@@ -475,10 +485,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(hasPower ? [fullWidth([{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }])] : []),
     // Gas and water side by side: today, this month, the cost, the flow and the last day per hour
     ...(meters.length ? [fullWidth([heading(t(hass, 'meter.heading'), 'mdi:gauge'), { type: 'custom:ad-meters', meters, ...look }])] : []),
-    ...floors.map((group): Section => {
+    ...pageGroups(area => areaEntities(hass, area.area_id, hide).some(isPower)).map((group): Section => {
       const cards = group.areas.flatMap(area => {
         const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)
-        if (!sensors.length) return []
         // Card and graph each take the full row: HA packs sections densely and would otherwise
         // slide the next room's card next to this room's graph. The history graph needs no long-term statistics.
         return [
@@ -487,7 +496,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: Math.min(10, 4 + Math.ceil(sensors.length / 2)) } },
         ]
       })
-      return { type: 'grid', column_span: 2, cards: cards.length ? [heading(group.floor?.name ?? t(hass, 'other_rooms')), ...cards] : [] }
+      return { type: 'grid', column_span: 2, cards: titled(group.title, cards) }
     }).filter(section => section.cards.length),
   ])
 
@@ -526,30 +535,27 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       const here = roomSet(areaId)
       return page.entities.filter(e => here.has(e))
     }
-    // One section per floor with a subtitle per room, so single-entity rooms don't each fill a section
-    const floorSections: Section[] = floors.map(group => {
-      const rooms = group.areas.map(area => ({ area, entities: inArea(area.area_id) })).filter(r => r.entities.length)
+    // One section per floor (or half of the rooms) with a subtitle per room, so single-entity rooms don't each fill a section
+    const floorSections: Section[] = pageGroups(area => inArea(area.area_id).length > 0).map(group => {
+      const rooms = group.areas.map(area => ({ area, entities: inArea(area.area_id) }))
       return {
         type: 'grid' as const,
         column_span: 2,
-        cards: rooms.length ? [
-          heading(group.floor?.name ?? t(hass, 'other_rooms')),
-          ...rooms.flatMap(({ area, entities }) => {
-            if (page.roomCard) return [page.roomCard(area, entities)]
-            const roomHeading = { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }
-            const tiles = (list: HassEntity[]) => list.map(e => tile(e, area.name))
-            const kinds = page.split ? [...new Set(entities.map(page.split))] : []
-            if (kinds.length < 2) return [groupHeading(area.name, entities, roomHeading), ...tiles(entities)]
-            // Several kinds in one room: the room heading only names it, each kind brings its own control
-            return [
-              groupHeading(area.name, [], roomHeading),
-              ...kinds.flatMap(kind => {
-                const ofKind = entities.filter(e => page.split!(e) === kind)
-                return [groupHeading(t(hass, `group.${kind}` as Key), ofKind, { minor: true }), ...tiles(ofKind)]
-              }),
-            ]
-          }),
-        ] : [],
+        cards: titled(group.title, rooms.flatMap(({ area, entities }) => {
+          if (page.roomCard) return [page.roomCard(area, entities)]
+          const roomHeading = { icon: area.icon ?? undefined, path: areaPath(area.area_id), sub: true }
+          const tiles = (list: HassEntity[]) => list.map(e => tile(e, area.name))
+          const kinds = page.split ? [...new Set(entities.map(page.split))] : []
+          if (kinds.length < 2) return [groupHeading(area.name, entities, roomHeading), ...tiles(entities)]
+          // Several kinds in one room: the room heading only names it, each kind brings its own control
+          return [
+            groupHeading(area.name, [], roomHeading),
+            ...kinds.flatMap(kind => {
+              const ofKind = entities.filter(e => page.split!(e) === kind)
+              return [groupHeading(t(hass, `group.${kind}` as Key), ofKind, { minor: true }), ...tiles(ofKind)]
+            }),
+          ]
+        })),
       }
     }).filter(section => section.cards.length)
     const placed = new Set(areas.flatMap(area => inArea(area.area_id)))

@@ -218,6 +218,24 @@ describe('room page, favorites and scenes', () => {
     expect(lights.find(c => c.title === 'Flur')!.control).toBeUndefined()
   })
 
+  it('with page_floors: false the pages list the rooms without floor headings, in two halves', async () => {
+    const hass = createHass(true)
+    const floorNames = Object.values(hass.floors ?? {}).map(f => f.name)
+    const byFloor = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
+    const byRoom = await generateDashboard({ type: 'custom:auto-dashboard', page_floors: false }, hass)
+    const headings = (views: typeof byRoom.views, path: string) => cards(views.find(v => v.path === path)!).filter(c => c.type === 'heading').map(c => c.heading)
+    for (const path of ['lights', 'climate', 'energy']) {
+      expect(headings(byFloor.views, path).some(h => floorNames.includes(h))).toBe(true)
+      expect(headings(byRoom.views, path).some(h => floorNames.includes(h))).toBe(false)
+    }
+    // The same tiles in the same order
+    const tiles = (views: typeof byRoom.views) => cards(views.find(v => v.path === 'lights')!).filter(c => c.type === 'custom:ad-tile').map(c => c.entity)
+    expect(tiles(byRoom.views)).toEqual(tiles(byFloor.views))
+    // Climate has no list beside it: the rooms go into two sections side by side
+    const climate = (byRoom.views.find(v => v.path === 'climate') as any).sections.filter((s: any) => s.cards.some((c: any) => c.type === 'custom:ad-climate-room'))
+    expect(climate).toHaveLength(2)
+  })
+
   it('favorites appear on Home and in their room; scenes default to all scenes', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', favorites: ['light.flur', 'script.gute_nacht'] }, createHass(true))
     const home = cards(views[0]!)
