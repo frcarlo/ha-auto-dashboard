@@ -1,6 +1,6 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { normalizeConfig } from './config'
-import { faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
+import { currentDashboard, faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
 import { t, type Key } from './i18n'
 import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities, isRoomFavorite,
@@ -30,7 +30,7 @@ const MAX_COLUMNS = 4
 const NO_FLOOR = 'no_floor'
 
 const areaPath = (areaId: string) => `area-${areaId}`
-const dashboardPath = () => (typeof location === 'undefined' ? undefined : location.pathname.split('/')[1]) || 'lovelace'
+const dashboardPath = currentDashboard
 
 function heading(text: string, icon?: string | null, navigateTo?: string, style: 'title' | 'subtitle' = 'title'): Card {
   return {
@@ -204,10 +204,39 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         (domainOf(e.entity_id) === 'sensor' && ['temperature', 'humidity'].includes(e.attributes.device_class)),
       counts: (e: HassEntity) => groupOf(e) === 'climate',
       // One card per room: the thermostat in the middle, all readings of the room beneath
-      roomCard: (area: AreaRegistryEntry, entities: HassEntity[]): Card => ({
-        type: 'custom:ad-climate-room', area: area.area_id, path: areaPath(area.area_id), entities: entities.map(e => e.entity_id),
-        ...(roomSchedules(area.area_id).length ? { schedules: roomSchedules(area.area_id) } : {}), ...look,
-      }),
+      roomCard: (area: AreaRegistryEntry, entities: HassEntity[]): Card => {
+        const climate = entities.find(e => domainOf(e.entity_id) === 'climate')
+        // Check if there's a temperature_sensor select for this climate entity
+        const climateNamePart = climate?.entity_id?.split('.')[1] || ''
+        const isVtherm = climate && climateNamePart && Object.keys(hass.states).some(id =>
+          id.startsWith('select.') && id.includes(climateNamePart) && (id.includes('temperature_sensor') || hass.states[id]?.attributes?.friendly_name?.toLowerCase().includes('temperature sensor'))
+        )
+        if (isVtherm && climate && climateNamePart) {
+          const tempSensor = Object.keys(hass.states).find(id => id.startsWith('sensor.') && id.includes(climateNamePart) && id.includes('temperature'))
+          const windowEntity = Object.keys(hass.states).find(id => id.startsWith('binary_sensor.') && id.includes(climateNamePart) && id.includes('window'))
+          const followSwitch = Object.keys(hass.states).find(id => id.startsWith('switch.') && id.includes(climateNamePart) && id.includes('follow'))
+          const emaTemp = Object.keys(hass.states).find(id => id.includes(climateNamePart) && id.includes('ema'))
+          const valveOpening = Object.keys(hass.states).find(id => id.includes(climateNamePart) && id.includes('valve_opening'))
+          const rateEntity = Object.keys(hass.states).find(id => id.includes(climateNamePart) && (id.includes('change_rate') || id.includes('temperaturänderungsrate')))
+          return {
+            type: 'custom:ad-climate-vtherm',
+            entity: climate.entity_id,
+            room: area.name,
+            path: areaPath(area.area_id),
+            ...(tempSensor ? { temperature_entity: tempSensor } : {}),
+            ...(followSwitch ? { follow_switch: followSwitch } : {}),
+            ...(windowEntity ? { window_entity: windowEntity } : {}),
+            ...(emaTemp ? { ema_temperature: emaTemp } : {}),
+            ...(valveOpening ? { valve_opening: valveOpening } : {}),
+            ...(rateEntity ? { temp_change_rate: rateEntity } : {}),
+            ...look,
+          }
+        }
+        return {
+          type: 'custom:ad-climate-room', area: area.area_id, path: areaPath(area.area_id), entities: entities.map(e => e.entity_id),
+          ...(roomSchedules(area.area_id).length ? { schedules: roomSchedules(area.area_id) } : {}), ...look,
+        }
+      },
       // The week of each plan beneath the rooms, a day to change on a tap
       after: (): Section[] => schedules.length ? [fullWidth([
         heading(t(hass, 'sched.heading'), 'mdi:calendar-clock'),

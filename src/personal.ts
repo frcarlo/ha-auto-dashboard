@@ -25,6 +25,9 @@ export interface PersonalSettings {
   pages?: StrategyConfig['pages']
 }
 
+/** The dashboard open in this browser, by its url path */
+export const currentDashboard = () => (typeof location === 'undefined' ? undefined : location.pathname.split('/')[1]) || 'lovelace'
+
 /** One entry per dashboard, so two Auto Dashboards keep their own settings */
 export const personalKey = (dashboard: string) => `auto_dashboard:${dashboard}`
 

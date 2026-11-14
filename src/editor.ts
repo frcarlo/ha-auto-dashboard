@@ -15,7 +15,8 @@ import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
-import { accessOf } from './access'
+import { accessOf, ruleFor } from './access'
+import { currentDashboard, loadPersonal, personalAllowed, savePersonal, type PersonalSettings } from './personal'
 import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, OwnCardsPage, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
 import { scrollRow } from './scroll-row'
 
@@ -70,6 +71,7 @@ export class AdStrategyEditor extends LitElement {
     cardsPage: { state: true },
     cardsSlot: { state: true },
     cardsError: { state: true },
+    own: { state: true },
   }
 
   hass?: HomeAssistant
@@ -85,6 +87,8 @@ export class AdStrategyEditor extends LitElement {
   cardsPage: OwnCardsPage = 'home'
   cardsSlot: 'top' | 'bottom' = 'top'
   cardsError = false
+  /** The admin's own settings for this dashboard: where they differ, they apply to the admin instead of what is set here */
+  own?: PersonalSettings
   private usersRequested = false
 
   static styles = [houseStyles, css`
@@ -100,6 +104,13 @@ export class AdStrategyEditor extends LitElement {
     .body > .field + .field, .body > .field + .row, .body > .row + .field { border-top: 1px solid var(--ad-line); padding-top: 14px; }
     .label { font-size: 14px; font-weight: 600; color: var(--primary-text-color, inherit); }
     .hint { font-size: 12px; color: var(--secondary-text-color, #94a3b8); line-height: 1.4; }
+    /* An own setting of the admin's that applies to them instead */
+    .own {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: -8px; font-size: 12px; line-height: 1.4;
+      color: var(--warning-color, #f59e0b);
+    }
+    .own .link { all: unset; cursor: pointer; font-weight: 600; color: var(--ad-accent); }
+    .own .link:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 2px; border-radius: 4px; }
     input[type=text], select, textarea {
       font: inherit; color: inherit; background: var(--secondary-background-color, rgba(127, 127, 127, 0.1));
       border: 1px solid var(--ad-line); border-radius: 10px; padding: 9px 12px;
@@ -195,7 +206,27 @@ export class AdStrategyEditor extends LitElement {
       this.hass.callWS<HaLabel[]>({ type: 'config/label_registry/list' })
         .then(labels => { this.labels = labels.filter(l => l.label_id !== HIDE_LABEL) })
         .catch(() => { this.labels = [] })
+      void loadPersonal(this.hass, currentDashboard()).then(own => { this.own = own })
     }
+  }
+
+  /**
+   * Under a setting the admin changed for themself on the settings page: that one applies to them, not this one.
+   * Other users' own settings stay unknown here, HA lets each user read only their own.
+   */
+  private ownNote(keys: (keyof PersonalSettings)[]) {
+    const own = this.own
+    if (!own || !this.hass || !personalAllowed(ruleFor(this.config.users, this.hass.user))) return nothing
+    if (!keys.some(key => own[key] !== undefined)) return nothing
+    const reset = async () => {
+      const next = { ...own }
+      for (const key of keys) delete next[key]
+      const value = Object.keys(next).length ? next : null
+      await savePersonal(this.hass!, currentDashboard(), value)
+      this.own = value ?? undefined
+    }
+    return html`<div class="own">${this.l('ed.own_note')}
+      <button class="link" @click=${reset}>${this.l('ed.own_reset')}</button></div>`
   }
 
   private l(key: Key, vars: Record<string, string | number> = {}) {
@@ -480,7 +511,7 @@ export class AdStrategyEditor extends LitElement {
     const c = this.config
     return html`
         ${this.field(this.l('favorites'), this.entityPicker(c.favorites?.filter(id => !isRoomFavorite(id)), undefined,
-          next => this.change({ favorites: replaceFavorites(c.favorites ?? [], false, next) })), this.l('ed.favorites_hint'))}
+          next => this.change({ favorites: replaceFavorites(c.favorites ?? [], false, next) })), this.l('ed.favorites_hint'))}${this.ownNote(['favorites'])}
         ${this.field(this.l('ed.favorite_rooms'), this.areasPicker(c.favorites?.filter(isRoomFavorite),
           next => this.change({ favorites: replaceFavorites(c.favorites ?? [], true, next) })), this.l('ed.favorite_rooms_hint'))}
         ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
@@ -550,17 +581,17 @@ export class AdStrategyEditor extends LitElement {
           @change=${(e: Event) => this.change({ title: (e.target as HTMLInputElement).value.trim() || undefined })}>`)}
         ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
           [['auto', 'ed.theme_auto'], ['dark', 'ed.theme_dark'], ['light', 'ed.theme_light']],
-          c.theme ?? 'auto', theme => this.change({ theme })))}
-        ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}
+          c.theme ?? 'auto', theme => this.change({ theme })))}${this.ownNote(['theme'])}
+        ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}${this.ownNote(['primary_color'])}
         ${isHexColor(c.primary_color) ? this.toggle(this.l('ed.ha_colors'), c.ha_colors !== false, ha_colors => this.change({ ha_colors })) : nothing}
-        ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}
+        ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}${this.ownNote(['glass'])}
         ${this.field(this.l('ed.background'), this.imagePicker(c.background_image), this.l('ed.background_hint'))}
         ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
           [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
-          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}
-        ${this.toggle(this.l('ed.floor_tabs'), !!c.floor_tabs, floor_tabs => this.change({ floor_tabs }))}
-        ${this.toggle(this.l('ed.page_floors'), c.page_floors !== false, on => this.change({ page_floors: on ? undefined : false }))}
-        ${this.field(this.l('ed.face'), this.faceFields(c.face, face => this.change({ face: face || undefined }), false), this.l('ed.face_hint'))}`
+          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}${this.ownNote(['nav_position'])}
+        ${this.toggle(this.l('ed.floor_tabs'), !!c.floor_tabs, floor_tabs => this.change({ floor_tabs }))}${this.ownNote(['floor_tabs', 'floor_start'])}
+        ${this.toggle(this.l('ed.page_floors'), c.page_floors !== false, on => this.change({ page_floors: on ? undefined : false }))}${this.ownNote(['page_floors'])}
+        ${this.field(this.l('ed.face'), this.faceFields(c.face, face => this.change({ face: face || undefined }), false), this.l('ed.face_hint'))}${this.ownNote(['face'])}`
   }
 
   private renderHouse() {

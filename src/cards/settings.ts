@@ -72,6 +72,11 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     .hint { font-size: var(--ad-fs-s); opacity: var(--ad-o2); line-height: 1.4; }
     .field { display: flex; flex-direction: column; gap: 8px; }
     .label { font-size: var(--ad-fs-s); font-weight: 600; opacity: 0.8; }
+    .label, .label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .row .what { flex: 1; }
+    /* The way back to the dashboard's value, next to a value the user set apart from it */
+    .back { flex: none; font-size: var(--ad-fs-s); font-weight: 500; color: rgb(var(--ad-primary)); opacity: 1; padding: 2px 6px; margin: -2px -6px; border-radius: 8px; }
+    .back:hover { background: rgba(var(--ad-primary), 0.1); }
 
     .seg { display: inline-flex; flex-wrap: wrap; align-self: flex-start; padding: 3px; gap: 2px; border-radius: 12px; background: rgba(var(--ad-on-surface), 0.07); }
     .seg button { padding: 7px 14px; border-radius: 9px; font-size: var(--ad-fs-s); }
@@ -189,13 +194,26 @@ export class AdSettings extends BaseCard<SettingsConfig> {
       <button aria-pressed=${value === v} @click=${() => pick(v)}>${label}</button>`)}</div>`
   }
 
-  private field(label: string, content: TemplateResult, hint?: string) {
-    return html`<div class="field"><span class="label">${label}</span>${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
+  private field(label: string, content: TemplateResult, hint?: string, own?: (keyof PersonalSettings)[]) {
+    return html`<div class="field"><span class="label">${label}${own ? this.back(own) : nothing}</span>${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
   }
 
-  private switchRow(content: TemplateResult, checked: boolean, label: string, toggle: (v: boolean) => void) {
-    return html`<div class="row"><span class="what">${content}</span>
+  private switchRow(content: TemplateResult, checked: boolean, label: string, toggle: (v: boolean) => void, own?: (keyof PersonalSettings)[]) {
+    return html`<div class="row"><span class="what">${content}</span>${own ? this.back(own) : nothing}
       <button class="switch" role="switch" aria-checked=${checked} aria-label=${label} @click=${() => toggle(!checked)}></button></div>`
+  }
+
+  /**
+   * A value the user set apart from the dashboard wins over it, also when the admin changes the dashboard later.
+   * This says so and takes the dashboard's value back; saved, the own value is gone and the dashboard's applies again.
+   */
+  private back(keys: (keyof PersonalSettings)[]) {
+    const base = this.config!.base as PersonalSettings
+    const d = this.draft!
+    const same = (key: keyof PersonalSettings) => JSON.stringify(d[key] ?? null) === JSON.stringify(base[key] ?? null)
+    if (keys.every(same)) return nothing
+    return html`<button class="back" title=${this.l('set.own_hint')}
+      @click=${() => this.set(Object.fromEntries(keys.map(key => [key, base[key]])) as Partial<PersonalSettings>)}>${this.l('set.as_dashboard')}</button>`
   }
 
   private renderLook(d: PersonalSettings) {
@@ -204,14 +222,14 @@ export class AdSettings extends BaseCard<SettingsConfig> {
       <h2>${this.l('set.look')}</h2>
       ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
         [['auto', this.l('ed.theme_auto')], ['dark', this.l('ed.theme_dark')], ['light', this.l('ed.theme_light')]],
-        d.theme ?? 'auto', theme => this.set({ theme })))}
+        d.theme ?? 'auto', theme => this.set({ theme })), undefined, ['theme'])}
       ${this.field(this.l('ed.primary'), html`<div class="colors">${SWATCHES.map(c => html`
         <button class="swatch" style="background:${c}" aria-label=${c} aria-pressed=${color === c}
-          @click=${() => this.set({ primary_color: c === SWATCHES[0] ? undefined : c })}></button>`)}</div>`)}
-      ${this.switchRow(html`${this.l('ed.glass')}`, !!d.glass, this.l('ed.glass'), glass => this.set({ glass }))}
+          @click=${() => this.set({ primary_color: c === SWATCHES[0] ? undefined : c })}></button>`)}</div>`, undefined, ['primary_color'])}
+      ${this.switchRow(html`${this.l('ed.glass')}`, !!d.glass, this.l('ed.glass'), glass => this.set({ glass }), ['glass'])}
       ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
         [['bottom', this.l('ed.nav_bottom')], ['top', this.l('ed.nav_top')], ['left', this.l('ed.nav_left')], ['right', this.l('ed.nav_right')]],
-        d.nav_position ?? 'bottom', nav_position => this.set({ nav_position })))}
+        d.nav_position ?? 'bottom', nav_position => this.set({ nav_position })), undefined, ['nav_position'])}
       ${this.renderFloors(d)}
       ${this.renderFace(d)}
     </section>`
@@ -223,13 +241,13 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     if (!floors?.length) return nothing
     const start = floors.some(f => f.id === d.floor_start) ? d.floor_start! : ''
     return html`
-      ${this.switchRow(html`${this.l('ed.floor_tabs')}`, !!d.floor_tabs, this.l('ed.floor_tabs'), floor_tabs => this.set({ floor_tabs }))}
+      ${this.switchRow(html`${this.l('ed.floor_tabs')}`, !!d.floor_tabs, this.l('ed.floor_tabs'), floor_tabs => this.set({ floor_tabs }), ['floor_tabs', 'floor_start'])}
       ${d.floor_tabs ? this.field(this.l('set.floor_start'), this.seg<string>(
         [['', this.l('set.floor_last')], ...floors.map(f => [f.id, f.name] as [string, string])], start,
         // "Last picked" over a dashboard that sets a floor needs '' to say so; otherwise nothing is stored
         id => this.set({ floor_start: id || (this.config!.base.floor_start ? '' : undefined) })),
         this.l('set.floor_start_hint')) : nothing}
-      ${this.switchRow(html`${this.l('ed.page_floors')}`, d.page_floors !== false, this.l('ed.page_floors'), page_floors => this.set({ page_floors }))}`
+      ${this.switchRow(html`${this.l('ed.page_floors')}`, d.page_floors !== false, this.l('ed.page_floors'), page_floors => this.set({ page_floors }), ['page_floors'])}`
   }
 
   private renderFace(d: PersonalSettings) {
@@ -246,7 +264,7 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     return this.field(this.l('ed.face'), html`
       ${this.seg(styles, face ? face.style ?? 'clock' : 'off', v => this.set({ face: v === 'off' ? false : { ...(face || {}), style: v } }))}
       ${face ? this.seg(WAITS.map(w => [String(w), w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)] as [string, string]),
-        String(after), v => this.set({ face: { ...face, after: Number(v) } })) : nothing}`)
+        String(after), v => this.set({ face: { ...face, after: Number(v) } })) : nothing}`, undefined, ['face'])
   }
 
   private renderPages(d: PersonalSettings) {
@@ -299,7 +317,7 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     }
     const results = this.results
     return html`<section class="card panel wide">
-      <h2>${this.l('set.favorites')}</h2>
+      <h2 class="label-row">${this.l('set.favorites')}${this.back(['favorites'])}</h2>
       <span class="hint">${this.l('set.favorites_hint')}</span>
       ${list.length ? html`<ul class="favs">${list.map((id, i) => {
         const r = this.describe(id)
