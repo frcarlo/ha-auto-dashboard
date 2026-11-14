@@ -1,5 +1,5 @@
 // Keeps the saved strategy config as small as hand-written YAML: no defaults, no empty lists.
-import type { PopupRule, RoomSettings, StrategyConfig, UserRule } from './types'
+import type { PageSettings, PopupRule, RoomSettings, StrategyConfig, UserRule } from './types'
 
 const DEFAULTS: Partial<Record<string, unknown>> = { theme: 'auto', glass: false, nav_position: 'bottom', floor_tabs: false, ha_colors: true, forecast_days: 3 }
 const RULE_DEFAULTS: Partial<Record<string, unknown>> = { access: 'full', settings: true }
@@ -22,11 +22,13 @@ export function cleanRoom(room: RoomSettings): RoomSettings | undefined {
   return Object.keys(out).length ? out : undefined
 }
 
-/** Pages without own cards drop out, so the YAML stays short */
+/** Pages without own cards or a picture drop out, so the YAML stays short */
 export function cleanPages(pages: StrategyConfig['pages']): StrategyConfig['pages'] {
   const kept = Object.entries(pages ?? {}).flatMap(([path, page]) => {
     const cards = Object.fromEntries(Object.entries(page?.cards ?? {}).filter(([, list]) => list?.length))
-    return Object.keys(cards).length ? [[path, { ...page, cards }]] : []
+    const image = page?.background_image?.trim()
+    const out: PageSettings = { ...(Object.keys(cards).length ? { cards } : {}), ...(image ? { background_image: image } : {}) }
+    return Object.keys(out).length ? [[path, out]] : []
   })
   return kept.length ? Object.fromEntries(kept) : undefined
 }

@@ -417,7 +417,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .ctrl.small ha-icon { --mdc-icon-size: 18px; }
     .ctrl ha-icon { --mdc-icon-size: 24px; }
     .ctrl.on { color: rgb(var(--ad-primary)); }
-    .ctrl.main { width: 42px; height: 42px; background: rgb(var(--ad-on-surface)); color: var(--ad-surface); }
+    .ctrl.primary { width: 42px; height: 42px; background: rgb(var(--ad-on-surface)); color: var(--ad-surface); }
     .ctrl[disabled] { opacity: 0.3; pointer-events: none; }
     .progress { display: flex; align-items: center; gap: 10px; width: 100%; font-size: var(--ad-fs-xs); opacity: 0.85; font-variant-numeric: tabular-nums; }
     .progress span { width: 40px; opacity: var(--ad-o2); }
@@ -1307,7 +1307,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
             ?disabled=${!ctl} @click=${() => this.control('shuffle_set', { shuffle: !a.shuffle })}><ha-icon icon="mdi:shuffle-variant"></ha-icon></button>` : nothing}
           <button class="ctrl" aria-label=${t(this.hass, 'mu.previous')} title=${t(this.hass, 'mu.previous')} ?disabled=${!ctl || !(f & F.PREVIOUS) || !active}
             @click=${() => this.control('media_previous_track')}><ha-icon icon="mdi:skip-previous"></ha-icon></button>
-          <button class="ctrl main" aria-label=${t(this.hass, playing ? 'mu.pause' : 'mu.play')} ?disabled=${!ctl || !(f & (playing ? F.PAUSE : F.PLAY))}
+          <button class="ctrl primary" aria-label=${t(this.hass, playing ? 'mu.pause' : 'mu.play')} ?disabled=${!ctl || !(f & (playing ? F.PAUSE : F.PLAY))}
             @click=${() => this.control(playing ? 'media_pause' : 'media_play')}><ha-icon icon=${playing ? 'mdi:pause' : 'mdi:play'}></ha-icon></button>
           <button class="ctrl" aria-label=${t(this.hass, 'mu.next')} title=${t(this.hass, 'mu.next')} ?disabled=${!ctl || !(f & F.NEXT) || !active}
             @click=${() => this.control('media_next_track')}><ha-icon icon="mdi:skip-next"></ha-icon></button>

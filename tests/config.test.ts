@@ -17,6 +17,20 @@ describe('cleanConfig', () => {
     expect(cleanConfig({ type: 'custom:auto-dashboard', theme: 'dark', glass: true, nav_position: 'left' }))
       .toEqual({ type: 'custom:auto-dashboard', theme: 'dark', glass: true, nav_position: 'left' })
   })
+
+  it('keeps a page with only a picture, drops empty pages', () => {
+    expect(cleanConfig({
+      type: 'custom:auto-dashboard',
+      pages: {
+        music: { background_image: ' /local/konzert.jpg ', cards: { top: [] } },
+        lights: { background_image: ' ' },
+        home: { cards: { top: [{ type: 'markdown' }], bottom: [] } },
+      },
+    })).toEqual({
+      type: 'custom:auto-dashboard',
+      pages: { music: { background_image: '/local/konzert.jpg' }, home: { cards: { top: [{ type: 'markdown' }] } } },
+    })
+  })
 })
 
 describe('room settings', () => {
