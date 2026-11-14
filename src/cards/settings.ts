@@ -8,6 +8,7 @@ import { allEntities, entityAreaId, hideOf, isRoomFavorite } from '../model'
 import { entityIcon, entityName, shortName } from '../presentation'
 import { loadPersonal, personalDiff, savePersonal, type PersonalSettings } from '../personal'
 import { tokens } from '../styles/tokens'
+import { SLIDE_INTERVALS, withAlbum } from '../album-picker'
 import type { FaceConfig, FaceStyle, NavPosition, OwnCardsPage, PagePath, ThemeMode } from '../types'
 
 interface SettingsConfig extends BaseConfig {
@@ -299,7 +300,21 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     return card(html`
       ${this.seg(styles, face ? face.style ?? 'clock' : 'off', v => this.set({ face: v === 'off' ? false : { ...(face || {}), style: v } }))}
       ${face ? this.field(this.l('ed.face_after'), this.seg(WAITS.map(w => [String(w), w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)] as [string, string]),
-        String(after), v => this.set({ face: { ...face, after: Number(v) } }))) : nothing}`)
+        String(after), v => this.set({ face: { ...face, after: Number(v) } }))) : nothing}
+      ${face && face.style === 'photo' ? this.albumFields(face, seconds, minutes) : nothing}`)
+  }
+
+  /** The photo face's slideshow: which album, how long each picture stays, shuffled or in order */
+  private albumFields(face: FaceConfig, seconds: Intl.NumberFormat, minutes: Intl.NumberFormat) {
+    const every = face.interval ?? 30
+    return html`${this.field(this.l('face.album'), html`<ad-album-picker .hass=${this.hass} .value=${face.album}
+        @value-changed=${(e: CustomEvent) => { e.stopPropagation(); this.set({ face: withAlbum(face, e.detail.value) }) }}></ad-album-picker>`,
+      this.l('face.album_hint'))}
+      ${face.album ? this.field(this.l('face.interval'), html`
+        ${this.seg(SLIDE_INTERVALS.map(s => [String(s), s < 60 ? seconds.format(s) : minutes.format(s / 60)] as [string, string]),
+          String(every), v => this.set({ face: { ...face, interval: Number(v) } }))}
+        ${this.seg<'shuffle' | 'order'>([['shuffle', this.l('face.shuffle')], ['order', this.l('face.in_order')]], face.shuffle === false ? 'order' : 'shuffle',
+          v => this.set({ face: { ...face, shuffle: v !== 'order' } }))}`) : nothing}`
   }
 
   /** Where the bar sits and which pages are in it */

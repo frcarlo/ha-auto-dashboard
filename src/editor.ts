@@ -12,6 +12,7 @@ import { entityName } from './presentation'
 import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
 import { imagePicker } from './media-picker'
+import { SLIDE_INTERVALS, withAlbum } from './album-picker'
 import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
@@ -104,6 +105,7 @@ export class AdStrategyEditor extends LitElement {
     }
     .body { display: flex; flex-direction: column; gap: 16px; }
     .field { display: flex; flex-direction: column; gap: 8px; }
+    .album { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
     /* Each option is its own block, so long chip lists don't run into the next heading */
     .body > .field + .field, .body > .field + .row, .body > .row + .field,
     .sec > .field + .field, .sec > .field + .row, .sec > .row + .field { border-top: 1px solid var(--ad-line); padding-top: 14px; }
@@ -274,7 +276,27 @@ export class AdStrategyEditor extends LitElement {
       v === 'inherit' ? undefined : v === 'off' ? (inherit ? false : undefined) : { ...(face || {}), style: v as FaceStyle }))}
       ${face ? html`<div class="seg" role="group" aria-label=${this.l('ed.face_after')}>${waits.map(w => html`
         <button aria-pressed=${after === w} @click=${() => onChange({ ...face, after: w === 120 ? undefined : w })}>
-          ${w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)}</button>`)}</div>` : nothing}`
+          ${w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)}</button>`)}</div>` : nothing}
+      ${face && face.style === 'photo' ? this.albumFields(face, onChange) : nothing}`
+  }
+
+  /** The photo face's slideshow: which album, how long each picture stays, shuffled or in order */
+  private albumFields(face: FaceConfig, onChange: (face: FaceConfig) => void) {
+    const minutes = new Intl.NumberFormat(this.hass?.language, { style: 'unit', unit: 'minute', unitDisplay: 'short' })
+    const seconds = new Intl.NumberFormat(this.hass?.language, { style: 'unit', unit: 'second', unitDisplay: 'short' })
+    const every = face.interval ?? 30
+    return html`<div class="album">
+      <span class="label">${this.l('face.album')}</span>
+      <ad-album-picker .hass=${this.hass} .value=${face.album}
+        @value-changed=${(e: CustomEvent) => { e.stopPropagation(); onChange(withAlbum(face, e.detail.value)) }}></ad-album-picker>
+      ${face.album ? html`
+        <div class="seg" role="group" aria-label=${this.l('face.interval')}>${SLIDE_INTERVALS.map(s => html`
+          <button aria-pressed=${every === s} @click=${() => onChange({ ...face, interval: s === 30 ? undefined : s })}>
+            ${s < 60 ? seconds.format(s) : minutes.format(s / 60)}</button>`)}</div>
+        ${this.seg<'shuffle' | 'order'>([['shuffle', 'face.shuffle'], ['order', 'face.in_order']], face.shuffle === false ? 'order' : 'shuffle',
+          v => onChange({ ...face, shuffle: v === 'order' ? false : undefined }))}` : nothing}
+      <span class="hint">${this.l('face.album_hint')}</span>
+    </div>`
   }
 
   private toggle(label: string, checked: boolean, onToggle: (v: boolean) => void) {

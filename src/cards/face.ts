@@ -8,6 +8,7 @@ import { CALENDAR_COLORS, addDays, sameDay, startOfDay, toEvent, type ApiEvent, 
 import { conditionIcon } from '../weather'
 import { entityName } from '../presentation'
 import { ACTIVE_PHASES, applianceIcon, appliancePhase, applianceProgress, applianceTimes, type Appliance, type AppliancePhase } from '../appliances'
+import { albumPictures, browseMedia, pictureUrl, playOrder, type MediaNode } from '../slideshow'
 import type { FaceStyle, HomeAssistant } from '../types'
 
 export interface FaceSettings {
@@ -20,6 +21,11 @@ export interface FaceSettings {
   calendars?: string[]
   /** The dashboard's background picture, for the photo face */
   image?: string
+  /** A folder of HA's media for a slideshow on the photo face, e.g. an Immich album; wins over `image` */
+  album?: string
+  /** Seconds per picture of the album */
+  interval?: number
+  shuffle?: boolean
   /** Washer, dryer, dishwasher: shown while they run, wait or need someone */
   appliances?: Appliance[]
 }
@@ -29,6 +35,10 @@ const PHASE_COLOR: Partial<Record<AppliancePhase, string>> = { running: 'warning
 const ACTIVITY = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const
 const EVENTS_EVERY = 15 * 60_000
 const SHIFT_EVERY = 60_000
+/** New pictures in the album show up without a reload */
+const ALBUM_EVERY = 60 * 60_000
+/** A picture that does not load is skipped; after this many in a row the slideshow waits for its next turn */
+const SLIDE_TRIES = 3
 /** After a tap or a touch the face waits at least this long, even when it is set to show right away */
 const GRACE = 60
 
@@ -40,6 +50,8 @@ export class AdFace extends LitElement {
     now: { state: true },
     events: { state: true },
     picture: { state: true },
+    slides: { state: true },
+    front: { state: true },
     shift: { state: true },
   }
 
@@ -49,6 +61,9 @@ export class AdFace extends LitElement {
   now = new Date()
   events: CalEvent[] = []
   picture?: string
+  /** The slideshow's two layers: one shows, the other takes the next picture and fades in over it */
+  slides: [string?, string?] = []
+  front = 0
   shift: [number, number] = [0, 0]
 
   private idle?: number
@@ -56,6 +71,13 @@ export class AdFace extends LitElement {
   private loadedAt = 0
   private shiftedAt = 0
   private pictureFor?: string
+  private albumFor?: string
+  private albumAt = 0
+  private albumItems: MediaNode[] = []
+  private order: number[] = []
+  private pos = 0
+  private slideAt = 0
+  private sliding = false
 
   private onActivity = () => {
     if (!this.shown) this.arm(false)
@@ -99,9 +121,11 @@ export class AdFace extends LitElement {
         this.shift = [Math.round(Math.random() * 24 - 12), Math.round(Math.random() * 24 - 12)]
       }
       if (Date.now() - this.loadedAt > EVENTS_EVERY) void this.loadEvents()
+      if (this.settings?.album && Date.now() - this.slideAt > (this.settings.interval ?? 30) * 1000) void this.nextSlide()
     }, 1000)
     void this.loadEvents()
     void this.loadPicture()
+    if (this.settings?.album) void this.nextSlide()
   }
 
   private hide(ev: Event) {
@@ -150,6 +174,63 @@ export class AdFace extends LitElement {
       this.picture = resolved?.url
     } catch {
       this.pictureFor = undefined
+    }
+  }
+
+  /** The album's pictures, again every hour; a new album starts from its beginning */
+  private async loadAlbum() {
+    const album = this.settings?.album
+    if (!album || !this.hass?.callWS) return
+    if (this.albumFor === album && Date.now() - this.albumAt < ALBUM_EVERY) return
+    const fresh = this.albumFor !== album
+    this.albumAt = Date.now()
+    try {
+      const items = albumPictures(await browseMedia(this.hass, album))
+      if (fresh || items.length !== this.albumItems.length) {
+        this.order = playOrder(items.length, this.settings?.shuffle !== false)
+        this.pos = 0
+      }
+      this.albumItems = items
+      this.albumFor = album
+    } catch {
+      // Not reachable right now (Immich down): the clock or the background picture until the next try
+      if (fresh) this.albumItems = []
+      this.albumFor = album
+    }
+  }
+
+  /** The next picture of the album, loaded first so it fades in whole */
+  private async nextSlide() {
+    if (this.sliding || !this.hass) return
+    this.sliding = true
+    this.slideAt = Date.now()
+    try {
+      await this.loadAlbum()
+      for (let i = 0; i < Math.min(SLIDE_TRIES, this.albumItems.length); i++) {
+        if (this.pos >= this.order.length) {
+          // Round done: a new shuffle, so the order does not repeat
+          this.order = playOrder(this.albumItems.length, this.settings?.shuffle !== false)
+          this.pos = 0
+        }
+        const item = this.albumItems[this.order[this.pos++]!]
+        if (!item) continue
+        try {
+          const url = await pictureUrl(this.hass, item.media_content_id)
+          const img = new Image()
+          img.src = url
+          await img.decode()
+          if (!this.shown) return
+          const back = 1 - this.front
+          const slides: [string?, string?] = [...this.slides]
+          slides[back] = url
+          this.slides = slides
+          this.front = back
+          return
+        } catch { /* gone or not loading: the next one */ }
+      }
+    } finally {
+      this.sliding = false
+      this.slideAt = Date.now()
     }
   }
 
@@ -282,7 +363,13 @@ export class AdFace extends LitElement {
     .backdrop { position: absolute; inset: -10%; background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(var(--ad-primary), 0.22), transparent 70%); }
     .picture { position: absolute; inset: 0; background-size: cover; background-position: center; }
     .picture::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent 45%, transparent 75%, rgba(0, 0, 0, 0.25)); }
-    .stage { position: absolute; inset: 0; transition: transform 2s ease; }
+    /* The slideshow: the next picture fades in over the one before */
+    .picture.slide { overflow: hidden; background: #000; opacity: 0; transition: opacity 1.6s ease; }
+    .picture.slide.front { opacity: 1; z-index: 1; }
+    .slide .fill, .slide .fit { position: absolute; background-position: center; background-repeat: no-repeat; }
+    .slide .fill { inset: -48px; background-size: cover; filter: blur(32px) brightness(0.55); }
+    .slide .fit { inset: 0; background-size: contain; }
+    .stage { position: absolute; inset: 0; z-index: 2; transition: transform 2s ease; }
 
     .center { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px; box-sizing: border-box; text-align: center; }
     .time { font-size: clamp(88px, min(24vw, 34vh), 280px); font-weight: 200; letter-spacing: -0.04em; line-height: 0.95; }
@@ -322,7 +409,7 @@ export class AdFace extends LitElement {
     }
 
     .live {
-      position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+      position: absolute; z-index: 2; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
       display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 48px);
     }
     .chip {
@@ -340,18 +427,29 @@ export class AdFace extends LitElement {
 
     @media (prefers-reduced-motion: reduce) {
       :host([shown]) { animation: none; }
-      .stage { transition: none; }
+      .stage, .picture.slide { transition: none; }
     }
   `]
 
+  /** One picture of the slideshow, whole; a portrait one on a blurred, darker copy of itself instead of black bars */
+  private slide(url: string | undefined, front: boolean) {
+    if (!url) return nothing
+    const bg = `background-image: url(${JSON.stringify(url)})`
+    return html`<div class="picture slide ${front ? 'front' : ''}"><div class="fill" style=${bg}></div><div class="fit" style=${bg}></div></div>`
+  }
+
   protected render() {
     if (!this.shown || !this.hass || !this.settings) return nothing
-    // Without its picture (none set, or still loading) the photo face shows the clock
-    const photo = this.settings.style === 'photo' && !!this.picture
+    // The album's slideshow, else the one picture; without either (none set, or still loading) the clock
+    const slideshow = this.settings.style === 'photo' && !!this.settings.album && this.slides.some(Boolean)
+    const photo = slideshow || (this.settings.style === 'photo' && !!this.picture)
+    const layer = (url: string | undefined) => url
+      ? html`<div class="picture" style="background-image: url(${JSON.stringify(url)})"></div>` : nothing
     return html`<div class="wake ${photo ? 'on-photo' : ''}" @click=${(ev: Event) => this.hide(ev)}
       role="button" tabindex="0" aria-label=${t(this.hass, 'face.wake')}
       @keydown=${(ev: KeyboardEvent) => { if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Escape') this.hide(ev) }}>
-      ${photo ? html`<div class="picture" style="background-image: url(${JSON.stringify(this.picture)})"></div>` : html`<div class="backdrop"></div>`}
+      ${slideshow ? [0, 1].map(i => this.slide(this.slides[i], i === this.front))
+        : photo ? layer(this.picture) : html`<div class="backdrop"></div>`}
       <div class="stage" style="transform: translate(${this.shift[0]}px, ${this.shift[1]}px)">${this.content(photo)}</div>
       ${this.live()}
     </div>`

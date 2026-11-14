@@ -163,6 +163,39 @@ const library: Record<string, Mi[]> = {
 const tracksOf = (item: Mi) => library.track.concat(library.track.map((t, i) => ({ ...t, uri: `${t.uri}-${item.uri}-${i}`, name: `${t.name} (Live)` })))
 
 // Two Spotify accounts, as a Sonos speaker's media browser lists them; the first belongs to spotify_frank
+/** HA's media as the browser shows it: the sources, an Immich account with albums, and local media */
+const IMMICH = 'media-source://immich/u1'
+const MOCK_ALBUMS: Record<string, { title: string; count: number }> = {
+  italien: { title: 'Italien', count: 12 },
+  garten: { title: 'Garten', count: 5 },
+  leer: { title: '', count: 0 },
+}
+function mediaBrowse(id?: string) {
+  const dir = (title: string, media_content_id: string, thumbnail?: string) => ({ title, media_content_id, media_class: 'directory', media_content_type: 'image', can_expand: true, can_play: false, thumbnail })
+  if (!id) return { ...dir('Medien', 'media-source://'), children: [dir('Immich', 'media-source://immich'), dir('Lokale Medien', 'media-source://media_source')] }
+  if (id === 'media-source://immich') return { ...dir('Immich', id), children: [dir('Frank Carlo', IMMICH)] }
+  if (id === 'media-source://media_source') return { ...dir('Lokale Medien', id), children: [] }
+  if (id === IMMICH) return { ...dir('Frank Carlo', id), children: [dir('albums', `${IMMICH}|albums`), dir('favorites', `${IMMICH}|favorites|favorites`)] }
+  if (id === `${IMMICH}|albums`) return { ...dir('albums', id), children: Object.entries(MOCK_ALBUMS).map(([key, a]) => dir(a.title, `${IMMICH}|albums|${key}`, `/immich/u1/${key}-0/thumbnail/image/jpeg`)) }
+  const key = id.split('|')[2] ?? ''
+  const album = MOCK_ALBUMS[key]
+  if (!album) return undefined
+  const children = Array.from({ length: album.count }, (_, i) => ({
+    title: `IMG_${key}_${i}.jpg`, media_class: 'image', media_content_type: 'image/jpeg', media_content_id: `${id}|${key}-${i}|IMG_${key}_${i}.jpg|image/jpeg`, can_expand: false, can_play: false,
+  }))
+  // A video in between, and one photo twice as RAW + JPEG, like Immich lists them
+  return { ...dir(album.title, id), children: album.count ? [...children.slice(0, 2), { ...children[1]!, media_content_id: `${children[1]!.media_content_id}-raw` },
+    { title: 'clip.mp4', media_class: 'video', media_content_type: 'video/mp4', media_content_id: `${id}|v|clip.mp4|video/mp4`, can_expand: false, can_play: true }, ...children.slice(2)] : [] }
+}
+/** A picture for a media id: a gradient with its number, portrait for every third one */
+function mediaPicture(id: string) {
+  const n = Number(/-(\d+)/.exec(id)?.[1] ?? 0)
+  const hue = (n * 47) % 360
+  const [w, h] = n % 3 === 2 ? [900, 1400] : [1600, 1000]
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,55%)"/><stop offset="1" stop-color="hsl(${(hue + 80) % 360},60%,25%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><text x="50%" y="50%" font-size="${h / 4}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.5)" font-family="sans-serif">${n + 1}</text></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 const SPOTIFY_ACCOUNTS = [{ id: 'spotify://entry-media_player.spotify_frank', title: 'frank.c' }, { id: 'spotify://01LENI', title: 'lenimusik' }]
 function spotifyBrowse(id: string) {
   const sp = (account: string, kind: string, n: number, name: string, hue: number, cls: string) => ({
@@ -649,6 +682,15 @@ export function createHass(dark: boolean): HomeAssistant {
           media_content_type: 'music', thumbnail: c.image, can_play: true, can_expand: c.media_type !== 'track',
         })) } as T
       }
+      // HA's media, with an Immich account like the integration shows it; pictures are drawn gradients
+      if (msg.type === 'media_source/browse_media') {
+        await new Promise(r => setTimeout(r, 200))
+        const node = mediaBrowse(msg.media_content_id as string | undefined)
+        if (!node) throw new Error('not found')
+        return node as T
+      }
+      if (msg.type === 'media_source/resolve_media') return { url: mediaPicture(String(msg.media_content_id)), mime_type: 'image/svg+xml' } as T
+      if (msg.type === 'auth/sign_path') return { path: mediaPicture(String(msg.path)) } as T
       // A user's own settings, kept in the browser here; HA keeps them per user on the server
       if (msg.type === 'frontend/get_user_data') {
         try { return { value: JSON.parse(localStorage.getItem(`mock:${msg.key}`) ?? 'null') } as T } catch { return { value: null } as T }

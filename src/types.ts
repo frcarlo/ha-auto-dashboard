@@ -133,6 +133,12 @@ export interface FaceConfig {
   /** Seconds without a touch, default 120; 0 shows the face right away */
   after?: number
   style?: FaceStyle
+  /** Photo face: a folder of HA's media shown picture by picture, e.g. an Immich album (media-source://immich/…) */
+  album?: string
+  /** Seconds per picture of the album, default 30 */
+  interval?: number
+  /** false: the album in its own order instead of shuffled */
+  shuffle?: boolean
 }
 
 /**

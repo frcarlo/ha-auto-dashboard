@@ -278,6 +278,12 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(weatherSensors(hass, config.weather_sensors)?.temperature ? { temperature: weatherSensors(hass, config.weather_sensors)!.temperature } : {}),
     ...(calendars.length ? { calendars: calendars.map(e => e.entity_id) } : {}),
     ...(config.background_image?.trim() ? { image: config.background_image.trim() } : {}),
+    // A slideshow from an album instead of the one background picture
+    ...(faceConfig.album?.trim() ? {
+      album: faceConfig.album.trim(),
+      interval: Math.max(5, Number(faceConfig.interval ?? 30) || 30),
+      shuffle: faceConfig.shuffle !== false,
+    } : {}),
     // Washer, dryer, dishwasher: the face shows them while they run or wait to be emptied
     ...(appliances.length ? { appliances } : {}),
   } : undefined

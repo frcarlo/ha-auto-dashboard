@@ -644,6 +644,15 @@ describe('face', () => {
     expect(await navFace({ face: { after: 0, style: 'photo' } })).toMatchObject({ after: 0, style: 'photo' })
   })
 
+  it('hands an album to the photo face, shuffled every 30 s unless told otherwise', async () => {
+    const album = 'media-source://immich/u1|albums|a1'
+    expect(await navFace({ face: { style: 'photo', album: ` ${album} ` } })).toMatchObject({ album, interval: 30, shuffle: true })
+    expect(await navFace({ face: { style: 'photo', album, interval: 2, shuffle: false } })).toMatchObject({ interval: 5, shuffle: false })
+    const without = await navFace({ face: { style: 'photo', album: ' ' } })
+    expect(without).not.toHaveProperty('album')
+    expect(without).not.toHaveProperty('interval')
+  })
+
   it('a user gets their own face, or none', async () => {
     const hass = createHass(true)
     const id = hass.user!.id
