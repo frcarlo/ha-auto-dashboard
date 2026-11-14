@@ -603,7 +603,11 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     : look.primary_color ? pageBackground(look.primary_color, config.theme) : undefined
   // Own cards (pages: <page>: cards: top/bottom) go below the page's header and at its end, like a room's
   const withOwnCards = (view: View): View => {
-    const cards = config.pages?.[String(view.path) as OwnCardsPage]?.cards
+    const page = config.pages?.[String(view.path) as OwnCardsPage]
+    // A page's own picture (pages: music: background_image) replaces the dashboard's, like a room's
+    const image = page?.background_image?.trim()
+    if (image) view = { ...view, background: imageBackground(image, config.theme) }
+    const cards = page?.cards
     if (!cards?.top?.length && !cards?.bottom?.length) return view
     const sections = [...(view.sections as Section[])]
     const navAt = sections.findIndex(s => s.cards.some(c => c.type === 'custom:ad-nav-bar'))
@@ -623,7 +627,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     title: config.title ?? t(hass, 'home'),
     // kiosk-mode reads its options from the generated dashboard, not from the strategy, so they go along unchanged
     ...(rawConfig.kiosk_mode ? { kiosk_mode: rawConfig.kiosk_mode } : {}),
-    // A room's own picture stays on its page
+    // A room's or a page's own picture stays on its page
     views: background ? views.map((view): View => (view.background ? view : { ...view, background })) : views,
   }
 }

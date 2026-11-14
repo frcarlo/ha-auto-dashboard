@@ -100,6 +100,8 @@ export interface RoomSettings {
 /** Own cards on a page under `pages: <page>:`, like a room's: plain Lovelace configs at the top or the bottom */
 export interface PageSettings {
   cards?: Partial<Record<'top' | 'bottom', Record<string, unknown>[]>>
+  /** Picture behind this page instead of the dashboard's background_image */
+  background_image?: string
 }
 
 /** Pages that take own cards: Home and the pages in the nav bar */

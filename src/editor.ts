@@ -71,6 +71,7 @@ export class AdStrategyEditor extends LitElement {
     roomArea: { state: true },
     cardsPage: { state: true },
     cardsSlot: { state: true },
+    bgPage: { state: true },
     cardsError: { state: true },
     own: { state: true },
   }
@@ -87,6 +88,8 @@ export class AdStrategyEditor extends LitElement {
   /** Page and place whose own cards are being edited */
   cardsPage: OwnCardsPage = 'home'
   cardsSlot: 'top' | 'bottom' = 'top'
+  /** Page whose background picture the Pages tab shows */
+  bgPage: PagePath = 'music'
   cardsError = false
   /** The admin's own settings for this dashboard: where they differ, they apply to the admin instead of what is set here */
   own?: PersonalSettings
@@ -544,6 +547,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.section('mdi:dock-bottom', this.l('ed.sec_which_pages'), this.field(this.l('ed.hide_pages'), this.chips(
           PAGES.map(p => ({ id: p, label: this.l(p) })), c.hide_pages, hide_pages => this.change({ hide_pages: hide_pages as PagePath[] })),
           this.l('ed.hide_pages_hint')))}
+        ${this.section('mdi:image-outline', this.l('ed.page_backgrounds'), this.renderPageBackgrounds())}
         ${this.section('mdi:calendar-month-outline', this.l('calendar'), html`
           ${this.field('', this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
           ${this.toggle(this.l('ed.calendar_edit'), c.calendar_edit !== false, calendar_edit => this.change({ calendar_edit: calendar_edit ? undefined : false }))}`)}
@@ -552,6 +556,24 @@ export class AdStrategyEditor extends LitElement {
           c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint')))}
         ${this.section('mdi:doorbell-video', this.l('ed.popups'), this.renderPopups())}
         ${this.section('mdi:code-braces', this.l('ed.page_cards'), this.renderPageCards())}`
+  }
+
+  /** A picture of its own behind one of the pages in the bar, instead of the dashboard's */
+  private renderPageBackgrounds() {
+    const pages = this.config.pages ?? {}
+    const set = (background_image?: string) => {
+      const { background_image: _, ...rest } = pages[this.bgPage] ?? {}
+      const page = background_image ? { ...rest, background_image } : rest
+      const next = { ...pages, [this.bgPage]: page }
+      if (!Object.keys(page).length) delete next[this.bgPage]
+      this.change({ pages: Object.keys(next).length ? next : undefined })
+    }
+    return this.field('', html`
+      <select .value=${this.bgPage} @change=${(e: Event) => (this.bgPage = (e.target as HTMLSelectElement).value as PagePath)}>
+        ${PAGES.map(p => html`<option value=${p} ?selected=${p === this.bgPage}>${this.l(p)}${pages[p]?.background_image ? ` (${this.l('ed.has_picture')})` : ''}</option>`)}
+      </select>
+      ${keyed(this.bgPage, imagePicker(this.hass, pages[this.bgPage]?.background_image, set))}`,
+      this.l('ed.page_background_hint'))
   }
 
   /** Own Lovelace cards at the top or the bottom of Home and the other pages, like a room's own cards */

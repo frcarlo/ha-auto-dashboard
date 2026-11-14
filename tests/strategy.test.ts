@@ -419,6 +419,18 @@ describe('primary color', () => {
     expect(alone.views.find(v => v.path === 'area-kuche')!.background).toMatchObject({ image: '/local/kueche.jpg', opacity: 60 })
     expect(alone.views.find(v => v.path === 'home')!.background).toBeUndefined()
   })
+
+  it("gives a page its own picture, the other pages keep the dashboard's", async () => {
+    const { views } = await generateDashboard({
+      type: 'custom:auto-dashboard', background_image: '/local/garten.jpg',
+      pages: { music: { background_image: ' /local/konzert.jpg ' }, climate: { background_image: '/local/winter.jpg' }, lights: { background_image: ' ' } },
+    }, createHass(true))
+    const bg = (path: string) => (views.find(v => v.path === path)?.background as { image?: string } | undefined)?.image
+    expect(bg('music')).toBe('/local/konzert.jpg')
+    expect(bg('climate')).toBe('/local/winter.jpg')
+    expect(bg('lights')).toBe('/local/garten.jpg')
+    expect(bg('home')).toBe('/local/garten.jpg')
+  })
 })
 
 describe('room settings, own cards and energy settings', () => {
