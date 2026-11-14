@@ -93,6 +93,8 @@ export interface RoomSettings {
   order?: string[]
   /** Plain Lovelace card configs */
   cards?: Partial<Record<CardSlot, Record<string, unknown>[]>>
+  /** Picture behind this room's page instead of the dashboard's background_image */
+  background_image?: string
 }
 
 /** Own cards on a page under `pages: <page>:`, like a room's: plain Lovelace configs at the top or the bottom */

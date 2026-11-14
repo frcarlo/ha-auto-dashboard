@@ -501,11 +501,13 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   ])
 
   const roomViews: View[] = areas.map(area => {
+    const roomImage = config.rooms?.[area.area_id]?.background_image?.trim()
     return {
       type: 'sections',
       title: area.name,
       path: areaPath(area.area_id),
       icon: area.icon ?? undefined,
+      ...(roomImage ? { background: imageBackground(roomImage, config.theme) } : {}),
       subview: true,
       back_path: `/${dashboardPath()}/home`,
       max_columns: MAX_COLUMNS,
@@ -621,6 +623,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     title: config.title ?? t(hass, 'home'),
     // kiosk-mode reads its options from the generated dashboard, not from the strategy, so they go along unchanged
     ...(rawConfig.kiosk_mode ? { kiosk_mode: rawConfig.kiosk_mode } : {}),
-    views: background ? views.map((view): View => ({ ...view, background })) : views,
+    // A room's own picture stays on its page
+    views: background ? views.map((view): View => (view.background ? view : { ...view, background })) : views,
   }
 }

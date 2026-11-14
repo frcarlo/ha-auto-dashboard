@@ -60,6 +60,8 @@ const config: StrategyConfig = {
   floor_start: params.get('tabs') || undefined,
   // ?rooms lists the pages by room only, without floor headings
   page_floors: params.has('rooms') ? false : undefined,
+  // ?roombg=kuche gives that room a picture of its own behind its page
+  rooms: params.get('roombg') ? { [params.get('roombg')!]: { background_image: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#065f46"/><stop offset="1" stop-color="#7c2d12"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><circle cx="1200" cy="250" r="180" fill="#fde68a" opacity=".5"/></svg>')}` } } : undefined,
   // ?face=analog&after=3 shows that face after three seconds without a touch
   face: params.has('face') ? { after: Number(params.get('after') ?? 3), style: (params.get('face') || 'clock') as NonNullable<StrategyConfig['face']>['style'] } : undefined,
   // ?as=leni&users={"leni":{"access":"read_only"}} views the dashboard as a non-admin with that rule

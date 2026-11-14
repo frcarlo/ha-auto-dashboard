@@ -5,6 +5,7 @@ import { keyed } from 'lit/directives/keyed.js'
 import { t, type Key } from './i18n'
 import { arrangeRoom, areaEntities, groupEntities } from './model'
 import { entityName, shortName } from './presentation'
+import { imagePicker } from './media-picker'
 import type { CardSlot, GroupKey, HassEntity, HomeAssistant, RoomSettings, StrategyConfig } from './types'
 
 export interface RoomsPatch {
@@ -30,7 +31,7 @@ export class AdRoomSettings extends LitElement {
 
   static styles = css`
     :host { display: flex; flex-direction: column; gap: 14px; }
-    select, textarea {
+    select, textarea, input {
       font: inherit; color: inherit; background: var(--secondary-background-color, rgba(127, 127, 127, 0.1));
       border: 1px solid var(--ad-line); border-radius: 10px; padding: 9px 12px;
     }
@@ -170,6 +171,16 @@ export class AdRoomSettings extends LitElement {
       <span class="hint ${this.yamlError ? 'error' : ''}">${this.l(this.yamlError ? 'ed.cards_error' : 'ed.cards_hint')}</span>`
   }
 
+  private renderBackground() {
+    const value = this.room.background_image
+    const picture = this.hass!.areas[this.area]?.picture
+    return html`
+      <span class="label">${this.l('ed.room_background')}</span>
+      ${keyed(this.area, imagePicker(this.hass, value, background_image => this.setRoom({ background_image })))}
+      ${picture && value !== picture ? html`<button class="link" @click=${() => this.setRoom({ background_image: picture })}>${this.l('ed.room_background_area')}</button>` : nothing}
+      <span class="hint">${this.l('ed.room_background_hint')}</span>`
+  }
+
   protected willUpdate() {
     if (this.hass && (!this.area || !this.hass.areas[this.area])) this.area = this.areas[0]?.area_id ?? ''
   }
@@ -188,6 +199,7 @@ export class AdRoomSettings extends LitElement {
     return html`
       ${this.renderGroups()}
       ${this.renderCards()}
+      ${this.renderBackground()}
       ${customized ? html`<button class="link" @click=${() => this.resetRoom()}>${this.l('ed.room_reset')}</button>` : nothing}`
   }
 }

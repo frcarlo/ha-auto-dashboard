@@ -404,6 +404,21 @@ describe('primary color', () => {
     const blank = await generateDashboard({ type: 'custom:auto-dashboard', background_image: '  ' }, createHass(true))
     expect(blank.views[0]!.background).toBeUndefined()
   })
+
+  it("gives a room's page its own picture, the other pages keep the dashboard's", async () => {
+    const { views } = await generateDashboard({
+      type: 'custom:auto-dashboard', theme: 'dark', background_image: '/local/garten.jpg',
+      rooms: { kuche: { background_image: ' media-source://image_upload/kueche ' }, wohnzimmer: { background_image: ' ' } },
+    }, createHass(true))
+    const bg = (path: string) => (views.find(v => v.path === path)!.background as { image?: string }).image
+    expect(bg('area-kuche')).toBe('media-source://image_upload/kueche')
+    expect(bg('area-wohnzimmer')).toBe('/local/garten.jpg')
+    expect(bg('home')).toBe('/local/garten.jpg')
+    // Without a dashboard picture only that room gets one
+    const alone = await generateDashboard({ type: 'custom:auto-dashboard', rooms: { kuche: { background_image: '/local/kueche.jpg' } } }, createHass(true))
+    expect(alone.views.find(v => v.path === 'area-kuche')!.background).toMatchObject({ image: '/local/kueche.jpg', opacity: 60 })
+    expect(alone.views.find(v => v.path === 'home')!.background).toBeUndefined()
+  })
 })
 
 describe('room settings, own cards and energy settings', () => {

@@ -11,6 +11,7 @@ import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
 import { entityName } from './presentation'
 import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
+import { imagePicker } from './media-picker'
 import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
@@ -41,8 +42,8 @@ interface Option {
 /** Accent suggestions; the color picker covers everything else. Indigo is the default. */
 const SWATCHES = ['#6366f1', '#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f43f5e', '#a855f7', '#64748b']
 
-type Tab = 'look' | 'home' | 'house' | 'rooms' | 'users'
-const TABS: [Tab, Key][] = [['look', 'ed.look'], ['home', 'ed.home'], ['house', 'ed.house'], ['rooms', 'ed.room_pages'], ['users', 'ed.users']]
+type Tab = 'look' | 'home' | 'pages' | 'house' | 'rooms' | 'users'
+const TABS: [Tab, Key][] = [['look', 'ed.look'], ['home', 'ed.home'], ['pages', 'ed.pages_tab'], ['house', 'ed.house'], ['rooms', 'ed.room_pages'], ['users', 'ed.users']]
 
 /** Room roles set in the house drawing, and the config list each one writes */
 type Tool = 'hide' | 'outdoor' | 'only'
@@ -101,7 +102,12 @@ export class AdStrategyEditor extends LitElement {
     .body { display: flex; flex-direction: column; gap: 16px; }
     .field { display: flex; flex-direction: column; gap: 8px; }
     /* Each option is its own block, so long chip lists don't run into the next heading */
-    .body > .field + .field, .body > .field + .row, .body > .row + .field { border-top: 1px solid var(--ad-line); padding-top: 14px; }
+    .body > .field + .field, .body > .field + .row, .body > .row + .field,
+    .sec > .field + .field, .sec > .field + .row, .sec > .row + .field { border-top: 1px solid var(--ad-line); padding-top: 14px; }
+    /* Each tab in blocks of what belongs together, framed like the user rules */
+    .sec { border: 1px solid var(--ad-line); border-radius: 14px; padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+    .sec h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+    .sec h3 ha-icon { --mdc-icon-size: 18px; color: var(--ad-accent); }
     .label { font-size: 14px; font-weight: 600; color: var(--primary-text-color, inherit); }
     .hint { font-size: 12px; color: var(--secondary-text-color, #94a3b8); line-height: 1.4; }
     /* An own setting of the admin's that applies to them instead */
@@ -350,7 +356,7 @@ export class AdStrategyEditor extends LitElement {
     const set = (next: ApplianceConfig[]) => this.change({ appliances: next.length ? next : undefined })
     const update = (i: number, patch: Partial<ApplianceConfig>) => set(list.map((a, j) => j !== i ? a
       : Object.fromEntries(Object.entries({ ...a, ...patch }).filter(([, v]) => v !== undefined && v !== '')) as unknown as ApplianceConfig))
-    return this.field(this.l('appliances'), html`
+    return this.field('', html`
       ${list.map((a, i) => html`<div class="appliance">
         <span>${this.l('ed.appliance_name')}</span>
         <input type="text" .value=${a.name ?? ''} @change=${(e: Event) => update(i, { name: (e.target as HTMLInputElement).value.trim() || undefined })}>
@@ -389,7 +395,7 @@ export class AdStrategyEditor extends LitElement {
         .filter((id): id is string => !!id)
       return html`<span class="hint">${ids.length ? this.l('ed.popup_auto', { ids: ids.join(', ') }) : this.l('ed.popup_auto_none')}</span>`
     }
-    return this.field(this.l('ed.popups'), html`
+    return this.field('', html`
       ${list.map((rule, i) => html`<div class="appliance">
         <span>${this.l('ed.popup_trigger')}</span>
         ${this.singleEntityPicker(rule.trigger || undefined, ['binary_sensor', 'event', 'input_boolean'], trigger => update(i, { trigger: trigger ?? '' }))}
@@ -411,21 +417,13 @@ export class AdStrategyEditor extends LitElement {
     this.l('ed.popups_hint'))
   }
 
-  /** HA's media picker with upload, like in its own view background editor, when it is loaded, else a path. */
-  private imagePicker(value: string | undefined) {
-    const set = (background_image?: string) => this.change({ background_image: background_image?.trim() || undefined })
-    if (customElements.get('ha-selector')) {
-      // The picker works with { media_content_id }; the config keeps just the id, a URL or media-source://…
-      return html`<ha-selector .hass=${this.hass} .value=${value ? { media_content_id: value } : undefined}
-        .selector=${{ media: { accept: ['image/*'], image_upload: true, hide_content_type: true } }}
-        @value-changed=${(e: CustomEvent) => set((e.detail.value as { media_content_id?: string } | undefined)?.media_content_id)}></ha-selector>`
-    }
-    return html`<input type="text" .value=${value ?? ''} placeholder="/local/garten.jpg"
-      @change=${(e: Event) => set((e.target as HTMLInputElement).value)}>`
+  /** Without a label when the block's heading already says it */
+  private field(label: string, content: TemplateResult, hint?: string) {
+    return html`<div class="field">${label ? html`<span class="label">${label}</span>` : nothing}${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
   }
 
-  private field(label: string, content: TemplateResult, hint?: string) {
-    return html`<div class="field"><span class="label">${label}</span>${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
+  private section(icon: string, title: string, content: unknown) {
+    return html`<section class="sec"><h3><ha-icon icon=${icon}></ha-icon>${title}</h3>${content}</section>`
   }
 
   // Data from HA
@@ -455,7 +453,7 @@ export class AdStrategyEditor extends LitElement {
   protected render() {
     if (!this.hass) return nothing
     const panels: Record<Tab, () => TemplateResult> = {
-      look: () => this.renderLook(), home: () => this.renderHome(), house: () => this.renderHouse(),
+      look: () => this.renderLook(), home: () => this.renderHome(), pages: () => this.renderPages(), house: () => this.renderHouse(),
       rooms: () => this.renderRoomPages(), users: () => this.renderUsers(),
     }
     return html`<div class="tabs" ${scrollRow()} role="tablist" @keydown=${this.onTabKey}>
@@ -510,28 +508,22 @@ export class AdStrategyEditor extends LitElement {
   private renderHome() {
     const c = this.config
     return html`
-        ${this.field(this.l('favorites'), this.entityPicker(c.favorites?.filter(id => !isRoomFavorite(id)), undefined,
-          next => this.change({ favorites: replaceFavorites(c.favorites ?? [], false, next) })), this.l('ed.favorites_hint'))}${this.ownNote(['favorites'])}
-        ${this.field(this.l('ed.favorite_rooms'), this.areasPicker(c.favorites?.filter(isRoomFavorite),
-          next => this.change({ favorites: replaceFavorites(c.favorites ?? [], true, next) })), this.l('ed.favorite_rooms_hint'))}
-        ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
-        ${this.field(this.l('todos'), this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint'))}
-        ${this.field(this.l('ed.calendars'), this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
-        ${this.toggle(this.l('ed.calendar_edit'), c.calendar_edit !== false, calendar_edit => this.change({ calendar_edit: calendar_edit ? undefined : false }))}
-        ${findSchools(this.hass!).length
-          ? this.toggle(this.l('ed.school_home'), c.school_home !== false, on => this.change({ school_home: on ? undefined : false })) : nothing}
-        ${this.field(this.l('ed.hide_chips'), this.chips(this.chipOptions,
-          [...(c.hide_chips ?? []), ...(c.school_chips === false ? ['school' as const] : [])],
-          hide_chips => this.change({ hide_chips: hide_chips as StatusChip[], school_chips: undefined })), this.l('ed.hide_chips_hint'))}
-        ${co2Sensors(this.hass!, Object.keys(this.hass!.states)).length && !c.hide_chips?.includes('co2') ? this.field(this.l('ed.co2_limit'), html`<div class="seg" role="group">${CO2_LIMITS.map(n => html`
-          <button aria-pressed=${(c.co2_limit ?? CO2_LIMIT) === n} @click=${() => this.change({ co2_limit: n === CO2_LIMIT ? undefined : n })}>${n}</button>`)}</div>`) : nothing}
-        ${this.renderAppliances()}
-        ${this.renderPopups()}
-        ${this.renderPageCards()}
-        ${this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
-          c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint'))}
-        ${c.hide_domains?.includes('weather') ? nothing : html`
-          ${this.field(this.l('ed.weather'), this.singleEntityPicker(c.weather_entity, 'weather', weather_entity => this.change({ weather_entity })), this.l('ed.weather_hint'))}
+        ${this.section('mdi:home-outline', this.l('ed.sec_content'), html`
+          ${this.field(this.l('favorites'), this.entityPicker(c.favorites?.filter(id => !isRoomFavorite(id)), undefined,
+            next => this.change({ favorites: replaceFavorites(c.favorites ?? [], false, next) })), this.l('ed.favorites_hint'))}${this.ownNote(['favorites'])}
+          ${this.field(this.l('ed.favorite_rooms'), this.areasPicker(c.favorites?.filter(isRoomFavorite),
+            next => this.change({ favorites: replaceFavorites(c.favorites ?? [], true, next) })), this.l('ed.favorite_rooms_hint'))}
+          ${this.field(this.l('scenes'), this.entityPicker(c.scenes, ['scene', 'script'], scenes => this.change({ scenes })), this.l('ed.scenes_hint'))}
+          ${findSchools(this.hass!).length
+            ? this.toggle(this.l('ed.school_home'), c.school_home !== false, on => this.change({ school_home: on ? undefined : false })) : nothing}`)}
+        ${this.section('mdi:dots-horizontal-circle-outline', this.l('ed.sec_status'), html`
+          ${this.field(this.l('ed.hide_chips'), this.chips(this.chipOptions,
+            [...(c.hide_chips ?? []), ...(c.school_chips === false ? ['school' as const] : [])],
+            hide_chips => this.change({ hide_chips: hide_chips as StatusChip[], school_chips: undefined })), this.l('ed.hide_chips_hint'))}
+          ${co2Sensors(this.hass!, Object.keys(this.hass!.states)).length && !c.hide_chips?.includes('co2') ? this.field(this.l('ed.co2_limit'), html`<div class="seg" role="group">${CO2_LIMITS.map(n => html`
+            <button aria-pressed=${(c.co2_limit ?? CO2_LIMIT) === n} @click=${() => this.change({ co2_limit: n === CO2_LIMIT ? undefined : n })}>${n}</button>`)}</div>`) : nothing}`)}
+        ${c.hide_domains?.includes('weather') ? nothing : this.section('mdi:weather-partly-cloudy', this.l('ed.weather'), html`
+          ${this.field(this.l('ed.weather_entity'), this.singleEntityPicker(c.weather_entity, 'weather', weather_entity => this.change({ weather_entity })), this.l('ed.weather_hint'))}
           ${this.field(this.l('ed.sensors'), html`<div class="sensors">${WEATHER_SENSORS.map(([key, classes]) => html`
             <span>${this.l(`ws.${key}` as Key)}</span>
             ${this.singleEntityPicker(c.weather_sensors?.[key], 'sensor', id => {
@@ -541,7 +533,25 @@ export class AdStrategyEditor extends LitElement {
             }, classes)}`)}</div>`, this.l('ed.sensors_hint'))}
           ${this.field(this.l('ed.warnings'), this.entityPicker(c.weather_warnings, ['binary_sensor', 'sensor'], weather_warnings => this.change({ weather_warnings })), this.l('ed.warnings_hint'))}
           ${this.field(this.l('ed.forecast_days'), html`<div class="seg" role="group">${[0, 3, 5, 7].map(n => html`
-            <button aria-pressed=${(c.forecast_days ?? 3) === n} @click=${() => this.change({ forecast_days: n })}>${n}</button>`)}</div>`)}`}`
+            <button aria-pressed=${(c.forecast_days ?? 3) === n} @click=${() => this.change({ forecast_days: n })}>${n}</button>`)}</div>`)}`)}
+        ${this.section('mdi:washing-machine', this.l('appliances'), this.renderAppliances())}`
+  }
+
+  /** The pages in the bar, and what the calendar, lists, TV and own cards on them show */
+  private renderPages() {
+    const c = this.config
+    return html`
+        ${this.section('mdi:dock-bottom', this.l('ed.sec_which_pages'), this.field(this.l('ed.hide_pages'), this.chips(
+          PAGES.map(p => ({ id: p, label: this.l(p) })), c.hide_pages, hide_pages => this.change({ hide_pages: hide_pages as PagePath[] })),
+          this.l('ed.hide_pages_hint')))}
+        ${this.section('mdi:calendar-month-outline', this.l('calendar'), html`
+          ${this.field('', this.entityPicker(c.calendars, ['calendar'], calendars => this.change({ calendars })), this.l('ed.calendars_hint'))}
+          ${this.toggle(this.l('ed.calendar_edit'), c.calendar_edit !== false, calendar_edit => this.change({ calendar_edit: calendar_edit ? undefined : false }))}`)}
+        ${this.section('mdi:format-list-checks', this.l('lists'), this.field('', this.entityPicker(c.todo_lists, ['todo'], todo_lists => this.change({ todo_lists })), this.l('ed.todos_hint')))}
+        ${this.section('mdi:television', this.l('ed.sec_tv'), this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
+          c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint')))}
+        ${this.section('mdi:doorbell-video', this.l('ed.popups'), this.renderPopups())}
+        ${this.section('mdi:code-braces', this.l('ed.page_cards'), this.renderPageCards())}`
   }
 
   /** Own Lovelace cards at the top or the bottom of Home and the other pages, like a room's own cards */
@@ -557,7 +567,7 @@ export class AdStrategyEditor extends LitElement {
       const cards = { ...(page?.cards ?? {}), [this.cardsSlot]: list as Record<string, unknown>[] }
       this.change({ pages: { ...(this.config.pages ?? {}), [this.cardsPage]: { ...(page ?? {}), cards } } })
     }
-    return this.field(this.l('ed.page_cards'), html`
+    return this.field('', html`
       <select .value=${this.cardsPage} @change=${(e: Event) => { this.cardsPage = (e.target as HTMLSelectElement).value as OwnCardsPage; this.cardsError = false }}>
         ${pages.map(p => html`<option value=${p} ?selected=${p === this.cardsPage}>${this.l(p)}${count(p) ? ` (${count(p)})` : ''}</option>`)}
       </select>
@@ -579,19 +589,22 @@ export class AdStrategyEditor extends LitElement {
     return html`
         ${this.field(this.l('ed.title'), html`<input type="text" .value=${c.title ?? ''} placeholder=${this.l('home')}
           @change=${(e: Event) => this.change({ title: (e.target as HTMLInputElement).value.trim() || undefined })}>`)}
-        ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
-          [['auto', 'ed.theme_auto'], ['dark', 'ed.theme_dark'], ['light', 'ed.theme_light']],
-          c.theme ?? 'auto', theme => this.change({ theme })))}${this.ownNote(['theme'])}
-        ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}${this.ownNote(['primary_color'])}
-        ${isHexColor(c.primary_color) ? this.toggle(this.l('ed.ha_colors'), c.ha_colors !== false, ha_colors => this.change({ ha_colors })) : nothing}
-        ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}${this.ownNote(['glass'])}
-        ${this.field(this.l('ed.background'), this.imagePicker(c.background_image), this.l('ed.background_hint'))}
-        ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
-          [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
-          c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}${this.ownNote(['nav_position'])}
-        ${this.toggle(this.l('ed.floor_tabs'), !!c.floor_tabs, floor_tabs => this.change({ floor_tabs }))}${this.ownNote(['floor_tabs', 'floor_start'])}
-        ${this.toggle(this.l('ed.page_floors'), c.page_floors !== false, on => this.change({ page_floors: on ? undefined : false }))}${this.ownNote(['page_floors'])}
-        ${this.field(this.l('ed.face'), this.faceFields(c.face, face => this.change({ face: face || undefined }), false), this.l('ed.face_hint'))}${this.ownNote(['face'])}`
+        ${this.section('mdi:palette-outline', this.l('ed.sec_colors'), html`
+          ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
+            [['auto', 'ed.theme_auto'], ['dark', 'ed.theme_dark'], ['light', 'ed.theme_light']],
+            c.theme ?? 'auto', theme => this.change({ theme })))}${this.ownNote(['theme'])}
+          ${this.field(this.l('ed.primary'), this.colorPicker(c.primary_color), this.l('ed.primary_hint'))}${this.ownNote(['primary_color'])}
+          ${isHexColor(c.primary_color) ? this.toggle(this.l('ed.ha_colors'), c.ha_colors !== false, ha_colors => this.change({ ha_colors })) : nothing}
+          ${this.toggle(this.l('ed.glass'), !!c.glass, glass => this.change({ glass }))}${this.ownNote(['glass'])}
+          ${this.field(this.l('ed.background'), imagePicker(this.hass, c.background_image, background_image => this.change({ background_image })), this.l('ed.background_hint'))}`)}
+        ${this.section('mdi:compass-outline', this.l('ed.sec_nav'), html`
+          ${this.field(this.l('ed.nav'), this.seg<NavPosition>(
+            [['bottom', 'ed.nav_bottom'], ['top', 'ed.nav_top'], ['left', 'ed.nav_left'], ['right', 'ed.nav_right']],
+            c.nav_position ?? 'bottom', nav_position => this.change({ nav_position })))}${this.ownNote(['nav_position'])}
+          ${this.toggle(this.l('ed.floor_tabs'), !!c.floor_tabs, floor_tabs => this.change({ floor_tabs }))}${this.ownNote(['floor_tabs', 'floor_start'])}
+          ${this.toggle(this.l('ed.page_floors'), c.page_floors !== false, on => this.change({ page_floors: on ? undefined : false }))}${this.ownNote(['page_floors'])}`)}
+        ${this.section('mdi:clock-outline', this.l('ed.face'), html`
+          ${this.field('', this.faceFields(c.face, face => this.change({ face: face || undefined }), false), this.l('ed.face_hint'))}${this.ownNote(['face'])}`)}`
   }
 
   private renderHouse() {
@@ -613,7 +626,7 @@ export class AdStrategyEditor extends LitElement {
       ...(c.outdoor_areas?.includes(id) ? ['outdoor' as const] : []),
     ]
     return html`
-        ${this.field(this.l('ed.tool'), html`${this.seg<Tool>(
+        ${this.section('mdi:floor-plan', this.l('rooms'), this.field(this.l('ed.tool'), html`${this.seg<Tool>(
           [['hide', 'ed.tool_hide'], ['outdoor', 'ed.tool_outdoor'], ['only', 'ed.tool_only']], this.tool, tool => (this.tool = tool))}
           <span class="hint tool-hint">${this.l(`ed.tool_${this.tool}_hint` as Key)}</span>
           ${house({
@@ -624,22 +637,20 @@ export class AdStrategyEditor extends LitElement {
             onFloor: id => this.change({ floors: toggleIn(c.floors, id) }),
             floorPressed: id => !!c.floors?.includes(id),
           })}
-          ${this.houseSummary()}`)}
-        ${this.field(this.l('ed.hide_domains'), this.chips(
-          DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
-        ${this.field(this.l('ed.hide_pages'), this.chips(
-          PAGES.map(p => ({ id: p, label: this.l(p) })), c.hide_pages, hide_pages => this.change({ hide_pages: hide_pages as PagePath[] })),
-          this.l('ed.hide_pages_hint'))}
-        ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
-          this.labelOptions, c.hide_labels, hide_labels => this.change({ hide_labels })), this.l('ed.hide_labels_hint')) : nothing}
-        ${this.field(this.l('ed.order'), html`<div class="order">
+          ${this.houseSummary()}`))}
+        ${this.section('mdi:eye-off-outline', this.l('ed.sec_hide'), html`
+          ${this.field(this.l('ed.hide_domains'), this.chips(
+            DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
+          ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
+            this.labelOptions, c.hide_labels, hide_labels => this.change({ hide_labels })), this.l('ed.hide_labels_hint')) : nothing}`)}
+        ${this.section('mdi:sort', this.l('ed.order'), this.field('', html`<div class="order">
           ${ordered.map((area, i) => html`<div>
             <span>${area.name}</span>
             <button class="icon-btn" aria-label="↑" ?disabled=${i === 0} @click=${() => move(i, -1)}>↑</button>
             <button class="icon-btn" aria-label="↓" ?disabled=${i === ordered.length - 1} @click=${() => move(i, 1)}>↓</button>
           </div>`)}
           ${c.area_order?.length ? html`<button class="link" @click=${() => this.change({ area_order: undefined })}>${this.l('ed.reset')}</button>` : nothing}
-        </div>`)}`
+        </div>`))}`
   }
 
   /** The status chips by the name they carry; the lessons chip only with pupils in the house */
