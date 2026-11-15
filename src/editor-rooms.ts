@@ -21,6 +21,7 @@ export class AdRoomSettings extends LitElement {
     area: { attribute: false },
     slot: { state: true },
     yamlError: { state: true },
+    open: { state: true },
   }
 
   hass?: HomeAssistant
@@ -28,6 +29,8 @@ export class AdRoomSettings extends LitElement {
   area = ''
   slot: CardSlot = 'top'
   yamlError = false
+  /** Groups shown unfolded, as "area/group"; all start folded so a room fits on one screen */
+  open = new Set<string>()
 
   static styles = css`
     :host { display: flex; flex-direction: column; gap: 14px; }
@@ -42,7 +45,16 @@ export class AdRoomSettings extends LitElement {
     .error { color: var(--error-color, #ef4444); }
     .group { border: 1px solid var(--ad-line); border-radius: 12px; overflow: hidden; }
     .row { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; min-height: 36px; }
-    .row.head { background: color-mix(in srgb, var(--ad-line) 40%, transparent); font-weight: 500; }
+    .row.head { background: color-mix(in srgb, var(--ad-line) 40%, transparent); font-weight: 500; padding-left: 4px; }
+    .fold { all: unset; flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; align-self: stretch; padding-left: 4px; border-radius: 8px; }
+    .fold:focus-visible { outline: 2px solid var(--ad-accent); }
+    .fold[disabled] { cursor: default; }
+    .fold[disabled] ha-icon { visibility: hidden; }
+    .fold ha-icon { display: flex; --mdc-icon-size: 18px; color: var(--secondary-text-color, #94a3b8); flex: none; transition: transform 0.15s; }
+    .fold[aria-expanded="true"] ha-icon { transform: rotate(90deg); }
+    .row .fold .name { flex: 0 1 auto; }
+    .fold .count { font-size: 12px; font-weight: 400; color: var(--secondary-text-color, #94a3b8); flex: none; }
+    @media (prefers-reduced-motion: reduce) { .fold ha-icon { transition: none; } }
     .row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
     .row.off .name { opacity: 0.45; text-decoration: line-through; }
     .row + .row { border-top: 1px solid var(--ad-line); }
@@ -120,15 +132,26 @@ export class AdRoomSettings extends LitElement {
     if (!groups.length) return html`<span class="hint">${this.l('ed.room_empty')}</span>`
     return html`<div class="groups">${groups.map(([key, entities], gi) => {
       const groupOff = hiddenGroups.includes(key)
+      const id = `${this.area}/${key}`
+      const open = !groupOff && this.open.has(id)
+      const fold = () => {
+        const next = new Set(this.open)
+        if (!next.delete(id)) next.add(id)
+        this.open = next
+      }
       return html`<div class="group">
         <div class="row head ${groupOff ? 'off' : ''}">
-          <span class="name">${t(this.hass, `group.${key}` as Key)}</span>
+          <button class="fold" aria-expanded=${open} ?disabled=${groupOff} @click=${fold}>
+            <ha-icon icon="mdi:chevron-right"></ha-icon>
+            <span class="name">${t(this.hass, `group.${key}` as Key)}</span>
+            <span class="count">${entities.length}</span>
+          </button>
           ${this.iconBtn('mdi:arrow-up', '↑', () => this.moveGroup(keys, gi, -1), gi === 0)}
           ${this.iconBtn('mdi:arrow-down', '↓', () => this.moveGroup(keys, gi, 1), gi === groups.length - 1)}
           ${this.iconBtn(groupOff ? 'mdi:eye-off-outline' : 'mdi:eye-outline', this.l(groupOff ? 'ed.show' : 'ed.hide'),
             () => this.setRoom({ hide_groups: this.toggleIn(this.room.hide_groups, key) }))}
         </div>
-        ${groupOff ? nothing : entities.map((e, i) => {
+        ${!open ? nothing : entities.map((e, i) => {
           const off = hiddenEntities.includes(e.entity_id)
           return html`<div class="row ${off ? 'off' : ''}">
             <span class="name" title=${e.entity_id}>${shortName(entityName(e), areaName)}</span>
