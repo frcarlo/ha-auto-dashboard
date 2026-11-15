@@ -309,12 +309,16 @@ export class AdFace extends LitElement {
   private live() {
     const hass = this.hass!
     const appliances = (this.settings?.appliances ?? []).map(a => this.applianceChip(a)).filter(Boolean).slice(0, 3)
-    const playing = Object.values(hass.states).filter(s => s.entity_id.startsWith('media_player.') && s.state === 'playing').slice(0, 2)
+    // Music Assistant's player and the speaker beneath it both report the same song: show it once
+    const songs = new Set<string>()
+    for (const p of Object.values(hass.states)) {
+      if (!p.entity_id.startsWith('media_player.') || p.state !== 'playing') continue
+      songs.add([p.attributes.media_title, p.attributes.media_artist].filter(Boolean).join(' – ') || entityName(p))
+    }
+    const playing = [...songs].slice(0, 2)
     if (!appliances.length && !playing.length) return nothing
-    return html`<div class="live">${appliances}${playing.map(p => {
-      const title = [p.attributes.media_title, p.attributes.media_artist].filter(Boolean).join(' – ')
-      return html`<span class="chip"><ha-icon icon="mdi:music"></ha-icon><span class="text">${title || entityName(p)}</span></span>`
-    })}</div>`
+    return html`<div class="live">${appliances}${playing.map(title =>
+      html`<span class="chip"><ha-icon icon="mdi:music"></ha-icon><span class="text">${title}</span></span>`)}</div>`
   }
 
   private analog() {

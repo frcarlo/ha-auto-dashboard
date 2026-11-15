@@ -8,6 +8,21 @@ One ES module (about 400 KB, 110 KB gzipped); its only dependency is Lit. No oth
 
 The dashboard speaks German and English and follows the language set in Home Assistant.
 
+![Home: greeting, status chips, weather, indoor climate and power, music, scenes and appliances at work](https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/screenshots/home.png)
+
+![Room cards on Home, grouped by floor: lights, heating, windows and media at a glance](https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/screenshots/rooms.png)
+
+![A room page: climate, quick tiles for lights, sockets and covers, then the room's groups](https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/screenshots/room.png)
+
+![The Climate page with Versatile Thermostat presets, window and regulation](https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/screenshots/climate.png)
+
+<p>
+  <img src="https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/screenshots/face.png" width="76%" alt="The clock face for wall tablets, with weather, the next event and appliances at work">
+  <img src="https://raw.githubusercontent.com/frcarlo/ha-auto-dashboard/main/assets/screenshots/phone.png" width="21.9%" alt="Home on a phone">
+</p>
+
+*Screenshots from the development harness with sample data.*
+
 ## What it builds
 
 - **Home**: greeting, clock, weather, people (home or away) and the alarm panel, status chips (lights on, open, unlocked, heating, playing, battery below 20 %, unavailable; a tap opens the list), indoor and outdoor climate and current power use, "Now playing", a row of scenes and scripts, favorites, and below them one room card per area, grouped by floor. With `floor_tabs: true` the floors become tabs above the rooms and Home shows one floor at a time; a light dot on a tab means lights are on there, and Home opens on a set start floor (`floor_start`, or per user in the settings) or else on the floor picked last on that device. From about 720 px wide (tablet, desktop) the weather sits next to indoor climate and power, and "Now playing" next to the scenes; the people sit at the front of the status chips. A tap on a person whose trackers come from the Companion app shows their phones, tablets and watches beneath: battery, charging and where each one is; a tap on a device shows everything it reports (address, next alarm, steps today, Wi-Fi, connection, battery health, app version), each row opening HA's dialog. People without a Companion app device open HA's dialog as before. That way the rooms start on the first screen. On a phone everything is stacked. The cog next to the clock opens the user's own settings.
