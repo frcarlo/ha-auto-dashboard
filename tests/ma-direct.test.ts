@@ -6,6 +6,15 @@ const hass = (panels: HomeAssistant['panels']) => ({ panels }) as HomeAssistant
 
 describe('maSlug', () => {
   it('finds the Music Assistant add-on among the sidebar panels', () => {
+    // As HA 2026.11 lists add-on panels
+    expect(maSlug(hass({
+      lovelace: { url_path: 'lovelace', config: null },
+      a0d7b954_vscode: { url_path: 'a0d7b954_vscode', config: { addon: 'a0d7b954_vscode' } },
+      d5369777_music_assistant: { url_path: 'd5369777_music_assistant', config: { addon: 'd5369777_music_assistant' } },
+    }))).toBe('d5369777_music_assistant')
+  })
+
+  it('also reads the panels of older HA', () => {
     expect(maSlug(hass({
       lovelace: { url_path: 'lovelace', config: null },
       a0d7b954_vscode: { url_path: 'a0d7b954_vscode', config: { ingress: 'a0d7b954_vscode' } },

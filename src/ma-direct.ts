@@ -58,12 +58,13 @@ export function fakeMaDirect(open: (hass: HomeAssistant) => Promise<MaDirect | u
 
 /** The Music Assistant add-on's slug, from its panel in the sidebar; only panels this user may open are listed */
 export function maSlug(hass: HomeAssistant): string | undefined {
-  return Object.values(hass.panels ?? {}).map(p => p.config?.ingress).find(s => !!s && /music_assistant/.test(s)) ?? undefined
+  return Object.values(hass.panels ?? {}).map(p => p.config?.addon ?? p.config?.ingress).find(s => !!s && /music_assistant/.test(s)) ?? undefined
 }
 
 /** The line to the add-on, opened once and shared; undefined when there is no add-on or it can't be reached */
 export function maDirect(hass: HomeAssistant): Promise<MaDirect | undefined> {
-  line ??= (replaced ? replaced(hass) : open(hass)).catch(() => undefined).then(direct => {
+  // The harness's fake add-on too only where the sidebar lists the add-on's panel
+  line ??= (!maSlug(hass) ? Promise.resolve(undefined) : replaced ? replaced(hass) : open(hass)).catch(() => undefined).then(direct => {
     // No line: try again next time, the add-on may just have been starting
     if (!direct) setTimeout(() => { line = undefined }, 60_000)
     return direct

@@ -670,7 +670,7 @@ export function createHass(dark: boolean): HomeAssistant {
     locale: { language: 'de' },
     user: { id: 'u-frank', name: 'Frank Carlo', is_admin: true },
     // The Music Assistant add-on's sidebar panel, through which the music page reads the whole queue
-    panels: { d5369777_music_assistant: { url_path: 'd5369777_music_assistant', config: { ingress: 'd5369777_music_assistant' } } },
+    panels: { d5369777_music_assistant: { url_path: 'd5369777_music_assistant', config: { addon: 'd5369777_music_assistant' } } },
     formatEntityState: (e: HassEntity) => {
       const map: Record<string, string> = {
         on: 'An', off: 'Aus', open: 'Offen', closed: 'Geschlossen', locked: 'Verriegelt', unlocked: 'Entriegelt',
