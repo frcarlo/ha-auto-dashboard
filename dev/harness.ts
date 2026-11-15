@@ -2,7 +2,8 @@
 import * as mdi from '@mdi/js'
 import '../src/index'
 import { generateDashboard } from '../src/strategy'
-import { applyService, createHass } from './mock'
+import { applyService, createHass, fakeQueue, queueAttributes } from './mock'
+import { fakeMaDirect } from '../src/ma-direct'
 import type { HomeAssistant, StrategyConfig } from '../src/types'
 
 // Stand-ins for HA's own icon elements. Shadow DOM like the real ones: light-DOM
@@ -142,6 +143,42 @@ hass.callWS = async <T,>(msg: Record<string, unknown>) => {
   if (msg.type === 'config/entity_registry/get') return { config_entry_id: `entry-${msg.entity_id}` } as T
   return baseWS<T>(msg)
 }
+
+// The Music Assistant add-on behind Ingress: its queue commands, and the event it sends when the queue changes.
+// ?ma=off leaves it out, like HA without the add-on
+const maListeners = new Set<(event: string, objectId?: string) => void>()
+if (params.get('ma') !== 'off') fakeMaDirect(async () => ({
+  base: '/api/hassio_ingress/fake/',
+  listen(callback) { maListeners.add(callback); return () => maListeners.delete(callback) },
+  async send<T>(command: string, args: Record<string, any> = {}): Promise<T> {
+    await new Promise(r => setTimeout(r, 150))
+    const q = fakeQueue
+    const changed = () => setTimeout(() => maListeners.forEach(l => l('queue_items_updated', q.id)), 50)
+    const at = (id: string | number) => typeof id === 'number' ? id : q.items.findIndex(i => i.queue_item_id === id)
+    if (command === 'player_queues/get') return { queue_id: q.id, current_index: q.current, items: q.items.length } as T
+    if (command === 'player_queues/items') return q.items.slice(args.offset ?? 0, (args.offset ?? 0) + (args.limit ?? 500)) as T
+    if (command === 'player_queues/play_index') {
+      q.current = at(args.index)
+      const id = 'media_player.ma_kuche'
+      hass = { ...hass, states: { ...hass.states, [id]: { ...hass.states[id]!, state: 'playing', attributes: { ...hass.states[id]!.attributes, ...queueAttributes(q.items[q.current]!) } } } }
+      for (const card of cards) card.hass = hass
+    }
+    if (command === 'player_queues/move_item') {
+      const from = at(args.queue_item_id)
+      const [item] = q.items.splice(from, 1)
+      q.items.splice(args.pos_shift === 0 ? q.current + 1 : from + args.pos_shift, 0, item!)
+    }
+    if (command === 'player_queues/delete_item') {
+      const i = at(args.item_id_or_index)
+      q.items.splice(i, 1)
+      if (i < q.current) q.current--
+    }
+    if (command === 'player_queues/clear') { q.items = []; q.current = 0 }
+    toast(`${command} ${JSON.stringify(args)}`)
+    changed()
+    return undefined as T
+  },
+}))
 
 /** Sets one entity's state and hands the new states to every card, like HA does */
 function setState(id: string, state: string) {

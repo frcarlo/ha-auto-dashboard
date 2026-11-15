@@ -9,6 +9,7 @@ import {
   playerPicture, playsItem, secureImage, type Lyrics, type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
 } from '../music'
 import { tokens } from '../styles/tokens'
+import { maDirect, maImageUrl, type MaDirect, type MaQueue, type MaQueueItem } from '../ma-direct'
 import type { HassEntity, NavPosition } from '../types'
 import { scrollRow } from '../scroll-row'
 
@@ -30,7 +31,7 @@ interface Shelf {
 }
 
 /** "now" is the big player with the lyrics, opened from the cover in the bar */
-type View = 'home' | 'search' | 'radio' | 'players' | 'detail' | 'now'
+type View = 'home' | 'search' | 'radio' | 'queue' | 'players' | 'detail' | 'now'
 type Enqueue = 'play' | 'replace' | 'next' | 'add'
 
 interface Library {
@@ -49,6 +50,7 @@ interface Detail {
 }
 
 interface QueueInfo {
+  queue_id?: string
   items?: number
   current_item?: { name?: string; media_item?: MediaItem } | null
   next_item?: { name?: string; media_item?: MediaItem } | null
@@ -107,6 +109,9 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     menu: { state: true },
     panel: { state: true },
     queue: { state: true },
+    queueList: { state: true },
+    showPlayed: { state: true },
+    confirmClear: { state: true },
     now: { state: true },
     message: { state: true },
     accounts: { state: true },
@@ -133,8 +138,18 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   /** The track whose menu is open */
   menu?: string
   private menuUp = false
-  panel?: 'queue' | 'transfer' | 'volume'
+  panel?: 'transfer' | 'volume'
+  /** What HA tells about the queue: the current and next track and how many there are */
   queue?: QueueInfo
+  /** The whole queue, read straight from the Music Assistant add-on where there is one */
+  queueList?: { items: MaQueueItem[]; current: number; offset: number; base: string }
+  showPlayed = false
+  confirmClear = false
+  /** Where the queue was opened from, for the way back */
+  private queueFrom: View = 'home'
+  private maLine?: MaDirect
+  private stopListening?: () => void
+  private queueTimer?: number
   now = Date.now()
   message?: string
   /** Spotify accounts offered for the library; the chosen one is remembered on this device */
@@ -363,6 +378,26 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       background: rgb(var(--ad-primary)); color: rgb(var(--ad-on-primary)); }
     .pill[disabled] { opacity: 0.4; pointer-events: none; }
     .pill.quiet { height: 36px; background: rgba(var(--ad-on-surface), 0.08); color: inherit; }
+    .pill { gap: 8px; }
+    .pill ha-icon { --mdc-icon-size: 18px; }
+    .pill.danger { background: rgba(var(--ad-error), 0.16); color: rgb(var(--ad-error)); }
+    .pill:focus-visible { outline: 2px solid rgb(var(--ad-primary)); outline-offset: 2px; }
+
+    /* Queue */
+    .queue-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 22px; }
+    .queue-head h1 { margin: 0 0 6px; font-size: clamp(24px, 4cqw, 40px); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
+    .queue-head .meta { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .queue-head .actions { margin: 0; gap: 8px; flex-wrap: wrap; }
+    .queue-head .pill { height: 38px; padding: 0 16px; font-size: var(--ad-fs-s); }
+    .fold { all: unset; display: flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: 12px; border-radius: 8px; }
+    .fold h3 { margin: 0; font-size: var(--ad-fs-l); font-weight: 600; }
+    .fold ha-icon { display: flex; --mdc-icon-size: 20px; opacity: var(--ad-o2); transition: transform 0.15s; }
+    .fold[aria-expanded="true"] ha-icon { transform: rotate(90deg); }
+    .fold:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
+    .now-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .now-text .now-chips .chip { margin-top: 0; }
+    .chip[disabled] { opacity: 0.4; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .fold ha-icon { transition: none; } }
 
     /* Speakers */
     .players { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 12px; }
@@ -498,6 +533,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     window.clearTimeout(this.messageTimer)
     document.removeEventListener('click', this.closeMenu)
     window.removeEventListener('resize', this.measure)
+    this.stopListening?.()
+    this.stopListening = undefined
+    this.maLine = undefined
+    window.clearTimeout(this.queueTimer)
   }
 
   /**
@@ -558,10 +597,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     }
     if (!this.libLoading && (!library || Date.now() - library.at > LIBRARY_EVERY) && !this.libFailed) void this.loadLibrary()
     if (!this.spotifyLoading && !this.shelves && this.config.spotify_browsers?.length) void this.loadSpotify()
-    // The queue changes with the track; read it again when the panel is open and something new plays
+    // The queue changes with the track; read it again while it is shown and something new plays
     const p = this.player
     const key = `${p?.entity_id}|${p?.attributes.media_content_id}|${p?.state}`
-    if (this.panel === 'queue' && key !== this.queueFor) {
+    if (this.view === 'queue' && key !== this.queueFor) {
       this.queueFor = key
       void this.loadQueue()
     }
@@ -824,9 +863,72 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
 
   private async loadQueue() {
     const id = this.target
-    if (!id || !this.hass?.callWS) return (this.queue = undefined)
+    if (!id || !this.hass?.callWS) {
+      this.queueList = undefined
+      return (this.queue = undefined)
+    }
     const r = await this.respond<Record<string, QueueInfo>>('music_assistant', 'get_queue', {}, id).catch(() => undefined)
-    this.queue = r?.[id]
+    if (id !== this.target) return
+    this.queue = r?.[id] ?? {}
+    const queueId = this.queue.queue_id
+    const line = queueId ? await maDirect(this.hass) : undefined
+    if (!line || !queueId) return (this.queueList = undefined)
+    this.listenTo(line)
+    try {
+      // Long queues from a bit before the current track on, so it is always among them
+      const info = await line.send<MaQueue>('player_queues/get', { queue_id: queueId })
+      const current = info?.current_index ?? -1
+      const offset = Math.max(0, current - 100)
+      const items = await line.send<MaQueueItem[]>('player_queues/items', { queue_id: queueId, limit: 500, offset })
+      if (id !== this.target) return
+      this.queueList = { items: items ?? [], current, offset, base: line.base }
+    } catch {
+      this.queueList = undefined
+    }
+  }
+
+  /** Music Assistant tells when a queue changes: read it again, once for a burst of changes */
+  private listenTo(line: MaDirect) {
+    if (this.maLine === line) return
+    this.stopListening?.()
+    this.maLine = line
+    this.stopListening = line.listen((event, objectId) => {
+      if (this.view !== 'queue' || !['queue_items_updated', 'queue_updated'].includes(event)) return
+      if (objectId && objectId !== this.queue?.queue_id) return
+      window.clearTimeout(this.queueTimer)
+      this.queueTimer = window.setTimeout(() => void this.loadQueue(), 400)
+    })
+  }
+
+  private async queueCommand(command: string, args: Record<string, unknown>) {
+    const queue_id = this.queue?.queue_id
+    const line = this.maLine
+    this.menu = undefined
+    if (!queue_id || !line || !this.target || !this.canControl(this.target)) return
+    try {
+      await line.send(command, { queue_id, ...args })
+    } catch (e) {
+      this.say((e as Error)?.message || t(this.hass, 'mu.error'))
+    }
+    void this.loadQueue()
+  }
+
+  /** What plays now as an item of the library, for a radio from it */
+  private get currentSong(): MediaItem | undefined {
+    const listed = this.queueList?.items[this.queueList.current - this.queueList.offset]?.media_item
+    const fromHa = this.queue?.current_item?.media_item
+    const p = this.player
+    const uri = listed?.uri ?? fromHa?.uri ?? (String(p?.attributes.media_content_id ?? '').includes('://') ? String(p!.attributes.media_content_id) : undefined)
+    if (!uri || !p || !['playing', 'paused', 'buffering'].includes(p.state)) return undefined
+    const type = listed?.media_type ?? fromHa?.media_type ?? 'track'
+    if (type !== 'track') return undefined
+    return { uri, media_type: 'track', name: listed?.name ?? fromHa?.name ?? String(p.attributes.media_title ?? '') } as MediaItem
+  }
+
+  private async songRadio(item: MediaItem) {
+    await this.play(item, 'replace', { radio: true })
+    this.say(t(this.hass, 'mu.radio_started', { name: item.name }))
+    if (this.view === 'queue') void this.loadQueue()
   }
 
   private async search() {
@@ -1211,6 +1313,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const back = this.nowFrom === 'detail' && !this.detail ? 'home' : this.nowFrom
     const backLabel = back === 'detail' ? this.detail?.item.name ?? '' : t(this.hass, `mu.${back}` as Key)
     const members = groupMembers(this.player)
+    const song = this.currentSong
     return html`
       <button class="back" @click=${() => this.closeNow()}><ha-icon icon="mdi:arrow-left"></ha-icon>${backLabel}</button>
       ${!track ? html`<div class="placeholder"><ha-icon icon="mdi:music-note-off"></ha-icon>${t(this.hass, 'mu.idle')}</div>` : html`
@@ -1222,10 +1325,14 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
               <h1>${track.title}</h1>
               ${track.artist ? html`<div class="now-artist">${track.artist}</div>` : nothing}
               ${track.album ? html`<div class="now-album">${track.album}</div>` : nothing}
-              <button class="chip" @click=${() => { this.view = 'players' }}>
-                <ha-icon icon=${this.info?.spotify ? 'mdi:spotify' : members.length ? 'mdi:speaker-multiple' : 'mdi:speaker'}></ha-icon>
-                ${this.info?.name}${members.length ? ` + ${members.length}` : ''}
-              </button>
+              <div class="now-chips">
+                <button class="chip" @click=${() => { this.view = 'players' }}>
+                  <ha-icon icon=${this.info?.spotify ? 'mdi:spotify' : members.length ? 'mdi:speaker-multiple' : 'mdi:speaker'}></ha-icon>
+                  ${this.info?.name}${members.length ? ` + ${members.length}` : ''}
+                </button>
+                ${song ? html`<button class="chip" ?disabled=${!this.target || !this.canControl(this.target)} @click=${() => this.songRadio(song)}>
+                  <ha-icon icon="mdi:radio"></ha-icon>${t(this.hass, 'mu.song_radio')}</button>` : nothing}
+              </div>
             </div>
           </div>
           ${this.renderLyrics()}
@@ -1235,19 +1342,114 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
 
   // ── Player bar ───────────────────────────────────────────
 
-  private renderQueue() {
-    const q = this.queue
-    const line = (label: Key, entry: QueueInfo['current_item']) => entry ? html`
-      <div class="pop-head">${t(this.hass, label)}</div>
-      <div class="q">${this.art(entry.media_item?.image)}<div class="text">
-        <div class="t">${entry.media_item?.name ?? entry.name}</div><div class="s">${entry.media_item ? itemSub(entry.media_item) : ''}</div></div></div>` : nothing
-    return html`<div class="pop" role="dialog" aria-label=${t(this.hass, 'mu.queue')}>
-      ${!q ? html`<div class="center" style="padding:20px 0"><span class="spinner"></span></div>` : html`
-        ${line('mu.now', q.current_item)}
-        ${q.next_item ? line('mu.up_next', q.next_item) : html`<div class="note">${t(this.hass, 'mu.queue_end')}</div>`}
-        ${q.items ? html`<div class="note">${t(this.hass, 'mu.queue_n', { n: q.items })}</div>` : nothing}
-      `}
+  private openQueue() {
+    if (this.view === 'queue') return this.closeQueue()
+    this.queueFrom = this.view
+    this.view = 'queue'
+    this.menu = undefined
+    this.panel = undefined
+    this.queueFor = ''
+    this.renderRoot.querySelector('.main')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+
+  private closeQueue() {
+    this.view = (this.queueFrom === 'detail' && !this.detail) || this.queueFrom === 'queue' ? 'home' : this.queueFrom
+  }
+
+  /** One track of the queue: a tap plays it, its menu moves it up, starts a radio from it or takes it out */
+  private queueRow(entry: MaQueueItem, index: number, base: string, current: boolean) {
+    const m = entry.media_item
+    const sub = [m?.artists?.map(a => a.name).join(', '), m?.album?.name].filter(Boolean).join(' · ')
+    const key = `q:${entry.queue_item_id}`
+    const open = this.menu === key
+    const ctl = !!this.target && this.canControl(this.target)
+    const act = (fn: () => void) => (e: Event) => { e.stopPropagation(); fn() }
+    const run = () => !current && ctl && this.queueCommand('player_queues/play_index', { index })
+    const song = m?.uri && (m.media_type ?? 'track') === 'track' ? { uri: m.uri, name: m.name ?? entry.name, media_type: 'track' } as MediaItem : undefined
+    return html`<div class="row ${current ? 'on' : ''}" role="button" tabindex="0" @click=${run} @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && run()}>
+      <span class="n">${current && this.player?.state === 'playing' ? eq : index + 1}</span>
+      ${this.art(maImageUrl(base, entry))}
+      <div style="min-width:0"><div class="t">${m?.name ?? entry.name}</div><div class="s">${sub}</div></div>
+      <span class="dur">${entry.duration ? formatTime(entry.duration) : ''}</span>
+      <div class="menu-wrap">
+        <button class="icon-btn" aria-label="Menü" aria-haspopup="menu" aria-expanded=${open} ?disabled=${!ctl}
+          @click=${(e: Event) => {
+            e.stopPropagation()
+            this.menuUp = (e.currentTarget as HTMLElement).getBoundingClientRect().top > window.innerHeight / 2
+            this.menu = open ? undefined : key
+          }}><ha-icon icon="mdi:dots-vertical"></ha-icon></button>
+        ${open ? html`<div class="menu ${this.menuUp ? 'up' : ''}" role="menu">
+          ${current ? nothing : html`
+            <button role="menuitem" @click=${act(() => this.queueCommand('player_queues/play_index', { index }))}><ha-icon icon="mdi:play"></ha-icon>${t(this.hass, 'mu.play')}</button>
+            <button role="menuitem" @click=${act(() => this.queueCommand('player_queues/move_item', { queue_item_id: entry.queue_item_id, pos_shift: 0 }))}><ha-icon icon="mdi:skip-next"></ha-icon>${t(this.hass, 'mu.play_next')}</button>`}
+          ${song ? html`<button role="menuitem" @click=${act(() => this.songRadio(song))}><ha-icon icon="mdi:radio"></ha-icon>${t(this.hass, 'mu.song_radio')}</button>` : nothing}
+          ${current ? nothing : html`<button role="menuitem" @click=${act(() => this.queueCommand('player_queues/delete_item', { item_id_or_index: entry.queue_item_id }))}><ha-icon icon="mdi:playlist-remove"></ha-icon>${t(this.hass, 'mu.remove')}</button>`}
+        </div>` : nothing}
+      </div>
     </div>`
+  }
+
+  /** The play queue as a page of its own: what plays, what comes, and what played before */
+  private renderQueue() {
+    const back = this.queueFrom === 'detail' && !this.detail ? 'home' : this.queueFrom === 'queue' ? 'home' : this.queueFrom
+    const backLabel = back === 'detail' ? this.detail?.item.name ?? '' : t(this.hass, `mu.${back}` as Key)
+    const q = this.queue
+    const list = this.queueList
+    const song = this.currentSong
+    const ctl = !!this.target && this.canControl(this.target)
+    const count = list?.items.length ?? q?.items ?? 0
+    const head = html`
+      <button class="back" @click=${() => this.closeQueue()}><ha-icon icon="mdi:arrow-left"></ha-icon>${backLabel}</button>
+      <div class="queue-head">
+        <div style="min-width:0">
+          <h1>${t(this.hass, 'mu.queue')}</h1>
+          <div class="meta">${[this.info?.name, count ? t(this.hass, 'mu.tracks_n', { n: count }) : ''].filter(Boolean).join(' · ')}</div>
+        </div>
+        <div class="actions">
+          ${song ? html`<button class="pill" ?disabled=${!ctl} @click=${() => this.songRadio(song)}><ha-icon icon="mdi:radio"></ha-icon>${t(this.hass, 'mu.song_radio')}</button>` : nothing}
+          ${list?.items.length && this.maLine ? html`<button class="pill quiet ${this.confirmClear ? 'danger' : ''}" ?disabled=${!ctl}
+            @click=${() => {
+              if (!this.confirmClear) { this.confirmClear = true; window.setTimeout(() => { this.confirmClear = false }, 4000); return }
+              this.confirmClear = false
+              void this.queueCommand('player_queues/clear', {})
+            }}><ha-icon icon="mdi:playlist-remove"></ha-icon>${t(this.hass, this.confirmClear ? 'mu.clear_confirm' : 'mu.clear_queue')}</button>` : nothing}
+        </div>
+      </div>
+      ${this.notMa()}`
+    if (!this.target) return html`${head}<div class="placeholder"><ha-icon icon="mdi:playlist-music-outline"></ha-icon>${t(this.hass, 'mu.not_ma')}</div>`
+    if (!q) return html`${head}<div class="center"><span class="spinner"></span></div>`
+    if (list) {
+      if (!list.items.length) return html`${head}<div class="placeholder"><ha-icon icon="mdi:playlist-music-outline"></ha-icon>${t(this.hass, 'mu.queue_empty')}</div>`
+      // Positions in the queue count from its start, the list from where it was read
+      const off = list.offset
+      const at = Math.min(Math.max(list.current - off, 0), list.items.length - 1)
+      const played = list.items.slice(0, at)
+      const coming = list.items.slice(at + 1)
+      return html`${head}
+        ${this.section(t(this.hass, 'mu.now'), html`<div class="rows">${this.queueRow(list.items[at]!, off + at, list.base, list.current >= 0)}</div>`)}
+        ${this.section(t(this.hass, 'mu.up_next'), coming.length
+          ? html`<div class="rows">${coming.map((entry, i) => this.queueRow(entry, off + at + 1 + i, list.base, false))}</div>`
+          : html`<p class="hint">${t(this.hass, 'mu.queue_end')}</p>`)}
+        ${played.length ? html`<div class="section">
+          <button class="fold" aria-expanded=${this.showPlayed} @click=${() => { this.showPlayed = !this.showPlayed }}>
+            <ha-icon icon="mdi:chevron-right"></ha-icon><h3>${t(this.hass, 'mu.played', { n: off + played.length })}</h3></button>
+          ${this.showPlayed ? html`<div class="rows">${played.map((entry, i) => this.queueRow(entry, off + i, list.base, false))}</div>` : nothing}
+        </div>` : nothing}`
+    }
+    // Only what the integration tells: the current and the next track, and how many there are
+    const line = (entry: QueueInfo['current_item'], n: number, on = false) => entry ? html`<div class="row ${on ? 'on' : ''}">
+      <span class="n">${on && this.player?.state === 'playing' ? eq : n}</span>
+      ${this.art(entry.media_item?.image)}
+      <div style="min-width:0"><div class="t">${entry.media_item?.name ?? entry.name}</div><div class="s">${entry.media_item ? itemSub(entry.media_item) : ''}</div></div>
+      <span class="dur">${entry.media_item?.duration ? formatTime(entry.media_item.duration) : ''}</span><span></span>
+    </div>` : nothing
+    if (!q.current_item && !q.next_item) return html`${head}<div class="placeholder"><ha-icon icon="mdi:playlist-music-outline"></ha-icon>${t(this.hass, 'mu.queue_empty')}</div>`
+    return html`${head}
+      ${q.current_item ? this.section(t(this.hass, 'mu.now'), html`<div class="rows">${line(q.current_item, 1, true)}</div>`) : nothing}
+      ${this.section(t(this.hass, 'mu.up_next'), q.next_item ? html`<div class="rows">${line(q.next_item, 2)}</div>
+        ${q.items && q.items > 2 ? html`<p class="hint">${t(this.hass, 'mu.queue_more', { n: q.items - 2 })}</p>` : nothing}`
+        : html`<p class="hint">${t(this.hass, 'mu.queue_end')}</p>`)}
+      <p class="hint">${t(this.hass, 'mu.queue_partial')}</p>`
   }
 
   private renderTransfer() {
@@ -1277,11 +1479,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const volume = Math.round(Number(a.volume_level ?? 0) * 100)
     const muted = !!a.is_volume_muted
     const repeat = (a.repeat ?? 'off') as string
-    const toggle = (panel: 'queue' | 'transfer' | 'volume') => (e: Event) => {
+    const toggle = (panel: 'transfer' | 'volume') => (e: Event) => {
       e.stopPropagation()
       this.panel = this.panel === panel ? undefined : panel
       this.menu = undefined
-      if (this.panel === 'queue') { this.queue = undefined; this.queueFor = ''; this.requestUpdate() }
     }
     const members = groupMembers(p)
     const volumeIcon = muted || volume === 0 ? 'mdi:volume-off' : volume < 50 ? 'mdi:volume-medium' : 'mdi:volume-high'
@@ -1325,11 +1526,9 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       <div class="right">
         <button class="ctrl small ${this.view === 'now' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.lyrics')} title=${t(this.hass, 'mu.lyrics')}
           aria-pressed=${this.view === 'now'} ?disabled=${!active} @click=${() => this.openNow()}><ha-icon icon="mdi:microphone-variant"></ha-icon></button>
-        ${this.target ? html`<div class="panel-wrap">
-          <button class="ctrl small ${this.panel === 'queue' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.queue')} title=${t(this.hass, 'mu.queue')} aria-expanded=${this.panel === 'queue'}
-            @click=${toggle('queue')}><ha-icon icon="mdi:playlist-play"></ha-icon></button>
-          ${this.panel === 'queue' ? this.renderQueue() : nothing}
-        </div>
+        ${this.target ? html`
+        <button class="ctrl small ${this.view === 'queue' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.queue')} title=${t(this.hass, 'mu.queue')} aria-pressed=${this.view === 'queue'}
+          @click=${() => this.openQueue()}><ha-icon icon="mdi:playlist-play"></ha-icon></button>
         <div class="panel-wrap">
           <button class="ctrl small ${this.panel === 'transfer' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.transfer')} title=${t(this.hass, 'mu.transfer')} aria-expanded=${this.panel === 'transfer'}
             ?disabled=${!ctl || this.maPlayers.length < 2} @click=${toggle('transfer')}><ha-icon icon="mdi:cast-audio"></ha-icon></button>
@@ -1351,9 +1550,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
 
   protected render() {
     if (!this.players.length) return nothing
-    const views: [View, string, Key][] = [['home', 'mdi:home-variant-outline', 'mu.home'], ['search', 'mdi:magnify', 'mu.search'], ['radio', 'mdi:radio', 'mu.radio'], ['players', 'mdi:speaker-multiple', 'mu.players']]
+    const views: [View, string, Key][] = [['home', 'mdi:home-variant-outline', 'mu.home'], ['search', 'mdi:magnify', 'mu.search'], ['radio', 'mdi:radio', 'mu.radio'], ['queue', 'mdi:playlist-play', 'mu.queue'], ['players', 'mdi:speaker-multiple', 'mu.players']]
     const current = this.view === 'detail' ? this.from : this.view
-    const go = (view: View) => { this.view = view; this.detail = undefined; this.menu = undefined }
+    const go = (view: View) => {
+      if (view === 'queue') return this.view === 'queue' ? undefined : this.openQueue()
+      this.view = view; this.detail = undefined; this.menu = undefined
+    }
     const glow = playerPicture(this.player)
     const playlists = [...(this.shelves?.find(s => s.key === 'current_user_playlists')?.items ?? []), ...(this.lib?.playlists ?? [])]
     return html`<div class="music ${this.fit ? 'fit' : ''}" style=${this.fit ? `--fit:${this.fit}px` : ''}>
@@ -1372,6 +1574,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
         ${this.view === 'home' ? this.renderHome()
           : this.view === 'search' ? this.renderSearch()
           : this.view === 'radio' ? this.renderRadio()
+          : this.view === 'queue' ? this.renderQueue()
           : this.view === 'players' ? this.renderPlayers()
           : this.view === 'now' ? this.renderNow()
           : this.renderDetail()}

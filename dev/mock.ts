@@ -162,6 +162,47 @@ const library: Record<string, Mi[]> = {
 }
 const tracksOf = (item: Mi) => library.track.concat(library.track.map((t, i) => ({ ...t, uri: `${t.uri}-${item.uri}-${i}`, name: `${t.name} (Live)` })))
 
+/** The queue as the Music Assistant add-on holds it, which the dashboard reads straight from the add-on */
+export interface FakeQueueItem {
+  queue_item_id: string
+  name: string
+  duration: number
+  image: { type: 'thumb'; path: string; provider: string; remotely_accessible: true } | null
+  media_item: Mi & { album?: { name: string } }
+}
+export const fakeQueue = { id: 'ma_kuche', items: [] as FakeQueueItem[], current: 0 }
+let queueSeq = 0
+function queueItem(t: Mi): FakeQueueItem {
+  const n = ++queueSeq
+  return {
+    queue_item_id: `qi${n}`, name: `${t.artists?.[0]?.name ?? ''} - ${t.name}`, duration: 170 + (n * 37) % 130,
+    image: t.image ? { type: 'thumb', path: t.image, provider: 'builtin', remotely_accessible: true } : null,
+    media_item: { ...t, album: { name: library.album.find(a => a.artists?.[0]?.name === t.artists?.[0]?.name)?.name ?? 'Singles' } },
+  }
+}
+export function setQueue(tracks: Mi[], current = 0) {
+  fakeQueue.items = tracks.map(queueItem)
+  fakeQueue.current = current
+}
+/** A radio from a track: the track, then songs like it */
+function radioFrom(track: Mi) {
+  const like = [...library.track, ...tracksOf(library.playlist[0]!)].filter(t => t.uri !== track.uri)
+  setQueue([track, ...like.slice(3), ...like.slice(0, 3)])
+}
+// Three played, Teardrop now, the rest of a playlist to come
+{
+  const list = tracksOf(library.playlist[0]!)
+  setQueue([...list.slice(7), ...list.slice(0, 7)], 3)
+}
+/** What a player shows for a queue item */
+export function queueAttributes(item: FakeQueueItem) {
+  const m = item.media_item
+  return {
+    media_title: m.name, media_artist: m.artists?.[0]?.name, media_album_name: m.album?.name, media_content_id: m.uri, entity_picture_local: m.image,
+    media_position: 0, media_position_updated_at: new Date().toISOString(), media_duration: item.duration,
+  }
+}
+
 // Two Spotify accounts, as a Sonos speaker's media browser lists them; the first belongs to spotify_frank
 /** HA's media as the browser shows it: the sources, an Immich account with albums, and local media */
 const IMMICH = 'media-source://immich/u1'
@@ -628,6 +669,8 @@ export function createHass(dark: boolean): HomeAssistant {
     language: 'de',
     locale: { language: 'de' },
     user: { id: 'u-frank', name: 'Frank Carlo', is_admin: true },
+    // The Music Assistant add-on's sidebar panel, through which the music page reads the whole queue
+    panels: { d5369777_music_assistant: { url_path: 'd5369777_music_assistant', config: { ingress: 'd5369777_music_assistant' } } },
     formatEntityState: (e: HassEntity) => {
       const map: Record<string, string> = {
         on: 'An', off: 'Aus', open: 'Offen', closed: 'Geschlossen', locked: 'Verriegelt', unlocked: 'Entriegelt',
@@ -759,10 +802,14 @@ async function musicResponse(msg: Record<string, any>, states: Record<string, Ha
   }
   if (msg.service === 'get_queue') {
     const id = [msg.target?.entity_id].flat()[0] as string
+    if (id === 'media_player.ma_kuche') {
+      const at = (i: number) => fakeQueue.items[i] ? { name: fakeQueue.items[i]!.name, media_item: { ...fakeQueue.items[i]!.media_item, duration: fakeQueue.items[i]!.duration } } : null
+      return { [id]: { queue_id: fakeQueue.id, items: fakeQueue.items.length, current_index: fakeQueue.current, current_item: at(fakeQueue.current), next_item: at(fakeQueue.current + 1) } }
+    }
     const e = states[id]
     const current = library.track.find(t => t.uri === e?.attributes.media_content_id) ?? library.track[0]!
     const next = library.track[(library.track.indexOf(current) + 1) % library.track.length]!
-    return { [id]: { items: 24, current_item: { name: current.name, media_item: current }, next_item: { name: next.name, media_item: next } } }
+    return { [id]: { queue_id: id.replace('media_player.', ''), items: 24, current_item: { name: current.name, media_item: current }, next_item: { name: next.name, media_item: next } } }
   }
   return {}
 }
@@ -814,7 +861,13 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
         }
       }
     }
-    if (domain === 'media_player' && ['media_next_track', 'media_previous_track'].includes(service)) {
+    if (id === 'media_player.ma_kuche' && ['media_next_track', 'media_previous_track'].includes(service)) {
+      const to = fakeQueue.current + (service === 'media_next_track' ? 1 : -1)
+      if (fakeQueue.items[to]) {
+        fakeQueue.current = to
+        Object.assign(attributes, queueAttributes(fakeQueue.items[to]!))
+      }
+    } else if (domain === 'media_player' && ['media_next_track', 'media_previous_track'].includes(service)) {
       const list = library.track
       const at = list.findIndex(t => t.uri === attributes.media_content_id)
       const next = list[(at + (service === 'media_next_track' ? 1 : list.length - 1)) % list.length]!
@@ -824,6 +877,13 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
       const all = Object.values(library).flat()
       const item = all.find(i => i.uri === data.media_id)
       const start = all.find(i => i.uri === data.start_item) ?? (item?.media_type === 'track' || item?.media_type === 'radio' ? item : library.track[0])
+      if (id === 'media_player.ma_kuche' && item) {
+        const list = item.media_type === 'track' || item.media_type === 'radio' ? [item] : tracksOf(item)
+        if (data.radio_mode && item.media_type === 'track') radioFrom(item)
+        else if (data.enqueue === 'next') fakeQueue.items.splice(fakeQueue.current + 1, 0, ...list.map(queueItem))
+        else if (data.enqueue === 'add') fakeQueue.items.push(...list.map(queueItem))
+        else setQueue(list, Math.max(0, list.findIndex(t => t.uri === start?.uri)))
+      }
       if (['play', 'replace', undefined].includes(data.enqueue) && start) {
         state = 'playing'
         Object.assign(attributes, {
