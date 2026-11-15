@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { maImageUrl, maSlug, type MaQueueItem } from '../src/ma-direct'
-import type { HomeAssistant } from '../src/types'
+import { canGroup, maImageUrl, maSlug, type MaPlayer, type MaQueueItem } from '../src/ma-direct'
+import type { HassEntity, HomeAssistant } from '../src/types'
 
 const hass = (panels: HomeAssistant['panels']) => ({ panels }) as HomeAssistant
 
@@ -47,5 +47,41 @@ describe('maImageUrl', () => {
 
   it('has none when only the server itself can read the picture', () => {
     expect(maImageUrl(base, item({ image: { path: '/music/cover.jpg', provider: 'filesystem', remotely_accessible: false } }))).toBeUndefined()
+  })
+})
+
+describe('canGroup', () => {
+  const speaker = (entity_id: string, friendly_name: string, active_queue: string): HassEntity =>
+    ({ entity_id, state: 'idle', attributes: { friendly_name, active_queue } })
+  const kitchen = speaker('media_player.kuche', 'Küche', 'RINCON_1')
+  const office = speaker('media_player.buro', 'Büro', 'RINCON_2')
+  const hub = speaker('media_player.nest_hub_2', 'Nest Hub', 'fe30')
+  const players: MaPlayer[] = [
+    { player_id: 'RINCON_1', provider: 'sonos--a', name: 'Küche', can_group_with: ['sonos--a'] },
+    { player_id: 'RINCON_2', provider: 'sonos--a', name: 'Büro', can_group_with: ['sonos--a'] },
+    { player_id: 'fe30', provider: 'chromecast--b', name: 'Nest Hub', can_group_with: ['c0ff'] },
+  ]
+
+  it('lets speakers of one kind play together, by provider or by player', () => {
+    expect(canGroup(kitchen, office, players)).toBe(true)
+    expect(canGroup(hub, speaker('media_player.mini', 'Mini', 'c0ff'), [...players, { player_id: 'c0ff', provider: 'chromecast--b', name: 'Mini' }])).toBe(true)
+  })
+
+  it('keeps Sonos and Cast apart', () => {
+    expect(canGroup(kitchen, hub, players)).toBe(false)
+    expect(canGroup(hub, kitchen, players)).toBe(false)
+  })
+
+  it('finds a renamed speaker by the queue it plays, and lets one it can\'t find through', () => {
+    expect(canGroup(speaker('media_player.kuche', 'Küchenradio', 'RINCON_1'), hub, players)).toBe(false)
+    expect(canGroup(kitchen, speaker('media_player.neu', 'Neu', 'x'), players)).toBe(true)
+  })
+
+  it('tells two speakers of the same name apart by their queues', () => {
+    const twins: MaPlayer[] = [
+      { player_id: 'a', provider: 'sonos--a', name: 'Lautsprecher', can_group_with: ['sonos--a'] },
+      { player_id: 'b', provider: 'chromecast--b', name: 'Lautsprecher', can_group_with: [] },
+    ]
+    expect(canGroup(speaker('media_player.x', 'Lautsprecher', 'a'), speaker('media_player.y', 'Lautsprecher', 'b'), twins)).toBe(false)
   })
 })

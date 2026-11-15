@@ -9,7 +9,7 @@ import {
   playerPicture, playsItem, secureImage, type Lyrics, type MediaItem, type MusicPlayer, type SpotifyAccount, type SpotifySection,
 } from '../music'
 import { tokens } from '../styles/tokens'
-import { maDirect, maImageUrl, type MaDirect, type MaQueue, type MaQueueItem } from '../ma-direct'
+import { canGroup, maDirect, maImageUrl, type MaDirect, type MaPlayer, type MaQueue, type MaQueueItem } from '../ma-direct'
 import type { HassEntity, NavPosition } from '../types'
 import { scrollRow } from '../scroll-row'
 
@@ -119,6 +119,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     shelves: { state: true },
     lyrics: { state: true },
     fit: { state: true },
+    maPlayerList: { state: true },
   }
 
   view: View = 'home'
@@ -138,7 +139,10 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   /** The track whose menu is open */
   menu?: string
   private menuUp = false
-  panel?: 'transfer' | 'volume'
+  panel?: 'transfer' | 'volume' | 'group'
+  /** Music Assistant's players, to tell which speakers can play together; unset without the add-on */
+  maPlayerList?: MaPlayer[]
+  private maPlayersAt = 0
   /** What HA tells about the queue: the current and next track and how many there are */
   queue?: QueueInfo
   /** The whole queue, read straight from the Music Assistant add-on where there is one */
@@ -313,6 +317,16 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .menu button:focus-visible, .pop .item:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
     .menu ha-icon, .pop .item ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); }
     .pop-head { padding: 8px 12px 4px; font-size: var(--ad-fs-xs); font-weight: 600; opacity: var(--ad-o3); }
+    .pop-note { margin: 4px 12px 8px; font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
+    .pop.group .member.on { background: rgba(var(--ad-primary), 0.1); border-radius: 12px; }
+    .pop.group .member.on .item ha-icon { color: rgb(var(--ad-primary)); opacity: 1; }
+    .pop.group .member input[type=range] { display: block; width: calc(100% - 24px); margin: 0 12px; padding-bottom: 10px; }
+    .pop.group .item[disabled] { cursor: default; opacity: 0.45; }
+    .pop.group .item[disabled]:hover { background: none; }
+    .pop.group .who-name { flex: 1; min-width: 0; text-align: start; }
+    .pop.group .dim { opacity: 0.5; }
+    .pop.group .why { display: block; font-size: var(--ad-fs-xs); opacity: 0.8; }
+    .pop.group .ungroup { margin-top: 4px; border-top: 1px solid rgba(var(--ad-on-surface), 0.08); border-radius: 0 0 12px 12px; }
     .pop .q { display: flex; align-items: center; gap: 12px; padding: 6px 12px; }
     .pop .q .art { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 8px; }
     .pop .q .text { min-width: 0; flex: 1; }
@@ -600,6 +614,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     // The queue changes with the track; read it again while it is shown and something new plays
     const p = this.player
     const key = `${p?.entity_id}|${p?.attributes.media_content_id}|${p?.state}`
+    if ((this.view === 'players' || this.panel === 'group') && Date.now() - this.maPlayersAt > 30_000) void this.loadMaPlayers()
     if (this.view === 'queue' && key !== this.queueFor) {
       this.queueFor = key
       void this.loadQueue()
@@ -1020,8 +1035,35 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   private toggleGroup(id: string) {
     const lead = this.target
     if (!lead) return
-    if (groupMembers(this.player).includes(id)) this.control('unjoin', {}, id)
-    else void this.call('media_player', 'join', lead, { group_members: [id] })
+    const failed = () => this.say(t(this.hass, 'mu.group_failed', { name: this.nameOf(id) }))
+    if (groupMembers(this.player).includes(id)) this.call('media_player', 'unjoin', id)?.catch(failed)
+    else this.call('media_player', 'join', lead, { group_members: [id] })?.catch(failed)
+  }
+
+  private ungroupAll() {
+    for (const id of groupMembers(this.player)) this.call('media_player', 'unjoin', id)
+    this.panel = undefined
+  }
+
+  /** Music Assistant's own list of players, which tells which of them can play in sync */
+  private async loadMaPlayers() {
+    this.maPlayersAt = Date.now()
+    const line = this.hass && await maDirect(this.hass)
+    const list = await line?.send<MaPlayer[]>('players/all').catch(() => undefined)
+    if (Array.isArray(list)) this.maPlayerList = list
+  }
+
+  /** The speakers that can play along with the chosen one, those Music Assistant says can't, and the lead itself */
+  private get partners() {
+    const lead = this.target
+    const leadState = this.state(lead)
+    if (!lead || !leadState || !(this.features(leadState) & F.GROUPING) || !this.canControl(lead)) return undefined
+    const members = groupMembers(leadState)
+    const others = this.maPlayers.filter(p => p.entity !== lead && this.reachable(p.entity) && this.features(this.state(p.entity)) & F.GROUPING
+      // A speaker already in another group is that group's to give
+      && !groupMembers(this.state(p.entity)).length)
+    const fits = (p: MusicPlayer) => members.includes(p.entity) || !this.maPlayerList || canGroup(leadState, this.state(p.entity)!, this.maPlayerList)
+    return { lead, members, fit: others.filter(fits), misfit: others.filter(p => !fits(p)) }
   }
 
   // ── Pieces ───────────────────────────────────────────────
@@ -1243,8 +1285,8 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
 
   private renderPlayers() {
     const selected = this.playerId
-    const lead = this.target
     const members = groupMembers(this.player)
+    const partners = this.partners
     const card = (p: MusicPlayer) => {
       const e = this.hass!.states[p.entity]
       const off = !this.reachable(p.entity)
@@ -1253,7 +1295,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
       const np = playing || e?.state === 'paused' ? [a.media_title, a.media_artist].filter(Boolean).join(' · ') : off ? t(this.hass, 'mu.unavailable') : t(this.hass, 'mu.idle')
       const pic = playing || e?.state === 'paused' ? playerPicture(e) : undefined
       const grouped = members.includes(p.entity)
-      const canGroup = lead && p.ma && p.entity !== lead && !off && this.features() & F.GROUPING && this.canControl(lead)
+      const groupable = !off && !!partners?.fit.some(f => f.entity === p.entity)
       const volume = Math.round(Number(a.volume_level ?? 0) * 100)
       const stop = (e: Event) => e.stopPropagation()
       return html`<div class="player ${p.entity === selected ? 'selected' : ''} ${playing ? 'playing' : ''} ${off ? 'off' : ''}" role="button" tabindex="0"
@@ -1270,7 +1312,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
           ${this.features(e) & F.VOLUME_SET ? html`<ha-icon icon="mdi:volume-medium" style="opacity:.5;--mdc-icon-size:16px"></ha-icon>
             <input type="range" min="0" max="100" .value=${String(volume)} aria-label="${t(this.hass, 'mu.volume')} ${p.name}" ?disabled=${!this.canControl(p.entity)}
               @change=${(ev: Event) => this.control('volume_set', { volume_level: Number((ev.target as HTMLInputElement).value) / 100 }, p.entity)}>` : html`<span style="flex:1"></span>`}
-          ${canGroup ? html`<button class="chip ${grouped ? 'on' : ''}" @click=${() => this.toggleGroup(p.entity)}>
+          ${groupable ? html`<button class="chip ${grouped ? 'on' : ''}" @click=${() => this.toggleGroup(p.entity)}>
             <ha-icon icon=${grouped ? 'mdi:link-variant-off' : 'mdi:link-variant'}></ha-icon>${t(this.hass, grouped ? 'mu.unjoin' : 'mu.join')}</button>` : nothing}
         </div>`}
       </div>`
@@ -1464,6 +1506,33 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     </div>`
   }
 
+  private renderGroup() {
+    const g = this.partners
+    if (!g) return nothing
+    const lead = this.nameOf(g.lead)
+    const row = (p: MusicPlayer, fits: boolean) => {
+      const e = this.state(p.entity)
+      const on = g.members.includes(p.entity)
+      const volume = Math.round(Number(e?.attributes.volume_level ?? 0) * 100)
+      return html`<div class="member ${on ? 'on' : ''}">
+        <button class="item" role="checkbox" aria-checked=${on} ?disabled=${!fits || !this.canControl(p.entity)} @click=${() => this.toggleGroup(p.entity)}>
+          <ha-icon icon=${on ? 'mdi:checkbox-marked-circle' : 'mdi:checkbox-blank-circle-outline'}></ha-icon>
+          <span class="who-name">${p.name}${p.area && !p.name.includes(p.area) ? html` <span class="dim">· ${p.area}</span>` : nothing}
+            ${fits ? nothing : html`<span class="why">${t(this.hass, 'mu.group_misfit', { name: lead })}</span>`}</span>
+          ${e?.state === 'playing' && !on ? eq : nothing}
+        </button>
+        ${on && this.features(e) & F.VOLUME_SET ? html`<input type="range" min="0" max="100" .value=${String(volume)} aria-label="${t(this.hass, 'mu.volume')} ${p.name}"
+          ?disabled=${!this.canControl(p.entity)} @change=${(ev: Event) => this.control('volume_set', { volume_level: Number((ev.target as HTMLInputElement).value) / 100 }, p.entity)}>` : nothing}
+      </div>`
+    }
+    return html`<div class="pop group" role="dialog" aria-label=${t(this.hass, 'mu.group')}>
+      <div class="pop-head">${t(this.hass, 'mu.group_head', { name: lead })}</div>
+      ${g.fit.length ? g.fit.map(p => row(p, true)) : html`<p class="pop-note">${t(this.hass, 'mu.group_none', { name: lead })}</p>`}
+      ${g.misfit.map(p => row(p, false))}
+      ${g.members.length ? html`<button class="item ungroup" @click=${() => this.ungroupAll()}><ha-icon icon="mdi:link-variant-off"></ha-icon>${t(this.hass, 'mu.ungroup_all')}</button>` : nothing}
+    </div>`
+  }
+
   private renderBar() {
     const p = this.player
     if (!p) return nothing
@@ -1479,7 +1548,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const volume = Math.round(Number(a.volume_level ?? 0) * 100)
     const muted = !!a.is_volume_muted
     const repeat = (a.repeat ?? 'off') as string
-    const toggle = (panel: 'transfer' | 'volume') => (e: Event) => {
+    const toggle = (panel: 'transfer' | 'volume' | 'group') => (e: Event) => {
       e.stopPropagation()
       this.panel = this.panel === panel ? undefined : panel
       this.menu = undefined
@@ -1533,7 +1602,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
           <button class="ctrl small ${this.panel === 'transfer' ? 'on' : ''}" aria-label=${t(this.hass, 'mu.transfer')} title=${t(this.hass, 'mu.transfer')} aria-expanded=${this.panel === 'transfer'}
             ?disabled=${!ctl || this.maPlayers.length < 2} @click=${toggle('transfer')}><ha-icon icon="mdi:cast-audio"></ha-icon></button>
           ${this.panel === 'transfer' ? this.renderTransfer() : nothing}
-        </div>` : nothing}
+        </div>
+        ${this.partners ? html`<div class="panel-wrap">
+          <button class="ctrl small ${this.panel === 'group' || members.length ? 'on' : ''}" aria-label=${t(this.hass, 'mu.group')} title=${t(this.hass, 'mu.group')}
+            aria-expanded=${this.panel === 'group'} @click=${toggle('group')}><ha-icon icon="mdi:speaker-multiple"></ha-icon></button>
+          ${this.panel === 'group' ? this.renderGroup() : nothing}
+        </div>` : nothing}` : nothing}
         ${f & F.VOLUME_SET ? html`
           <div class="panel-wrap vol-btn">
             <button class="ctrl small" aria-label=${t(this.hass, 'mu.volume')} aria-expanded=${this.panel === 'volume'} @click=${toggle('volume')}><ha-icon icon=${volumeIcon}></ha-icon></button>

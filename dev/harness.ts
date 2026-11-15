@@ -155,6 +155,12 @@ if (params.get('ma') !== 'off') fakeMaDirect(async () => ({
     const q = fakeQueue
     const changed = () => setTimeout(() => maListeners.forEach(l => l('queue_items_updated', q.id)), 50)
     const at = (id: string | number) => typeof id === 'number' ? id : q.items.findIndex(i => i.queue_item_id === id)
+    // Two Sonos that play in sync, and a Cast speaker that goes with neither
+    if (command === 'players/all') return [
+      { player_id: 'ma_kuche', provider: 'sonos--1', name: 'Lautsprecher', can_group_with: ['sonos--1'] },
+      { player_id: 'ma_wohnzimmer', provider: 'sonos--1', name: 'Lautsprecher', can_group_with: ['sonos--1'] },
+      { player_id: 'ma_schlafzimmer', provider: 'chromecast--1', name: 'Nest Mini', can_group_with: [] },
+    ] as T
     if (command === 'player_queues/get') return { queue_id: q.id, current_index: q.current, items: q.items.length } as T
     if (command === 'player_queues/items') return q.items.slice(args.offset ?? 0, (args.offset ?? 0) + (args.limit ?? 500)) as T
     if (command === 'player_queues/play_index') {

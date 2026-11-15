@@ -267,11 +267,11 @@ export const musicDefs: Def[] = [
   ['media_player.ma_kuche', 'playing', {
     friendly_name: 'Lautsprecher', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.42, shuffle: false, repeat: 'off',
     media_title: 'Teardrop', media_artist: 'Massive Attack', media_album_name: 'Mezzanine', media_content_id: 'library://track/31', media_duration: 331, media_position: 74,
-    media_position_updated_at: new Date().toISOString(), entity_picture_local: cover(280, 'Mezzanine'), group_members: ['media_player.ma_kuche'], supported_features: 8320575,
+    media_position_updated_at: new Date().toISOString(), entity_picture_local: cover(280, 'Mezzanine'), group_members: ['media_player.ma_kuche'], supported_features: 8320575, active_queue: 'ma_kuche',
   }, 'kuche'],
-  ['media_player.ma_wohnzimmer', 'idle', { friendly_name: 'Lautsprecher', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.3, group_members: [], supported_features: 8320575 }, 'wohnzimmer'],
+  ['media_player.ma_wohnzimmer', 'idle', { friendly_name: 'Lautsprecher', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.3, group_members: [], supported_features: 8320575, active_queue: 'ma_wohnzimmer' }, 'wohnzimmer'],
   ['media_player.ma_schlafzimmer', 'paused', {
-    friendly_name: 'Nest Mini', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.18, group_members: [], supported_features: 8320575,
+    friendly_name: 'Nest Mini', mass_player_type: 'player', device_class: 'speaker', volume_level: 0.18, group_members: [], supported_features: 8320575, active_queue: 'ma_schlafzimmer',
     media_title: 'Deutschlandfunk', media_content_id: 'library://radio/42', entity_picture_local: cover(0, 'DLF'),
   }, 'schlafzimmer'],
   ['media_player.ma_buro', 'unavailable', { friendly_name: 'Büro Sonos', mass_player_type: 'player', supported_features: 8320575 }, 'buro_keller'],

@@ -3,7 +3,7 @@
 // so the browser needs no address or login of Music Assistant: HA opens an Ingress session for the signed-in
 // user, and Music Assistant signs that user in on its side. Without the add-on (a server elsewhere, HA in
 // Docker) there is no line, and the music page falls back to what the integration tells.
-import type { HomeAssistant } from './types'
+import type { HassEntity, HomeAssistant } from './types'
 
 export interface MaImage {
   type?: string
@@ -159,6 +159,38 @@ async function open(hass: HomeAssistant): Promise<MaDirect | undefined> {
       return () => listeners.delete(callback)
     },
   }
+}
+
+/** A player as Music Assistant knows it (`players/all`), what grouping needs of it */
+export interface MaPlayer {
+  player_id: string
+  /** The instance id of the provider that brings the player, e.g. one per Sonos or Cast setup */
+  provider: string
+  name: string
+  /** The players it can play in sync with; a provider's instance id stands for all of that provider's players */
+  can_group_with?: string[]
+}
+
+/**
+ * Which speakers can play along with the lead, by Music Assistant's own word: Sonos goes with Sonos, Cast with
+ * Cast, but not across. A speaker Music Assistant's list doesn't name counts as fitting, so does every one
+ * when the lead itself isn't found, and HA has the last word when it is asked to join them.
+ */
+export function canGroup(lead: HassEntity, candidate: HassEntity, players: MaPlayer[]): boolean {
+  const l = maPlayerOf(lead, players)
+  const c = maPlayerOf(candidate, players)
+  if (!l || !c) return true
+  const fits = (a: MaPlayer, b: MaPlayer) => !!a.can_group_with?.some(id => id === b.player_id || id === b.provider)
+  return fits(l, c) || fits(c, l)
+}
+
+/** The Music Assistant player behind an HA entity: by name where only one player has it, else by the queue it plays */
+function maPlayerOf(entity: HassEntity, players: MaPlayer[]): MaPlayer | undefined {
+  const name = entity.attributes.friendly_name
+  const named = players.filter(p => p.name === name)
+  if (named.length === 1) return named[0]
+  // A speaker on its own plays its own queue, named like itself
+  return players.find(p => p.player_id === entity.attributes.active_queue)
 }
 
 /** A queue item's picture: the add-on's resized copy where it has one, else the picture itself if a browser may load it */
