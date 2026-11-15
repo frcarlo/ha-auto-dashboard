@@ -17,6 +17,7 @@ import { meterSources } from './meters'
 import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
+import { printers } from './printers'
 import type { NavItem } from './cards/nav-bar'
 import type { FaceSettings } from './cards/face'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, OwnCardsPage, PagePath, StrategyConfig } from './types'
@@ -437,6 +438,9 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ] : []),
     { type: 'grid', column_span: 2, cards: [heading(t(hass, 'batteries'), 'mdi:battery-50'), { type: 'custom:ad-maintenance-list', source: 'battery', ...scopeOpts }] },
     { type: 'grid', column_span: 2, cards: [heading(t(hass, 'status.unavailable'), 'mdi:lan-disconnect'), { type: 'custom:ad-maintenance-list', source: 'unavailable', ...scopeOpts }] },
+    // Printers only where one reports its cartridges, across the page so several sit side by side
+    ...(printers(hass, areaIds, hideOpts.hide_labels, hideOpts.hide_entities).length
+      ? [{ type: 'grid' as const, column_span: MAX_COLUMNS, cards: [heading(t(hass, 'printers'), 'mdi:printer-outline'), { type: 'custom:ad-printers', ...scopeOpts }] }] : []),
     ...(isAdmin ? [system('log', t(hass, 'sys.log'), 'mdi:text-box-search-outline', MAX_COLUMNS)] : []),
   ])
 

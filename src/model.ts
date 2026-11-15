@@ -118,7 +118,7 @@ export function entityAreaId(hass: HomeAssistant, entityId: string): string | un
 }
 
 /** Whether the entity, its device or its area carries one of the labels. */
-function labelled(hass: HomeAssistant, entityId: string, labels: string[]) {
+export function labelled(hass: HomeAssistant, entityId: string, labels: string[]) {
   const entry = hass.entities[entityId]
   const has = (own?: string[]) => !!own?.some(l => labels.includes(l))
   return has(entry?.labels) || has(hass.devices[entry?.device_id ?? '']?.labels) || has(hass.areas[entityAreaId(hass, entityId) ?? '']?.labels)

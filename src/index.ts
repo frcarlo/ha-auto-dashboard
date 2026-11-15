@@ -18,6 +18,7 @@ import { AdHouseInfo } from './cards/house-info'
 import { AdWeather } from './cards/weather'
 import { AdPower } from './cards/power'
 import { AdMaintenanceList } from './cards/maintenance-list'
+import { AdPrinters } from './cards/printers'
 import { AdSystem } from './cards/system'
 import { AdAppliance } from './cards/appliance'
 import { AdTv } from './cards/tv'
@@ -82,6 +83,7 @@ define('ad-house-info', AdHouseInfo)
 define('ad-weather', AdWeather)
 define('ad-power', AdPower)
 define('ad-maintenance-list', AdMaintenanceList)
+define('ad-printers', AdPrinters)
 define('ad-system', AdSystem)
 define('ad-appliance', AdAppliance)
 define('ad-tv', AdTv)

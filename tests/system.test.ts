@@ -90,10 +90,10 @@ describe('maintenance page', () => {
     expect(sources).toEqual(['health', 'backup', 'repairs', 'integrations', 'updates', 'battery', 'unavailable', 'log'])
   })
 
-  it('fills the rows: the load and the log across, four short blocks, then two halves', async () => {
+  it('fills the rows: the load, the printers and the log across, four short blocks, then two halves', async () => {
     const { spans } = await page(true)
     // Between the page header and the bar
-    expect(spans.slice(1, -1)).toEqual([4, 1, 1, 1, 1, 2, 2, 4])
+    expect(spans.slice(1, -1)).toEqual([4, 1, 1, 1, 1, 2, 2, 4, 4])
   })
 
   it('keeps batteries and unavailable devices for everyone else, reached through the chips', async () => {

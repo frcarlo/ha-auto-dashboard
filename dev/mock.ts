@@ -472,6 +472,36 @@ const deviceDefs: DeviceDef[] = [
       ['sensor.steckdose_kaffeemaschine_spannung', '231', { friendly_name: 'Steckdose Kaffeemaschine Spannung', device_class: 'voltage', unit_of_measurement: 'V' }],
     ],
   },
+  // Printers: a Brother laser with toner, drums and wear parts, an Epson inkjet over IPP with its own low level
+  {
+    id: 'dev-brother', name: 'Drucker', model: 'MFC-L3750CDW', area: 'buro_keller', platform: 'brother', entities: [
+      ['sensor.mfc_l3750cdw_status', 'bitte warten', { friendly_name: 'Drucker Status' }, undefined, 'status'],
+      ['sensor.mfc_l3750cdw_druckerstatus', 'idle', { friendly_name: 'Drucker', device_class: 'enum', options: ['idle', 'printing', 'stopped'] }, 'ipp'],
+      ['sensor.mfc_l3750cdw_verbleibender_schwarz_toner', '92', { friendly_name: 'Drucker Schwarz-Toner', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'black_toner_remaining'],
+      ['sensor.mfc_l3750cdw_verbleibender_cyan_toner', '54', { friendly_name: 'Drucker Cyan-Toner', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'cyan_toner_remaining'],
+      ['sensor.mfc_l3750cdw_verbleibender_magenta_toner', '8', { friendly_name: 'Drucker Magenta-Toner', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'magenta_toner_remaining'],
+      ['sensor.mfc_l3750cdw_verbleibender_gelb_toner', '49', { friendly_name: 'Drucker Gelb-Toner', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'yellow_toner_remaining'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_der_schwarz_trommel', '54', { friendly_name: 'Drucker Lebensdauer Schwarz-Trommel', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'black_drum_remaining_life'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_der_cyan_trommel', '54', { friendly_name: 'Drucker Lebensdauer Cyan-Trommel', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'cyan_drum_remaining_life'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_der_magenta_trommel', '54', { friendly_name: 'Drucker Lebensdauer Magenta-Trommel', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'magenta_drum_remaining_life'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_der_gelb_trommel', '54', { friendly_name: 'Drucker Lebensdauer Gelb-Trommel', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'yellow_drum_remaining_life'],
+      ['sensor.mfc_l3750cdw_cyan_trommel_restseiten', '9658', { friendly_name: 'Drucker Restseiten Cyan-Trommel', unit_of_measurement: 'pages' }, undefined, 'cyan_drum_remaining_pages'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_der_bandeinheit', '87', { friendly_name: 'Drucker Lebensdauer Bandeinheit', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'belt_unit_remaining_life'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_der_fixiereinheit', '84', { friendly_name: 'Drucker Lebensdauer Fixiereinheit', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'fuser_remaining_life'],
+      ['sensor.mfc_l3750cdw_restlebensdauer_des_pf_kit_1', '85', { friendly_name: 'Drucker Lebensdauer PF-Kit 1', unit_of_measurement: '%', state_class: 'measurement' }, undefined, 'pf_kit_1_remaining_life'],
+      ['binary_sensor.mfc_l3750cdw_kein_papier', 'on', { friendly_name: 'Drucker Kein Papier', device_class: 'problem' }, 'ipp'],
+      ['binary_sensor.mfc_l3750cdw_papierstau', 'off', { friendly_name: 'Drucker Papierstau', device_class: 'problem' }, 'ipp'],
+    ],
+  },
+  {
+    id: 'dev-epson', name: 'Drucker', model: 'WF-3820 Series', area: 'buro_keller', platform: 'ipp', entities: [
+      ['sensor.epson_wf_3820_series', 'printing', { friendly_name: 'Drucker', device_class: 'enum', options: ['idle', 'printing', 'stopped'] }, undefined, 'printer'],
+      ['sensor.epson_wf_3820_series_black_ink', '73', { friendly_name: 'Drucker Black ink', unit_of_measurement: '%', marker_type: 'ink-cartridge', marker_low_level: 15, marker_high_level: 100 }],
+      ['sensor.epson_wf_3820_series_cyan_ink', '12', { friendly_name: 'Drucker Cyan ink', unit_of_measurement: '%', marker_type: 'ink-cartridge', marker_low_level: 15, marker_high_level: 100 }],
+      ['sensor.epson_wf_3820_series_magenta_ink', '42', { friendly_name: 'Drucker Magenta ink', unit_of_measurement: '%', marker_type: 'ink-cartridge', marker_low_level: 15, marker_high_level: 100 }],
+      ['sensor.epson_wf_3820_series_yellow_ink', '82', { friendly_name: 'Drucker Yellow ink', unit_of_measurement: '%', marker_type: 'ink-cartridge', marker_low_level: 15, marker_high_level: 100 }],
+    ],
+  },
   // Versatile Thermostat over a radiator valve: presets, regulation, window and the follow switch
   {
     id: 'dev-vtherm-schlafzimmer', name: 'VThermostat Schlafzimmer', area: 'schlafzimmer', platform: 'versatile_thermostat', entities: [
