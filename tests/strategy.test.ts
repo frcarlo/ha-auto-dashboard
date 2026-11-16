@@ -592,6 +592,9 @@ describe('calendar page', () => {
     expect(home.find(c => c.type === 'custom:ad-status-bar')!.schools.map((s: { name: string }) => s.name)).toEqual(['Leni', 'Tom'])
     const room = cardsOf(views.find(v => v.path === 'area-kinderzimmer')!)
     expect(room.filter(c => c.type === 'custom:ad-school').map(c => [c.school.name, c.full])).toEqual([['Leni', true], ['Tom', true]])
+    // Under a heading like the room's other sections
+    const sections = views.find(v => v.path === 'area-kinderzimmer')!.sections as { cards: Record<string, any>[] }[]
+    expect(sections.filter(s => s.cards.some(c => c.type === 'custom:ad-school')).map(s => s.cards[0]!.title)).toEqual(['Stundenplan', 'Stundenplan'])
     // The sensors are in the card, not tiles of their own
     expect(room.some(c => c.type === 'custom:ad-tile' && String(c.entity).includes('stunde'))).toBe(false)
     const calendar = cardsOf(views.find(v => v.path === 'calendar')!).find(c => c.type === 'custom:ad-calendar')!

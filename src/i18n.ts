@@ -2,6 +2,7 @@ import type { HomeAssistant } from './types'
 
 const de = {
   appliances: 'Geräte',
+  timetable: 'Stundenplan',
   'appliance.unavailable': 'Nicht verfügbar',
   'appliance.off': 'Aus',
   'appliance.ready': 'Bereit',
@@ -693,6 +694,7 @@ export type Key = keyof typeof de
 
 const en: Record<Key, string> = {
   appliances: 'Appliances',
+  timetable: 'Timetable',
   'appliance.unavailable': 'Unavailable',
   'appliance.off': 'Off',
   'appliance.ready': 'Ready',

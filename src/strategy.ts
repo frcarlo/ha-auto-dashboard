@@ -334,7 +334,10 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       ...ownSections(own('top')),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map(e => tile(e, area.name)), true),
       // A pupil's day: every lesson, cancelled and changed ones marked
-      ...schools.filter(s => s.area === area.area_id).map((s): Section => ({ type: 'grid', cards: [schoolCard(s, true)] })),
+      ...schools.filter(s => s.area === area.area_id).map((s): Section => ({
+        type: 'grid',
+        cards: [{ type: 'custom:ad-group-heading', title: t(hass, 'timetable'), entities: [], ...look }, schoolCard(s, true)],
+      })),
       ...cameraInfos.filter(c => c.area === area.area_id).map((c): Section => ({ type: 'grid', cards: [cameraCard(hass.states[c.entity]!, area.name, c.name)] })),
       ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }] })),
       ...(appliances.some(a => a.area === area.area_id) ? [{
