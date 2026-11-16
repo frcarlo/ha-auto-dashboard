@@ -353,9 +353,12 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   }
   const singleRoom = scoped && areas.length === 1 ? areas[0] : undefined
 
+  // Without a title of its own, the name given under Settings → Dashboards, as HA's own dashboards do.
+  // HA's header shows the first view's title when it is the only top-level one, so Home carries it too.
+  const title = config.title || dashboardTitle(hass) || t(hass, 'home')
   const home: View = {
     type: 'sections',
-    title: t(hass, 'home'),
+    title,
     path: 'home',
     icon: 'mdi:home-outline',
     max_columns: MAX_COLUMNS,
@@ -634,8 +637,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     .filter(view => !ownHidden.has(String(view.path)))
     .map(withOwnCards)
   return {
-    // Without a title of its own, the name given under Settings → Dashboards, as HA's own dashboards do
-    title: config.title ?? dashboardTitle(hass) ?? t(hass, 'home'),
+    title,
     // kiosk-mode reads its options from the generated dashboard, not from the strategy, so they go along unchanged
     ...(rawConfig.kiosk_mode ? { kiosk_mode: rawConfig.kiosk_mode } : {}),
     // A room's or a page's own picture stays on its page

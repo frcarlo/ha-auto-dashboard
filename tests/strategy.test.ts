@@ -16,8 +16,11 @@ describe('generateDashboard', () => {
 
   it("takes the dashboard's name from HA's dashboard list when it has no title of its own", async () => {
     const hass = { ...createHass(true), panels: { lovelace: { url_path: 'lovelace', title: 'Übersicht' } } }
-    expect((await generateDashboard({ type: 'custom:auto-dashboard' }, hass)).title).toBe('Übersicht')
-    expect((await generateDashboard({ type: 'custom:auto-dashboard', title: 'Haus' }, hass)).title).toBe('Haus')
+    const named = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
+    expect(named.title).toBe('Übersicht')
+    const own = await generateDashboard({ type: 'custom:auto-dashboard', title: 'Jonathan' }, hass)
+    // HA's header shows Home's title, as Home is the only top-level view
+    expect([own.title, own.views[0]!.title]).toEqual(['Jonathan', 'Jonathan'])
     expect((await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))).title).toBe('Zuhause')
   })
 
