@@ -64,7 +64,7 @@ export interface HomeAssistant {
   locale?: { language: string }
   user?: { id: string; name: string; is_admin?: boolean }
   /** The sidebar's panels this user may open; an add-on's panel names it as `config.addon` (older HA: `config.ingress`) */
-  panels?: Record<string, { url_path?: string; config?: { addon?: string; ingress?: string } | null }>
+  panels?: Record<string, { url_path?: string; title?: string | null; config?: { addon?: string; ingress?: string } | null }>
   /** HA's core settings; the currency for prices */
   config?: { currency?: string }
   callService(domain: string, service: string, data?: Record<string, unknown>, target?: Record<string, unknown>): Promise<unknown>

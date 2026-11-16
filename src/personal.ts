@@ -28,6 +28,9 @@ export interface PersonalSettings {
 /** The dashboard open in this browser, by its url path */
 export const currentDashboard = () => (typeof location === 'undefined' ? undefined : location.pathname.split('/')[1]) || 'lovelace'
 
+/** The name the dashboard has in HA's dashboard list and sidebar; the default dashboard has none of its own */
+export const dashboardTitle = (hass: HomeAssistant, dashboard = currentDashboard()) => hass.panels?.[dashboard]?.title || undefined
+
 /** One entry per dashboard, so two Auto Dashboards keep their own settings */
 export const personalKey = (dashboard: string) => `auto_dashboard:${dashboard}`
 

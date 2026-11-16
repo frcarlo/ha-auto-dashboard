@@ -14,6 +14,13 @@ describe('generateDashboard', () => {
     expect(views.filter(v => !v.subview).map(v => v.path)).toEqual(['home'])
   })
 
+  it("takes the dashboard's name from HA's dashboard list when it has no title of its own", async () => {
+    const hass = { ...createHass(true), panels: { lovelace: { url_path: 'lovelace', title: 'Übersicht' } } }
+    expect((await generateDashboard({ type: 'custom:auto-dashboard' }, hass)).title).toBe('Übersicht')
+    expect((await generateDashboard({ type: 'custom:auto-dashboard', title: 'Haus' }, hass)).title).toBe('Haus')
+    expect((await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))).title).toBe('Zuhause')
+  })
+
   it('puts one room card per area under its floor, top floor first', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const sections = views[0]!.sections as { cards: Record<string, any>[] }[]

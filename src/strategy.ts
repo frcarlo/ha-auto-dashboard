@@ -1,6 +1,6 @@
 import { accessOf, intersect, ruleFor } from './access'
 import { normalizeConfig } from './config'
-import { currentDashboard, faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
+import { currentDashboard, dashboardTitle, faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
 import { t, type Key } from './i18n'
 import {
   SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities, isRoomFavorite,
@@ -634,7 +634,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     .filter(view => !ownHidden.has(String(view.path)))
     .map(withOwnCards)
   return {
-    title: config.title ?? t(hass, 'home'),
+    // Without a title of its own, the name given under Settings → Dashboards, as HA's own dashboards do
+    title: config.title ?? dashboardTitle(hass) ?? t(hass, 'home'),
     // kiosk-mode reads its options from the generated dashboard, not from the strategy, so they go along unchanged
     ...(rawConfig.kiosk_mode ? { kiosk_mode: rawConfig.kiosk_mode } : {}),
     // A room's or a page's own picture stays on its page

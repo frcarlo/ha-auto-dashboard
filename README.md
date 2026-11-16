@@ -121,7 +121,7 @@ All options, all optional:
 ```yaml
 strategy:
   type: custom:auto-dashboard
-  title: Home
+  title: Home              # otherwise the name under Settings → Dashboards
   theme: auto              # auto | dark | light, auto follows HA's dark mode
   glass: false             # frosted-glass cards, with a soft light in the muted accent color behind them
   background_image: /local/garden.jpg   # photo behind the cards, veiled in the page color; replaces the glass light

@@ -18,7 +18,7 @@ import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import { accessOf, ruleFor } from './access'
-import { currentDashboard, loadPersonal, personalAllowed, savePersonal, type PersonalSettings } from './personal'
+import { currentDashboard, dashboardTitle, loadPersonal, personalAllowed, savePersonal, type PersonalSettings } from './personal'
 import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, OwnCardsPage, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
 import { scrollRow } from './scroll-row'
 
@@ -631,7 +631,7 @@ export class AdStrategyEditor extends LitElement {
   private renderLook() {
     const c = this.config
     return html`
-        ${this.field(this.l('ed.title'), html`<input type="text" .value=${c.title ?? ''} placeholder=${this.l('home')}
+        ${this.field(this.l('ed.title'), html`<input type="text" .value=${c.title ?? ''} placeholder=${dashboardTitle(this.hass!) ?? this.l('home')}
           @change=${(e: Event) => this.change({ title: (e.target as HTMLInputElement).value.trim() || undefined })}>`)}
         ${this.section('mdi:palette-outline', this.l('ed.sec_colors'), html`
           ${this.field(this.l('ed.theme'), this.seg<ThemeMode>(
