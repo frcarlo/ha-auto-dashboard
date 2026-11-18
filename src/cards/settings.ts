@@ -156,6 +156,9 @@ export class AdSettings extends BaseCard<SettingsConfig> {
     .primary[disabled] { opacity: 0.4; pointer-events: none; }
     .link { padding: 10px 12px; border-radius: 12px; font-size: var(--ad-fs-m); color: rgb(var(--ad-primary)); }
     .link:hover { background: rgba(var(--ad-primary), 0.1); }
+    /* Back home without HA's own back arrow, which kiosk mode hides */
+    .actions .close { width: 40px; height: 40px; }
+    .actions .close ha-icon { --mdc-icon-size: 22px; }
 
     select {
       all: unset; box-sizing: border-box; width: 100%; padding: 10px 14px; border-radius: 12px; font-size: var(--ad-fs-m); cursor: pointer;
@@ -444,6 +447,7 @@ export class AdSettings extends BaseCard<SettingsConfig> {
         ${changed && !this.error ? html`<span class="state">${this.l('set.unsaved')}</span>` : nothing}
         <button class="link" ?disabled=${this.busy} @click=${() => this.save(true)}>${this.l('set.reset')}</button>
         <button class="primary" ?disabled=${this.busy || !changed} @click=${() => this.save()}>${this.busy ? this.l('set.saving') : this.l('set.save')}</button>
+        <button class="icon-btn close" aria-label=${this.l('set.close')} title=${this.l('set.close')} @click=${() => this.navigate('home')}><ha-icon icon="mdi:close"></ha-icon></button>
         ${this.error ? html`<span class="error">${this.error}</span>` : nothing}
       </div>
       <div class="cols">
