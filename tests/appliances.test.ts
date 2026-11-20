@@ -17,6 +17,16 @@ describe('appliances', () => {
       notices: ['sensor.geschirrspuler_salz_fast_leer', 'sensor.geschirrspuler_klarspuler_fast_leer'],
     })
     expect(washer).toMatchObject({ kind: 'washer', area: 'waschkeller', remaining: 'sensor.waschmaschine_verbleibende_zeit', power: 'sensor.waschmaschine_leistung' })
+    // The counter that keeps going, not the one of the last cycle
+    expect(washer!.energy).toBe('sensor.waschmaschine_energie_gesamt')
+  })
+
+  it('takes the energy counter of the plug an appliance set up by hand hangs on', () => {
+    const hass = createHass(true)
+    const dryer = findAppliances(hass, [{ status: 'sensor.trockner_leistung', name: 'Trockner' }]).find(a => a.name === 'Trockner')
+    expect(dryer?.energy).toBe('sensor.trockner_energie')
+    const own = findAppliances(hass, [{ status: 'sensor.trockner_leistung', name: 'Trockner', energy: 'sensor.waschmaschine_energie_gesamt' }]).find(a => a.name === 'Trockner')
+    expect(own?.energy).toBe('sensor.waschmaschine_energie_gesamt')
   })
 
   it('adds appliances set up by hand, and one with a found status replaces it', () => {

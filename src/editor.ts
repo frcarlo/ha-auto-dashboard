@@ -13,6 +13,9 @@ import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
 import { imagePicker } from './media-picker'
 import { SLIDE_INTERVALS, withAlbum } from './album-picker'
+
+/** Minutes into the face until the wall tablet's screen goes dark; 0 never */
+const SCREEN_OFF = [0, 5, 10, 15, 30, 60]
 import { WEATHER_SENSORS } from './weather'
 import type { RoomsPatch } from './editor-rooms'
 import { house, houseStyles, type RoomMark } from './editor-house'
@@ -277,7 +280,14 @@ export class AdStrategyEditor extends LitElement {
       ${face ? html`<div class="seg" role="group" aria-label=${this.l('ed.face_after')}>${waits.map(w => html`
         <button aria-pressed=${after === w} @click=${() => onChange({ ...face, after: w === 120 ? undefined : w })}>
           ${w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)}</button>`)}</div>` : nothing}
-      ${face && face.style === 'photo' ? this.albumFields(face, onChange) : nothing}`
+      ${face && face.style === 'photo' ? this.albumFields(face, onChange) : nothing}
+      ${face ? html`<div class="album">
+        <span class="label">${this.l('face.screen_off')}</span>
+        <div class="seg" role="group" aria-label=${this.l('face.screen_off')}>${SCREEN_OFF.map(m => html`
+          <button aria-pressed=${(face.screen_off ?? 0) === m} @click=${() => onChange({ ...face, screen_off: m || undefined })}>
+            ${m ? minutes.format(m) : this.l('face.screen_never')}</button>`)}</div>
+        <span class="hint">${this.l('face.screen_off_hint')}</span>
+      </div>` : nothing}`
   }
 
   /** The photo face's slideshow: which album, how long each picture stays, shuffled or in order */

@@ -448,6 +448,8 @@ const deviceDefs: DeviceDef[] = [
       ['sensor.waschmaschine_verbleibende_zeit', '0', { friendly_name: 'Waschmaschine Verbleibende Zeit', device_class: 'duration', unit_of_measurement: 'min' }],
       ['sensor.waschmaschine_programm', 'Baumwolle Long', { friendly_name: 'Waschmaschine Programm', ...ENUM(['Baumwolle Long', 'Feinwäsche', 'off']) }],
       ['sensor.waschmaschine_leistung', '0.4', { friendly_name: 'Waschmaschine Leistung', device_class: 'power', unit_of_measurement: 'W' }],
+      ['sensor.waschmaschine_energie_des_letzten_zyklus', '0.84', { friendly_name: 'Waschmaschine Energie des letzten Zyklus', device_class: 'energy', unit_of_measurement: 'kWh' }],
+      ['sensor.waschmaschine_energie_gesamt', '91.1', { friendly_name: 'Waschmaschine Energie gesamt', device_class: 'energy', state_class: 'total_increasing', unit_of_measurement: 'kWh' }],
     ],
   },
   // Only a smart plug: the dashboard gets it from `appliances:` in the harness config
@@ -455,6 +457,7 @@ const deviceDefs: DeviceDef[] = [
     id: 'dev-trockner', name: 'Trockner', area: 'waschkeller', platform: 'mqtt', entities: [
       ['switch.trockner', 'on', { friendly_name: 'Trockner', device_class: 'outlet' }],
       ['sensor.trockner_leistung', '820', { friendly_name: 'Trockner Leistung', device_class: 'power', unit_of_measurement: 'W' }],
+      ['sensor.trockner_energie', '597600', { friendly_name: 'Trockner Energie', device_class: 'energy', state_class: 'total_increasing', unit_of_measurement: 'Wh' }],
     ],
   },
   {
@@ -773,6 +776,12 @@ export function createHass(dark: boolean): HomeAssistant {
         return null as T
       }
       if (msg.type === 'recorder/statistics_during_period') return statistics(msg, latest ?? states) as T
+      // What a counter used today: a made-up amount, steady per counter
+      if (msg.type === 'recorder/statistic_during_period') {
+        const id = String(msg.statistic_id)
+        const kwh = 0.4 + (([...id].reduce((h, c) => h + c.charCodeAt(0), 0) % 30) / 10)
+        return { change: states[id]?.attributes.unit_of_measurement === 'Wh' ? kwh * 1000 : kwh } as T
+      }
       if (msg.type === 'history/history_during_period') return cameraHistory(Date.parse(String(msg.start_time)), msg.entity_ids as string[]) as T
       if (msg.type === 'energy/get_prefs') return {
         energy_sources: [

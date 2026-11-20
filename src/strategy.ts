@@ -285,6 +285,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       interval: Math.max(5, Number(faceConfig.interval ?? 30) || 30),
       shuffle: faceConfig.shuffle !== false,
     } : {}),
+    // The screen goes dark a while into the face, on the wall tablet's app only
+    ...(Number(faceConfig.screen_off) > 0 ? { screen_off: Number(faceConfig.screen_off) } : {}),
     // Washer, dryer, dishwasher: the face shows them while they run or wait to be emptied
     ...(appliances.length ? { appliances } : {}),
   } : undefined

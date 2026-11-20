@@ -68,12 +68,17 @@ const config: StrategyConfig = {
   face: params.has('face') ? {
     after: Number(params.get('after') ?? 3), style: (params.get('face') || 'clock') as NonNullable<StrategyConfig['face']>['style'],
     ...(params.get('album') ? { album: `media-source://immich/u1|albums|${params.get('album')}`, interval: Number(params.get('interval') ?? 30) } : {}),
+    // &screenoff=0.1: Kiosk Satellite's screen goes dark six seconds into the face (window.kioskSatellite is faked then)
+    ...(params.get('screenoff') ? { screen_off: Number(params.get('screenoff')) } : {}),
   } : undefined,
   // ?as=leni&users={"leni":{"access":"read_only"}} views the dashboard as a non-admin with that rule
   users: params.has('users') ? JSON.parse(params.get('users')!) : undefined,
   pages: params.has('pages') ? JSON.parse(params.get('pages')!) : undefined,
   // ?popup adds the doorbell popup; "Klingeln" in the bar (or ?ring=3, after three seconds) rings like the Reolink: on for 4 s
   popups: params.has('popup') ? [{ trigger: 'binary_sensor.haustur_besucher', ...(params.get('popup') ? { close_after: Number(params.get('popup')) } : {}) }] : undefined,
+}
+if (params.get('screenoff') && !window.kioskSatellite) {
+  window.kioskSatellite = { screenOff: async () => { console.info('[kiosk] screenOff'); document.documentElement.style.filter = 'brightness(0)'; return true } }
 }
 let hass: HomeAssistant = createHass(dark)
 if (params.get('warn') === 'on') {

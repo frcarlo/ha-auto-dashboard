@@ -32,6 +32,8 @@ interface SettingsConfig extends BaseConfig {
 
 const SWATCHES = ['#6366f1', '#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f43f5e', '#a855f7', '#64748b']
 const WAITS = [0, 30, 60, 120, 300, 600]
+/** Minutes into the face until the screen goes dark, offered inside the Kiosk Satellite app only; 0 never */
+const SCREEN_OFF = [0, 5, 10, 15, 30, 60]
 const MAX_RESULTS = 8
 
 export class AdSettings extends BaseCard<SettingsConfig> {
@@ -304,7 +306,10 @@ export class AdSettings extends BaseCard<SettingsConfig> {
       ${this.seg(styles, face ? face.style ?? 'clock' : 'off', v => this.set({ face: v === 'off' ? false : { ...(face || {}), style: v } }))}
       ${face ? this.field(this.l('ed.face_after'), this.seg(WAITS.map(w => [String(w), w === 0 ? this.l('ed.face_now') : w < 60 ? seconds.format(w) : minutes.format(w / 60)] as [string, string]),
         String(after), v => this.set({ face: { ...face, after: Number(v) } }))) : nothing}
-      ${face && face.style === 'photo' ? this.albumFields(face, seconds, minutes) : nothing}`)
+      ${face && face.style === 'photo' ? this.albumFields(face, seconds, minutes) : nothing}
+      ${face && window.kioskSatellite ? this.field(this.l('face.screen_off'), this.seg(
+        SCREEN_OFF.map(m => [String(m), m ? minutes.format(m) : this.l('face.screen_never')] as [string, string]),
+        String(face.screen_off ?? 0), v => this.set({ face: { ...face, screen_off: Number(v) || undefined } })), this.l('face.screen_off_hint')) : nothing}`)
   }
 
   /** The photo face's slideshow: which album, how long each picture stays, shuffled or in order */

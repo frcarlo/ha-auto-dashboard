@@ -141,6 +141,11 @@ export interface FaceConfig {
   interval?: number
   /** false: the album in its own order instead of shuffled */
   shuffle?: boolean
+  /**
+   * Minutes after the face appears until the screen goes dark, 0 or unset: never. Only in the Kiosk Satellite app,
+   * which turns its own panel off; the app's own screensaver, which would do it otherwise, stays off for the face.
+   */
+  screen_off?: number
 }
 
 /**
@@ -188,6 +193,8 @@ export interface ApplianceConfig {
   phase?: string
   door?: string
   power?: string
+  /** An energy counter for what it used today; by default the one on its device or its plug */
+  energy?: string
   notices?: string[]
 }
 

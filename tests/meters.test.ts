@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearUsage, formatVolume, loadUsage, meterSources, usageOf } from '../src/meters'
+import { clearUsage, formatVolume, loadToday, loadUsage, meterSources, todayOf, usageOf } from '../src/meters'
 import type { HomeAssistant } from '../src/types'
 
 const hass = (ids: string[], callWS?: unknown) => ({ states: Object.fromEntries(ids.map(id => [id, { entity_id: id, state: '1', attributes: {} }])), callWS }) as unknown as HomeAssistant
@@ -25,6 +25,23 @@ describe('meters', () => {
     await loadUsage(hass(['sensor.gas'], callWS), ['sensor.gas'], now)
     expect(callWS).toHaveBeenCalledTimes(2)
     expect(usageOf(['sensor.gas'])).toEqual({ today: 0.75, month: 40, hours: [[midnight - 2 * 3600_000, 1], [midnight + 3600_000, 0.5], [midnight + 9 * 3600_000, 0.25]] })
+  })
+
+  it('asks a counter for its change since midnight once, again after ten minutes or on a new day', async () => {
+    const now = new Date(2026, 10, 12, 10, 30).getTime()
+    const callWS = vi.fn(async () => ({ change: 0.84 }))
+    const h = hass(['sensor.waschmaschine_energie'], callWS)
+    await loadToday(h, 'sensor.waschmaschine_energie', now)
+    await loadToday(h, 'sensor.waschmaschine_energie', now + 60_000)
+    expect(callWS).toHaveBeenCalledTimes(1)
+    expect(callWS).toHaveBeenCalledWith({ type: 'recorder/statistic_during_period', statistic_id: 'sensor.waschmaschine_energie', calendar: { period: 'day' }, types: ['change'] })
+    expect(todayOf('sensor.waschmaschine_energie')).toBe(0.84)
+    await loadToday(h, 'sensor.waschmaschine_energie', now + 11 * 60_000)
+    expect(callWS).toHaveBeenCalledTimes(2)
+    // No statistics for it (or no access): nothing to show, and no error
+    callWS.mockRejectedValueOnce(new Error('no'))
+    await loadToday(h, 'sensor.waschmaschine_energie', now + 22 * 60_000)
+    expect(todayOf('sensor.waschmaschine_energie')).toBeUndefined()
   })
 
   it('shows a day of water in litres, gas in m³', () => {

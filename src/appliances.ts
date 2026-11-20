@@ -19,6 +19,8 @@ export interface Appliance {
   phase?: string
   door?: string
   power?: string
+  /** An energy counter (kWh, ever rising), for what it used today: the appliance's own, else its plug's */
+  energy?: string
   /** Enum sensors that say "present" when something needs doing, like salt or rinse aid running low */
   notices?: string[]
 }
@@ -83,14 +85,30 @@ function rolesOf(entities: HassEntity[]): Omit<Appliance, 'kind' | 'name' | 'are
     (domainOf(e.entity_id) === 'binary_sensor' && e.attributes.device_class === 'door') ||
     (sensor(e) && optionsOf(e).includes('open') && optionsOf(e).includes('closed') && /door|tür|tur\b|_tur/.test(text(e))))
   const power = pick(entities, e => sensor(e) && e.attributes.device_class === 'power')
+  const energy = pick(entities, isEnergyCounter, e => (/gesamt|total/.test(text(e)) ? 1 : 0))
   // "Program finished" or "aborted" come as such sensors too; the state already says that
   const notices = entities
     .filter(e => sensor(e) && optionsOf(e).includes('present') && optionsOf(e).every(o => ['present', 'off', 'confirmed'].includes(o)) && !/program/.test(text(e)))
     .map(e => e.entity_id)
   return {
     ...(progress ? { progress } : {}), ...(end ? { end } : {}), ...(remaining ? { remaining } : {}), ...(program ? { program } : {}),
-    ...(phase ? { phase } : {}), ...(door ? { door } : {}), ...(power ? { power } : {}), ...(notices.length ? { notices } : {}),
+    ...(phase ? { phase } : {}), ...(door ? { door } : {}), ...(power ? { power } : {}),
+    ...(energy ? { energy } : {}), ...(notices.length ? { notices } : {}),
   }
+}
+
+/** A meter of the energy used: kWh or Wh that keeps counting, not "energy of the last cycle" */
+function isEnergyCounter(e: HassEntity) {
+  return domainOf(e.entity_id) === 'sensor' && e.attributes.device_class === 'energy'
+    && ['total', 'total_increasing'].includes(String(e.attributes.state_class)) && !/zyklus|cycle|letzte|last/.test(text(e))
+}
+
+/** The energy counter beside a power reading, on its device: the plug the appliance hangs on */
+function energyBeside(hass: HomeAssistant, entityId: string | undefined) {
+  const device = entityId ? hass.entities[entityId]?.device_id : undefined
+  if (!device) return undefined
+  const entities = deviceEntityIds(hass, device).map(id => hass.states[id]).filter((e): e is HassEntity => !!e)
+  return pick(entities, isEnergyCounter, e => (/gesamt|total/.test(text(e)) ? 1 : 0))
 }
 
 /** Every entity of each device, visible or not: a progress sensor may well be a diagnostic one. */
@@ -124,12 +142,15 @@ export function findAppliances(
     if (!status || own.some(c => c.status === status)) continue
     const device = hass.devices[deviceId]
     const name = device?.name_by_user ?? device?.name ?? entityName(hass.states[status]!)
+    const roles = rolesOf(entities)
     found.push(clean({
       kind: kindOf(`${name} ${device?.model ?? ''} ${entities.map(text).join(' ')}`),
       name,
       area: entityAreaId(hass, status),
       status,
-      ...rolesOf(entities),
+      ...roles,
+      // WashData and the like measure through a plug: its counter then belongs to the appliance
+      energy: roles.energy ?? energyBeside(hass, roles.power),
     }))
   }
   const manual = own
@@ -140,6 +161,7 @@ export function findAppliances(
       area: c.area ?? entityAreaId(hass, c.status),
       status: c.status,
       progress: c.progress, end: c.end, remaining: c.remaining, program: c.program, phase: c.phase, door: c.door, power: c.power,
+      energy: c.energy ?? energyBeside(hass, c.power ?? c.status),
       ...(c.notices?.length ? { notices: c.notices } : {}),
     }))
   return [...manual, ...found].sort((a, b) => a.name.localeCompare(b.name))

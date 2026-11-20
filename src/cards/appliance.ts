@@ -9,6 +9,7 @@ import {
   type Appliance, type AppliancePhase,
 } from '../appliances'
 import { entityName, shortName } from '../presentation'
+import { loadToday, todayFresh, todayOf } from '../meters'
 import { tokens } from '../styles/tokens'
 
 interface ApplianceCardConfig extends BaseConfig {
@@ -44,6 +45,10 @@ export class AdAppliance extends BaseCard<ApplianceCardConfig> {
     .head ha-icon { --mdc-icon-size: 18px; opacity: var(--ad-o2); flex: 0 0 auto; }
     .head .title { font-weight: 500; white-space: nowrap; }
     .head .program { opacity: var(--ad-o2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    /* What it used today, at the far end of the head */
+    .head .today { margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 2px; padding-left: 8px;
+      font-size: var(--ad-fs-s); opacity: var(--ad-o2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .head .today ha-icon { --mdc-icon-size: 14px; opacity: 1; }
 
     .body { display: flex; align-items: center; gap: 16px; }
     .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -105,7 +110,27 @@ export class AdAppliance extends BaseCard<ApplianceCardConfig> {
 
   protected watched() {
     const a = this.config!.appliance
-    return [a.status, a.progress, a.end, a.remaining, a.program, a.phase, a.door, a.power, ...(a.notices ?? [])].filter((id): id is string => !!id)
+    return [a.status, a.progress, a.end, a.remaining, a.program, a.phase, a.door, a.power, a.energy, ...(a.notices ?? [])].filter((id): id is string => !!id)
+  }
+
+  protected updated() {
+    // The counter's state changes keep it fresh; the statistics are asked again at most every ten minutes
+    const id = this.config?.appliance.energy
+    if (!id || !this.hass?.callWS || this.hidden || todayFresh(id)) return
+    void loadToday(this.hass, id).then(() => this.requestUpdate())
+  }
+
+  /** What it used since midnight, "0,84 kWh"; nothing before it has used anything */
+  private usedToday(a: Appliance) {
+    const entity = this.hass!.states[a.energy ?? '']
+    let value = todayOf(a.energy ?? '')
+    if (!entity || value === undefined) return undefined
+    const unit = String(entity.attributes.unit_of_measurement ?? 'kWh')
+    if (unit === 'Wh') value /= 1000
+    else if (unit === 'MWh') value *= 1000
+    if (value < 0.005) return undefined
+    const lang = this.hass!.locale?.language ?? this.hass!.language
+    return `${new Intl.NumberFormat(lang, { maximumFractionDigits: value < 10 ? 2 : 1 }).format(value)} kWh`
   }
 
   private time(ms: number) {
@@ -173,6 +198,7 @@ export class AdAppliance extends BaseCard<ApplianceCardConfig> {
       : phase === 'delayed' && end !== undefined ? t(hass, 'done_at', { time: this.time(end) })
       : phase === 'finished' ? since : undefined
     const notes = this.notes(a)
+    const used = this.usedToday(a)
     const ring = progress !== undefined
     return html`<div class="card ${COLOR[phase] ?? ''}" role="button" tabindex="0"
       aria-label="${a.name}: ${t(hass, `appliance.${phase}` as Key)}"
@@ -181,6 +207,7 @@ export class AdAppliance extends BaseCard<ApplianceCardConfig> {
         <ha-icon icon=${applianceIcon(a.kind)}></ha-icon>
         <span class="title">${a.name}</span>
         ${program ? html`<span class="program">${program}</span>` : nothing}
+        ${used ? html`<span class="today"><ha-icon icon="mdi:lightning-bolt"></ha-icon>${t(hass, 'appliance.today', { value: used })}</span>` : nothing}
       </div>
       <div class="body">
         <div class="text">

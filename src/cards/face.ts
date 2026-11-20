@@ -28,6 +28,18 @@ export interface FaceSettings {
   shuffle?: boolean
   /** Washer, dryer, dishwasher: shown while they run, wait or need someone */
   appliances?: Appliance[]
+  /** Minutes into the face until the screen goes dark, in the Kiosk Satellite app */
+  screen_off?: number
+}
+
+/** What the Kiosk Satellite app gives the page it shows (https://github.com/jxlarrea/kiosk-satellite, docs/js-api.md) */
+interface KioskSatellite {
+  screenOff(): Promise<boolean>
+  isScreenOn?(): Promise<boolean>
+}
+
+declare global {
+  interface Window { kioskSatellite?: KioskSatellite }
 }
 
 const PHASE_COLOR: Partial<Record<AppliancePhase, string>> = { running: 'warning', delayed: 'warning', paused: 'warning', finished: 'success', action: 'error', error: 'error' }
@@ -67,6 +79,7 @@ export class AdFace extends LitElement {
   shift: [number, number] = [0, 0]
 
   private idle?: number
+  private dark?: number
   private tick?: number
   private loadedAt = 0
   private shiftedAt = 0
@@ -83,17 +96,41 @@ export class AdFace extends LitElement {
     if (!this.shown) this.arm(false)
   }
 
+  /** The panel came back without a tap (motion, the power button, HA): the face stays and the wait starts again */
+  private onScreenOn = () => {
+    if (this.shown) this.armDark()
+  }
+
   connectedCallback() {
     super.connectedCallback()
     for (const type of ACTIVITY) window.addEventListener(type, this.onActivity, { capture: true, passive: true })
+    // Where the app sends its events is not written down: both, a second call only restarts the same wait
+    window.addEventListener('kiosksatellite:screenon', this.onScreenOn)
+    document.addEventListener('kiosksatellite:screenon', this.onScreenOn)
     this.arm(true)
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
     for (const type of ACTIVITY) window.removeEventListener(type, this.onActivity, { capture: true })
+    window.removeEventListener('kiosksatellite:screenon', this.onScreenOn)
+    document.removeEventListener('kiosksatellite:screenon', this.onScreenOn)
     window.clearTimeout(this.idle)
+    window.clearTimeout(this.dark)
     window.clearInterval(this.tick)
+  }
+
+  /**
+   * Kiosk Satellite turns its panel off only during its own screensaver, which stays off for the face; so the
+   * face asks the app itself, a while after it came up. Other browsers have no such app and keep the screen on.
+   */
+  private armDark() {
+    window.clearTimeout(this.dark)
+    const minutes = Number(this.settings?.screen_off)
+    if (!(minutes > 0) || !window.kioskSatellite?.screenOff) return
+    this.dark = window.setTimeout(() => {
+      if (this.shown) void window.kioskSatellite?.screenOff().catch(() => false)
+    }, minutes * 60_000)
   }
 
   /**
@@ -126,6 +163,7 @@ export class AdFace extends LitElement {
     void this.loadEvents()
     void this.loadPicture()
     if (this.settings?.album) void this.nextSlide()
+    this.armDark()
   }
 
   private hide(ev: Event) {
@@ -134,6 +172,7 @@ export class AdFace extends LitElement {
     ev.stopPropagation()
     this.shown = false
     window.clearInterval(this.tick)
+    window.clearTimeout(this.dark)
     this.arm(false)
   }
 
@@ -141,6 +180,7 @@ export class AdFace extends LitElement {
     // A new wait when the settings change, e.g. a shorter time in the config
     const before = changed.get('settings') as FaceSettings | undefined
     if (changed.has('settings') && !this.shown && before?.after !== this.settings?.after) this.arm(!before)
+    if (changed.has('settings') && this.shown && before?.screen_off !== this.settings?.screen_off) this.armDark()
   }
 
   private async loadEvents() {

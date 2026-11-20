@@ -103,10 +103,44 @@ export function loadUsage(hass: HomeAssistant, ids: string[], now = Date.now()):
   return job
 }
 
+// ── One counter's use today ───────────────────────────────
+
+const today = new Map<string, { at: number; day: number; value?: number }>()
+const todayLoading = new Map<string, Promise<void>>()
+
+/** What a counter went up by since midnight; undefined until loaded or without statistics */
+export const todayOf = (id: string) => today.get(id)?.value
+
+/**
+ * The change since midnight, as HA's statistic card reckons it: the hours from the long-term statistics, the
+ * current hour from the five-minute ones, so a program that runs right now counts too. Kept for ten minutes.
+ */
+export const todayFresh = (id: string, now = Date.now()) => {
+  const known = today.get(id)
+  return !!known && now - known.at < STALE_MS && known.day === startOfDay(now)
+}
+
+export function loadToday(hass: HomeAssistant, id: string, now = Date.now()): Promise<void> {
+  if (!hass.callWS || todayFresh(id, now)) return Promise.resolve()
+  const running = todayLoading.get(id)
+  if (running) return running
+  const job = hass.callWS<{ change?: number | null }>({
+    type: 'recorder/statistic_during_period', statistic_id: id, calendar: { period: 'day' }, types: ['change'],
+  }).then(r => {
+    const value = Number(r?.change)
+    today.set(id, { at: now, day: startOfDay(now), ...(r?.change != null && Number.isFinite(value) ? { value } : {}) })
+  }).catch(() => { today.set(id, { at: now, day: startOfDay(now) }) })
+    .finally(() => todayLoading.delete(id))
+  todayLoading.set(id, job)
+  return job
+}
+
 /** For tests */
 export function clearUsage() {
   cache.clear()
   loading.clear()
+  today.clear()
+  todayLoading.clear()
 }
 
 /** The meter's unit */
