@@ -103,6 +103,10 @@ describe('TV apps', () => {
     expect(appLabel('com.spocky.projengmenu', 'Startseite')).toBe('Startseite')
     expect(appLabel('com.example.mediathek', 'Startseite')).toBe('Mediathek')
     expect(appLabel('YouTube', 'Startseite')).toBe('YouTube')
+    // An input named on the TV (webOS: HDMI 1 called "PS5") instead of "Hdmi1"
+    expect(appLabel('com.webos.app.hdmi1', 'Startseite', 'PS5')).toBe('PS5')
+    expect(appLabel('com.webos.app.hdmi1', 'Startseite')).toBe('Hdmi1')
+    expect(appLabel('de.telekom.magentatv.tv', 'Startseite', 'Magenta TV')).toBe('MagentaTV')
   })
 
   it('hands the apps to the TV card', async () => {

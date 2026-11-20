@@ -135,7 +135,7 @@ export class AdTv extends BaseCard<TvCardConfig> {
     const a = player?.attributes ?? {}
     const features = Number(a.supported_features ?? 0)
     const running = (a.app_id ?? a.app_name) as string | undefined
-    const now = on ? appLabel(running, t(hass, 'tv_home_screen')) ?? (a.source ?? a.media_title) as string | undefined : undefined
+    const now = on ? appLabel(running, t(hass, 'tv_home_screen'), typeof a.source === 'string' ? a.source : undefined) ?? (a.source ?? a.media_title) as string | undefined : undefined
     const apps = on && control && tv.keys ? this.config!.apps ?? [] : []
     const sub = off ? t(hass, 'unavailable') : on ? now ?? t(hass, 'on') : t(hass, 'off')
     const pad = on && control && !!tv.remote && !!tv.keys

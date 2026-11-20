@@ -34,14 +34,17 @@ export function tvApps(keys: string[] | undefined): TvApp[] {
 }
 
 /**
- * What the TV runs, the way people call it: a known app's name, "home" for a launcher,
- * else the app id's last part ("com.example.mediathek" → "Mediathek"). Names that are no ids stay.
+ * What the TV runs, the way people call it: a known app's name, "home" for a launcher, the TV's own name
+ * for its source, else the app id's last part ("com.example.mediathek" → "Mediathek"). Names that are no ids stay.
  */
-export function appLabel(id: string | undefined, home: string): string | undefined {
+export function appLabel(id: string | undefined, home: string, source?: string): string | undefined {
   if (!id) return undefined
   if (LAUNCHERS.includes(id)) return home
   const known = Object.values(TV_APPS).find(app => app.package === id)
   if (known) return known.name
+  // What the TV itself calls it beats a name made up from the package: webOS runs an HDMI input as
+  // com.webos.app.hdmi1, and its source is the input's own name, "PS5"
+  if (source?.trim()) return source.trim()
   if (!/^[\w]+(\.[\w]+)+$/.test(id)) return id
   const last = id.split('.').pop()!
   return last.charAt(0).toUpperCase() + last.slice(1)
