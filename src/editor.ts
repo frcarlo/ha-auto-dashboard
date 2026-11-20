@@ -55,7 +55,7 @@ const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide
 const TOOL_MARKS: Record<Tool, RoomMark> = { hide: 'hidden', outdoor: 'outdoor', only: 'only' }
 
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
-const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'battery', 'unavailable', 'presence', 'school',
+const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'gaming', 'battery', 'unavailable', 'presence', 'school',
   'warning', 'waste', 'birthday', 'parcel', 'appliance', 'co2']
 const EVENT_CHIPS: StatusChip[] = ['school', 'warning', 'waste', 'birthday', 'parcel', 'appliance', 'co2']
 const CO2_LIMITS = [1000, 1200, 1500, 2000]

@@ -368,6 +368,14 @@ export function deviceName(hass: HomeAssistant, entity: HassEntity) {
   return device?.name_by_user ?? device?.name ?? String(entity.attributes.friendly_name ?? entity.entity_id)
 }
 
+/**
+ * A console on which someone plays, with the game: PS5-MQTT's activity sensor says "playing" and names the title.
+ * Merely switched on is no game; that is the console's power switch.
+ */
+export function isGaming(e: HassEntity) {
+  return domainOf(e.entity_id) === 'sensor' && e.state === 'playing' && typeof e.attributes.title_name === 'string' && !!e.attributes.title_name
+}
+
 /** Things worth a glance on the home page. Only non-empty items are returned. */
 /** Sensors that say someone is there: motion, and presence or occupancy (mmWave radar and the like) */
 export const PRESENCE_CLASSES = ['motion', 'moving', 'occupancy', 'presence']
@@ -388,6 +396,7 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [],
     { key: 'unlocked', entities: entities.filter(is('lock')).filter(e => ['unlocked', 'open', 'opening', 'unlocking'].includes(e.state)) },
     { key: 'heating', entities: entities.filter(is('climate')).filter(e => e.attributes.hvac_action === 'heating' || (e.attributes.hvac_action === undefined && e.state === 'heat')) },
     { key: 'media', entities: entities.filter(is('media_player')).filter(e => isActive(e)) },
+    { key: 'gaming', entities: entities.filter(isGaming) },
     {
       key: 'battery',
       entities: batteries.filter(e => e.state !== '' && Number(e.state) < LOW_BATTERY),

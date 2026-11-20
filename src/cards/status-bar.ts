@@ -96,6 +96,7 @@ const ICONS: Record<StatusKey, string> = {
   unlocked: 'mdi:lock-open-variant-outline',
   heating: 'mdi:fire',
   media: 'mdi:play-circle',
+  gaming: 'mdi:controller',
   battery: 'mdi:battery-alert-variant-outline',
   unavailable: 'mdi:lan-disconnect',
 }
@@ -103,7 +104,7 @@ const ICONS: Record<StatusKey, string> = {
 const COLORS: Record<StatusKey, string> = {
   presence: 'primary',
   lights: 'warning', openings: 'warning', unlocked: 'warning', heating: 'warning',
-  media: 'primary', battery: 'error', unavailable: 'muted',
+  media: 'primary', gaming: 'primary', battery: 'error', unavailable: 'muted',
 }
 
 export class AdStatusBar extends BaseCard<StatusBarConfig> {
@@ -389,13 +390,15 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       ${openItem ? html`<div class="list card">
         ${openItem.entities.map(e => {
           const area = this.areaName(e)
-          const name = shortName(this.open === 'unavailable' ? deviceName(this.hass!, e) : entityName(e), area)
+          // A console by its device ("PS5 Jonathan", not "PS5 Jonathan activity"), and the game it plays
+          const gaming = this.open === 'gaming'
+          const name = shortName(this.open === 'unavailable' || gaming ? deviceName(this.hass!, e) : entityName(e), area)
           return html`
             <button class="item" @click=${() => this.moreInfo(e.entity_id)}>
-              <ha-icon icon=${entityIcon(e)}></ha-icon>
+              <ha-icon icon=${gaming ? ICONS.gaming : entityIcon(e)}></ha-icon>
               <span>${name}</span>
               ${area && area !== name ? html`<span class="a">${area}</span>` : nothing}
-              <span class="s">${this.hass!.formatEntityState?.(e) ?? e.state}</span>
+              <span class="s">${gaming ? String(e.attributes.title_name) : this.hass!.formatEntityState?.(e) ?? e.state}</span>
             </button>`
         })}
         ${link ? html`<button class="more" @click=${() => this.navigate(link)}>

@@ -139,6 +139,12 @@ describe('homeStatus', () => {
     expect(counts).toEqual({ lights: 2, openings: 1, heating: 1, battery: 1 })
   })
 
+  it('counts consoles on which someone plays a game, not those merely switched on', () => {
+    const playing = st('sensor.ps5_jonathan_activity', 'playing', { activity: 'playing', title_name: 'Grand Theft Auto VI' })
+    const items = homeStatus([playing, st('sensor.ps5_joshua_activity', 'idle', { activity: 'idle' }), st('switch.ps5_joshua_power', 'on')])
+    expect(items.map(i => [i.key, i.entities.map(e => e.entity_id)])).toEqual([['gaming', ['sensor.ps5_jonathan_activity']]])
+  })
+
   it('shows motion or presence only when asked, as on a room page', () => {
     const entities = [st('binary_sensor.bad_bewegung', 'on', { device_class: 'motion' }), st('binary_sensor.bad_radar', 'off', { device_class: 'occupancy' }), st('binary_sensor.bad_fenster', 'on', { device_class: 'window' })]
     expect(homeStatus(entities).map(i => i.key)).toEqual(['openings'])
