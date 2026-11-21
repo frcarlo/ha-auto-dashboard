@@ -358,8 +358,8 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
       ...groups.map(([key, entities]): Section => ({
         type: 'grid',
         // Scenes and scripts as the row of buttons Home has, with when each last ran
-        cards: key === 'scene'
-          ? [groupHeading(t(hass, 'group.scene'), []), { type: 'custom:ad-scenes', entities: entities.map(e => e.entity_id), ...look }, ...own(key)]
+        cards: key === 'scene' || key === 'timer'
+          ? [groupHeading(t(hass, `group.${key}`), []), { type: key === 'scene' ? 'custom:ad-scenes' : 'custom:ad-timers', entities: entities.map(e => e.entity_id), ...look }, ...own(key)]
           : [groupHeading(t(hass, `group.${key}`), entities), ...(key === 'media' ? tvCards : []), ...entities.map(e => tile(e, area.name)), ...own(key)],
       })),
       ...ownSections(own('bottom')),

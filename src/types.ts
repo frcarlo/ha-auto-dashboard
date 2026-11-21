@@ -86,7 +86,7 @@ export type ThemeMode = 'auto' | 'dark' | 'light'
 /** Groups on a room page, by what the entities do */
 export type GroupKey =
   | 'light' | 'climate' | 'shading' | 'awning' | 'opening' | 'gate' | 'lock' | 'media' | 'outlet' | 'switch'
-  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene' | 'button'
+  | 'select' | 'motion' | 'safety' | 'sensor' | 'scene' | 'timer' | 'button'
 
 /** Where own cards go on a room page: top, bottom, or at the end of a group */
 export type CardSlot = 'top' | 'bottom' | GroupKey

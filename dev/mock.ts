@@ -887,6 +887,15 @@ export function applyService(hass: HomeAssistant, called: string, service: strin
     if (service === 'turn_on') state = domain === 'scene' ? new Date().toISOString() : 'on'
     if (service === 'press') state = new Date().toISOString()
     if (service === 'turn_off') state = 'off'
+    // A timer runs from its duration, or from what was left when it was paused
+    if (domain === 'timer') {
+      const hms = (v: unknown) => String(v ?? '0:00:00').split(':').reduce((sum, n) => sum * 60 + Number(n), 0) * 1000
+      const left = e.state === 'active' ? Date.parse(String(attributes.finishes_at)) - Date.now() : hms(e.state === 'paused' ? attributes.remaining : attributes.duration)
+      const clock = (ms: number) => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 3600)}:${String(Math.floor(t / 60) % 60).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}` }
+      if (service === 'start') { state = 'active'; attributes.finishes_at = new Date(Date.now() + left).toISOString() }
+      if (service === 'pause') { state = 'paused'; attributes.remaining = clock(left); delete attributes.finishes_at }
+      if (service === 'cancel') { state = 'idle'; delete attributes.finishes_at; attributes.remaining = attributes.duration }
+    }
     if (domain === 'light' && data.brightness_pct) { state = 'on'; attributes.brightness = Math.round(data.brightness_pct * 2.55) }
     if (domain === 'light' && service === 'turn_on' && !attributes.brightness) attributes.brightness = 255
     if (domain === 'climate' && data.temperature !== undefined) attributes.temperature = data.temperature

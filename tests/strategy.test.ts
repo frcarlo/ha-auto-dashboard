@@ -208,6 +208,17 @@ describe('room page, favorites and scenes', () => {
     expect(kitchen.some(c => c.type === 'custom:ad-tile' && c.entity === 'scene.kuche_hell')).toBe(false)
   })
 
+  it('gives a room its timers as a row of buttons after the scenes, shortest first in the card', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const kitchen = cards(views.find(v => v.path === 'area-kuche')!)
+    const row = kitchen.find(c => c.type === 'custom:ad-timers')
+    expect(row).toBeTruthy()
+    expect([...row!.entities].sort()).toEqual(['timer.nudeln', 'timer.timer_10_minuten'])
+    expect(kitchen.find(c => c.type === 'custom:ad-group-heading' && c.title === 'Timer')).toBeTruthy()
+    expect(kitchen.indexOf(row!)).toBeGreaterThan(kitchen.findIndex(c => c.type === 'custom:ad-scenes'))
+    expect(kitchen.some(c => c.type === 'custom:ad-tile' && String(c.entity).startsWith('timer.'))).toBe(false)
+  })
+
   it('lights, covers and security list what happened today beside the tiles; climate does not', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     for (const path of ['lights', 'covers', 'security']) {

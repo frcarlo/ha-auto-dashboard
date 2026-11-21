@@ -28,8 +28,8 @@ export type { GroupKey } from './types'
 
 /** Order in which groups appear on a room page. */
 export const GROUP_ORDER: GroupKey[] = [
-  // The room's scenes first, as the row of buttons Home has
-  'scene', 'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'button',
+  // The room's scenes first, as the row of buttons Home has, then its timers, a row of buttons too
+  'scene', 'timer', 'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'button',
 ]
 
 /** Groups the security page collects. */
@@ -50,6 +50,7 @@ const GROUP_BY_DOMAIN: Record<string, GroupKey> = {
   input_select: 'select',
   scene: 'scene',
   script: 'scene',
+  timer: 'timer',
   button: 'button',
   input_button: 'button',
   sensor: 'sensor',
