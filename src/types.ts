@@ -31,6 +31,10 @@ export interface DeviceRegistryEntry {
   model?: string | null
   area_id?: string | null
   labels?: string[]
+  /** 'service' for an integration's own entry that is no device in the house */
+  entry_type?: string | null
+  disabled_by?: string | null
+  manufacturer?: string | null
 }
 
 export interface AreaRegistryEntry {
@@ -152,7 +156,7 @@ export interface FaceConfig {
  * Chips in the status bar that can be hidden; `school` is cancelled and changed lessons, the rest from `warning` on
  * are what's coming up: weather warnings, the bin to put out, birthdays, parcels, appliances that finished, stuffy rooms
  */
-export type StatusChip = 'presence' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'gaming' | 'battery' | 'unavailable' | 'school' | EventKey
+export type StatusChip = 'presence' | 'timers' | 'lights' | 'openings' | 'unlocked' | 'heating' | 'media' | 'gaming' | 'battery' | 'unavailable' | 'school' | EventKey
 
 export type EventKey = 'warning' | 'waste' | 'birthday' | 'parcel' | 'appliance' | 'co2'
 

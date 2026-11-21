@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices, entityAreaId } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices, entityAreaId, timerLeft } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -85,11 +85,18 @@ describe('areaEntities', () => {
 })
 
 describe('floorsWithAreas', () => {
-  it('sorts floors top-down, skips empty areas, puts floorless last', () => {
+  it('sorts floors top-down, skips empty areas, puts floorless last; rooms in the order HA has them', () => {
     const groups = floorsWithAreas(fakeHass())
     expect(groups.map(g => g.floor?.floor_id ?? null)).toEqual(['eg', null])
-    expect(groups[0]!.areas.map(a => a.area_id)).toEqual(['kueche', 'wohnzimmer'])
+    expect(groups[0]!.areas.map(a => a.area_id)).toEqual(['wohnzimmer', 'kueche'])
     expect(groups[1]!.areas.map(a => a.area_id)).toEqual(['flur'])
+  })
+
+  it('follows HA when its rooms are sorted anew under Settings → Areas', () => {
+    const hass = fakeHass()
+    const { kueche, ...rest } = hass.areas
+    hass.areas = { kueche: kueche!, ...rest }
+    expect(floorsWithAreas(hass)[0]!.areas.map(a => a.area_id)).toEqual(['kueche', 'wohnzimmer'])
   })
 
   it('applies area_order and hide_areas', () => {
@@ -137,6 +144,28 @@ describe('homeStatus', () => {
     const items = homeStatus(Object.values(hass.states), batteryEntities(hass))
     const counts = Object.fromEntries(items.map(i => [i.key, i.entities.length]))
     expect(counts).toEqual({ lights: 2, openings: 1, heating: 1, battery: 1 })
+  })
+
+  it('counts running and paused timers and the next timer of a satellite still ahead, soonest first', () => {
+    const now = Date.parse('2026-11-21T12:00:00Z')
+    const active = st('timer.nudeln', 'active', { finishes_at: '2026-11-21T12:03:20Z', remaining: '0:10:00' })
+    const paused = st('timer.eier', 'paused', { remaining: '0:01:05' })
+    const idle = st('timer.tee', 'idle', { duration: '0:05:00' })
+    const satellite = st('sensor.kuche_tablet_vs_next_timer', '2026-11-21T12:10:00Z', { device_class: 'timestamp' })
+    const past = st('sensor.flur_vs_next_timer', '2026-11-21T11:00:00Z', { device_class: 'timestamp' })
+    const alarm = st('sensor.phone_next_alarm', '2026-11-22T06:00:00Z', { device_class: 'timestamp' })
+    expect(timerLeft(active, now)).toBe(200_000)
+    expect(timerLeft(paused, now)).toBe(65_000)
+    expect(timerLeft(idle, now)).toBeUndefined()
+    expect(timerLeft(satellite, now)).toBe(600_000)
+    expect(timerLeft(past, now)).toBeUndefined()
+    // A next alarm is no countdown
+    expect(timerLeft(alarm, now)).toBeUndefined()
+    vi.setSystemTime(now)
+    const [timers] = homeStatus([active, paused, idle, satellite, past, alarm])
+    vi.useRealTimers()
+    expect(timers!.key).toBe('timers')
+    expect(timers!.entities.map(e => e.entity_id)).toEqual(['timer.eier', 'timer.nudeln', 'sensor.kuche_tablet_vs_next_timer'])
   })
 
   it('counts consoles on which someone plays a game, not those merely switched on', () => {

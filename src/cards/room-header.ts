@@ -5,7 +5,7 @@ import { BaseCard, type BaseConfig } from './base'
 import { t, type Key } from '../i18n'
 import { canBulk } from '../access'
 import { areaEntities, entityIndex, hideOf, isOutlet, quickGroups, roomSummary, type QuickKey, type Reading } from '../model'
-import { domainOf, hvacColor, isActive, isUnavailable } from '../presentation'
+import { domainOf, hvacColor, isActive, isUnavailable, openHa } from '../presentation'
 import { materials } from '../styles/materials'
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
@@ -56,6 +56,16 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
     /* The room name is the page's one big type element */
     h1 { min-width: 0; margin: 0; font-size: var(--ad-fs-2xl); font-weight: 200; letter-spacing: -0.045em; line-height: 1; }
     .values { display: flex; gap: 16px; }
+    /* Admins: the room's settings in HA, where its name, picture and temperature sensor are chosen */
+    .edit {
+      all: unset; margin-left: auto; align-self: center; display: inline-flex; align-items: center; justify-content: center; flex: none;
+      width: 36px; height: 36px; border-radius: 18px; cursor: pointer; opacity: 0.55; transition: opacity 0.15s, background 0.15s;
+    }
+    .edit:hover, .edit:focus-visible { opacity: 1; background: rgba(var(--ad-on-surface), 0.08); }
+    .edit:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
+    .top.photo .edit { position: absolute; top: 10px; right: 10px; color: #fff; }
+    .top.photo .edit:hover { background: rgba(0, 0, 0, 0.3); }
+    .edit ha-icon { --mdc-icon-size: 20px; }
     .value {
       all: unset; display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; font-size: var(--ad-fs-m); font-weight: 300;
       font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0.8;
@@ -251,7 +261,9 @@ export class AdRoomHeader extends BaseCard<RoomHeaderConfig> {
       <div class="values">
         ${climate ? nothing : this.valueChip(summary.temperature, 'mdi:thermometer', 1)}
         ${this.valueChip(summary.humidity, 'mdi:water-percent', 0)}
-      </div>`
+      </div>
+      ${this.hass!.user?.is_admin ? html`<button class="edit" title=${t(this.hass, 'room.edit')} aria-label=${t(this.hass, 'room.edit')}
+        @click=${() => openHa(`/config/areas/area/${this.config!.area}`)}><ha-icon icon="mdi:cog-outline"></ha-icon></button>` : nothing}`
   }
 
   protected render() {

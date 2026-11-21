@@ -200,3 +200,9 @@ export function stateColor(entity: MinimalEntity | undefined, active = isActive(
   if (domain === 'alarm_control_panel') return 'error'
   return 'primary'
 }
+
+/** A page of HA's own settings, e.g. /config/repairs, opened in place like HA's links do */
+export function openHa(path: string) {
+  history.pushState(null, '', path)
+  window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }))
+}

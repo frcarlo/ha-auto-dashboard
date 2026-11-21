@@ -2,8 +2,8 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { allEntities, batteryEntities, deviceName, entityAreaId, entityIndex, hideOf, homeStatus, unavailableDevices, type StatusKey } from '../model'
-import { entityIcon, entityName, shortName } from '../presentation'
+import { allEntities, batteryEntities, deviceName, entityAreaId, entityIndex, hideOf, homeStatus, timerLeft, unavailableDevices, type StatusKey } from '../model'
+import { domainOf, entityIcon, entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import { peopleIds, peopleStyles, renderPeople } from './people'
 import { personPanelStyles, renderPersonPanel } from './person-panel'
@@ -95,6 +95,7 @@ const ICONS: Record<StatusKey, string> = {
   openings: 'mdi:window-open-variant',
   unlocked: 'mdi:lock-open-variant-outline',
   heating: 'mdi:fire',
+  timers: 'mdi:timer-outline',
   media: 'mdi:play-circle',
   gaming: 'mdi:controller',
   battery: 'mdi:battery-alert-variant-outline',
@@ -102,7 +103,7 @@ const ICONS: Record<StatusKey, string> = {
 }
 
 const COLORS: Record<StatusKey, string> = {
-  presence: 'primary',
+  presence: 'primary', timers: 'primary',
   lights: 'warning', openings: 'warning', unlocked: 'warning', heating: 'warning',
   media: 'primary', gaming: 'primary', battery: 'error', unavailable: 'muted',
 }
@@ -116,6 +117,9 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   /** Ticks every minute: bins show from the afternoon before, calendars are fetched again */
   now = Date.now()
   private timer?: number
+  /** Ticks every second while a countdown runs, so it counts down on the chip */
+  private seconds?: number
+  private counting = false
 
   connectedCallback() {
     super.connectedCallback()
@@ -125,9 +129,46 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
   disconnectedCallback() {
     super.disconnectedCallback()
     window.clearInterval(this.timer)
+    window.clearInterval(this.seconds)
+    this.seconds = undefined
+  }
+
+  /** "3:20", or "1:02:03" from an hour on */
+  private countdown(ms: number) {
+    const total = Math.ceil(ms / 1000)
+    const h = Math.floor(total / 3600)
+    const m = Math.floor((total % 3600) / 60)
+    const s = String(total % 60).padStart(2, '0')
+    return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
+  }
+
+  /** A timer of the list, with pause or resume and cancel for timer helpers; a satellite's timer only opens */
+  private timerRow(e: HassEntity, area?: string) {
+    const left = timerLeft(e, this.now)
+    const paused = e.state === 'paused'
+    const helper = domainOf(e.entity_id) === 'timer'
+    const name = shortName(entityName(e), area)
+    const act = (service: string) => (ev: Event) => { ev.stopPropagation(); this.call('timer', service, e.entity_id) }
+    return html`<div class="item timer" role="button" tabindex="0" @click=${() => this.moreInfo(e.entity_id)}
+      @keydown=${(ev: KeyboardEvent) => (ev.key === 'Enter' || ev.key === ' ') && this.moreInfo(e.entity_id)}>
+      <ha-icon icon=${paused ? 'mdi:timer-pause-outline' : ICONS.timers}></ha-icon>
+      <span>${name}</span>
+      ${area && area !== name ? html`<span class="a">${area}</span>` : nothing}
+      <span class="s">${left !== undefined ? this.countdown(left) : ''}${paused ? ` · ${t(this.hass, 'timer.paused')}` : ''}</span>
+      ${helper && this.canControl(e.entity_id) ? html`
+        <button class="act" @click=${act(paused ? 'start' : 'pause')} aria-label=${t(this.hass, paused ? 'timer.resume' : 'timer.pause')}>
+          <ha-icon icon=${paused ? 'mdi:play' : 'mdi:pause'}></ha-icon></button>
+        <button class="act" @click=${act('cancel')} aria-label=${t(this.hass, 'timer.cancel')}><ha-icon icon="mdi:close"></ha-icon></button>` : nothing}
+    </div>`
   }
 
   protected updated() {
+    // A countdown on screen ticks every second; without one the minute is enough
+    if (this.counting && !this.seconds) this.seconds = window.setInterval(() => (this.now = Date.now()), 1000)
+    if (!this.counting && this.seconds) {
+      window.clearInterval(this.seconds)
+      this.seconds = undefined
+    }
     const ev = this.config?.events
     if (!ev || !this.hass) return
     const calendars = [...(ev.birthdays ?? []), ...(ev.parcels ?? [])]
@@ -168,6 +209,10 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     .item .s { margin-left: auto; opacity: var(--ad-o2); font-size: var(--ad-fs-s); white-space: nowrap; }
     .more { all: unset; align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; cursor: pointer; font-size: var(--ad-fs-s); color: rgb(var(--ad-primary)); }
     .more:hover { background: rgba(var(--ad-primary), 0.1); }
+    .item.timer .s { font-variant-numeric: tabular-nums; }
+    .item .act { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 15px; cursor: pointer; background: rgba(var(--ad-on-surface), 0.08); }
+    .item .act:hover { background: rgba(var(--ad-on-surface), 0.14); }
+    .item .act ha-icon { --mdc-icon-size: 16px; opacity: 1; }
     .item .who { opacity: var(--ad-o3); font-size: var(--ad-fs-s); white-space: nowrap; }
     .item.cancelled .s { color: rgb(var(--ad-error)); opacity: 1; }
     .item.changed .s { color: rgb(var(--ad-warning)); opacity: 1; }
@@ -363,6 +408,8 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
     const events = this.eventChips()
     const openEvent = events.find(c => c.key === this.open)
     const openItem = items.find(i => i.key === this.open)
+    const timers = items.find(i => i.key === 'timers')
+    this.counting = !!timers
     const link = openItem && this.config!.links?.[openItem.key]
     const phones = this.openPhones
     const openPerson = phones.length ? this.hass!.states[(this.open as string).slice(7)] : undefined
@@ -377,7 +424,8 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
           <button class="chip ${COLORS[item.key]}" aria-expanded=${this.open === item.key} @click=${() => this.flip(item.key)}>
             <ha-icon icon=${ICONS[item.key]}></ha-icon>
             ${item.key === 'presence' ? nothing : html`<span class="n">${item.entities.length}</span>`}
-            <span class="l">${t(this.hass, `status.${item.key}`)}</span>
+            <span class="l">${t(this.hass, `status.${item.key}`)}${item.key === 'timers' && timerLeft(item.entities[0]!, this.now) !== undefined
+              ? html` · <span class="clock">${this.countdown(timerLeft(item.entities[0]!, this.now)!)}</span>` : nothing}</span>
           </button>`)
         : school || events.length ? nothing : html`<span class="chip quiet"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="l">${t(this.hass, 'all_quiet')}</span></span>`}
       </div>
@@ -390,6 +438,7 @@ export class AdStatusBar extends BaseCard<StatusBarConfig> {
       ${openItem ? html`<div class="list card">
         ${openItem.entities.map(e => {
           const area = this.areaName(e)
+          if (this.open === 'timers') return this.timerRow(e, area)
           // A console by its device ("PS5 Jonathan", not "PS5 Jonathan activity"), and the game it plays
           const gaming = this.open === 'gaming'
           const name = shortName(this.open === 'unavailable' || gaming ? deviceName(this.hass!, e) : entityName(e), area)

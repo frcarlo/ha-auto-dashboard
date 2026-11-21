@@ -7,6 +7,7 @@ import { domainOf, entityIcon, entityName, isUnavailable } from '../presentation
 import { tokens } from '../styles/tokens'
 import type { HassEntity } from '../types'
 import { scrollRow } from '../scroll-row'
+import { loadSceneTints, onTint, tintOf } from '../scene-colors'
 
 interface ScenesConfig extends BaseConfig {
   entities: string[]
@@ -75,6 +76,11 @@ export class AdScenes extends BaseCard<ScenesConfig> {
     return this.config!.entities
   }
 
+  protected updated() {
+    // The colour each scene's lights get; HA only tells admins, the others keep the plain buttons
+    if (this.hass && this.config) void loadSceneTints(this.hass, this.config.entities).then(changed => changed && this.requestUpdate())
+  }
+
   private async run(entity: HassEntity) {
     const id = entity.entity_id
     let result: Feedback = 'ok'
@@ -115,9 +121,12 @@ export class AdScenes extends BaseCard<ScenesConfig> {
           : this.hass!.entities[entity.entity_id]?.icon ?? entity.attributes.icon ?? entityIcon(entity)
         const color = feedback === 'ok' ? 'success' : feedback === 'error' ? 'error' : ''
         const armed = this.armed === entity.entity_id
+        // The scene in the light it makes: warm white, red, blue; while the check or the cross shows, their colour
+        const tint = feedback ? undefined : tintOf(entity.entity_id)
+        const style = Array.isArray(tint) ? `background: rgb(${tint.join(',')}); color: ${onTint(tint)}` : ''
         return html`<button class=${armed ? 'armed' : ''} ?disabled=${isUnavailable(entity) || !this.canControl(entity.entity_id)}
           @click=${() => this.tap(entity)}>
-          <span class="dot ${color}"><ha-icon icon=${icon}></ha-icon></span>
+          <span class="dot ${color}" style=${style}><ha-icon icon=${icon}></ha-icon></span>
           <span class="text"><span class="name">${entityName(entity)}</span><span class="sub">${armed ? t(this.hass, 'run.again_long') : this.sub(entity)}</span></span>
         </button>`
       })}

@@ -3,9 +3,10 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
+import { openHa } from '../presentation'
 import {
-  backupStatus, failedIntegrations, formatBytes, health, issueTitle, logErrors, logSource, openIssues, relativeTime,
-  type BackupInfo, type ConfigEntry, type FailedIntegration, type FlowProgress, type Health, type Issue, type LogEntry,
+  backupStatus, devicesWithoutArea, discovered, failedIntegrations, formatBytes, health, issueTitle, logErrors, logSource, openIssues, relativeTime,
+  type BackupInfo, type ConfigEntry, type Discovered, type FailedIntegration, type FlowProgress, type Health, type Issue, type LogEntry,
 } from '../system'
 import { tokens } from '../styles/tokens'
 
@@ -20,11 +21,6 @@ const MAX_ROWS = 6
 
 const REFRESH_MS: Record<SystemSource, number> = { health: 30_000, repairs: 60_000, integrations: 60_000, log: 60_000, backup: 60_000 }
 
-/** A page of HA's settings, e.g. /config/repairs */
-function openHa(path: string) {
-  history.pushState(null, '', path)
-  window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }))
-}
 
 export class AdSystem extends BaseCard<SystemConfig> {
   static properties = {
@@ -40,6 +36,7 @@ export class AdSystem extends BaseCard<SystemConfig> {
     issues?: Issue[]
     titles?: Record<string, string>
     integrations?: FailedIntegration[]
+    discovered?: Discovered[]
     log?: LogEntry[]
     backup?: BackupInfo
   }
@@ -157,7 +154,7 @@ export class AdSystem extends BaseCard<SystemConfig> {
           ws<ConfigEntry[]>({ type: 'config_entries/get' }),
           ws<FlowProgress[]>({ type: 'config_entries/flow/progress' }).catch(() => []),
         ])
-        this.data = { integrations: failedIntegrations(entries, flows) }
+        this.data = { integrations: failedIntegrations(entries, flows), discovered: discovered(flows) }
       } else if (source === 'log') {
         this.data = { log: logErrors(await ws<LogEntry[]>({ type: 'system_log/list' })) }
       } else {
@@ -263,11 +260,22 @@ export class AdSystem extends BaseCard<SystemConfig> {
         () => openHa('/config/repairs'), i.severity === 'warning' ? 'warning' : 'error',
       ), '/config/repairs', t(this.hass, 'sys.no_repairs'))
     } else if (source === 'integrations') {
-      body = this.list(d.integrations ?? [], i => this.item(
-        i.state === 'reauth' ? 'mdi:account-key-outline' : 'mdi:puzzle-remove-outline', i.title,
-        i.reason ?? t(this.hass, `sys.state.${i.state}` as 'sys.state.setup_error'), i.domain,
-        () => openHa(`/config/integrations/integration/${i.domain}`), i.state === 'setup_retry' ? 'warning' : 'error',
-      ), '/config/integrations/dashboard', t(this.hass, 'sys.no_integrations'))
+      // Integrations that fail first, then devices HA found and that wait to be set up, then devices in no room
+      type Row = { icon: string; name: string; sub?: string; value?: string; open: string; tone: string }
+      const rows: Row[] = [
+        ...(d.integrations ?? []).map(i => ({
+          icon: i.state === 'reauth' ? 'mdi:account-key-outline' : 'mdi:puzzle-remove-outline', name: i.title,
+          sub: i.reason ?? t(this.hass, `sys.state.${i.state}` as 'sys.state.setup_error'), value: i.domain,
+          open: `/config/integrations/integration/${i.domain}`, tone: i.state === 'setup_retry' ? 'warning' : 'error',
+        })),
+        ...(d.discovered ?? []).map(f => ({ icon: 'mdi:new-box', name: f.name, sub: t(this.hass, 'sys.discovered', { domain: f.domain }), open: '/config/integrations/dashboard', tone: 'warning' })),
+        ...devicesWithoutArea(this.hass!).map(dev => ({
+          icon: 'mdi:map-marker-question-outline', name: dev.name_by_user ?? dev.name ?? dev.id,
+          sub: [t(this.hass, 'sys.no_area'), dev.manufacturer, dev.model].filter(Boolean).join(' · '), open: `/config/devices/device/${dev.id}`, tone: '',
+        })),
+      ]
+      body = this.list(rows, r => this.item(r.icon, r.name, r.sub, r.value, () => openHa(r.open), r.tone),
+        '/config/integrations/dashboard', t(this.hass, 'sys.no_integrations'))
     } else if (source === 'log') {
       body = this.list(d.log ?? [], e => this.item(
         'mdi:alert-circle-outline', e.message[0] ?? e.name,

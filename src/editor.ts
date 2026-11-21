@@ -5,7 +5,7 @@ import { keyed } from 'lit/directives/keyed.js'
 import { cleanConfig, normalizeConfig } from './config'
 import { findSchools } from './school'
 import { CO2_LIMIT, co2Sensors } from './events'
-import { HIDE_LABEL, hideOf, isRoomFavorite, replaceFavorites } from './model'
+import { HIDE_LABEL, haAreaOrder, hideOf, isRoomFavorite, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
 import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
 import { entityName } from './presentation'
@@ -55,7 +55,7 @@ const TOOL_KEYS: Record<Tool, 'hide_areas' | 'outdoor_areas' | 'areas'> = { hide
 const TOOL_MARKS: Record<Tool, RoomMark> = { hide: 'hidden', outdoor: 'outdoor', only: 'only' }
 
 const PAGES: PagePath[] = ['lights', 'climate', 'covers', 'security', 'cameras', 'music', 'calendar', 'lists', 'energy', 'maintenance']
-const CHIPS: StatusChip[] = ['lights', 'openings', 'unlocked', 'heating', 'media', 'gaming', 'battery', 'unavailable', 'presence', 'school',
+const CHIPS: StatusChip[] = ['timers', 'lights', 'openings', 'unlocked', 'heating', 'media', 'gaming', 'battery', 'unavailable', 'presence', 'school',
   'warning', 'waste', 'birthday', 'parcel', 'appliance', 'co2']
 const EVENT_CHIPS: StatusChip[] = ['school', 'warning', 'waste', 'birthday', 'parcel', 'appliance', 'co2']
 const CO2_LIMITS = [1000, 1200, 1500, 2000]
@@ -473,7 +473,8 @@ export class AdStrategyEditor extends LitElement {
   private get orderedAreas(): AreaRegistryEntry[] {
     const order = this.config.area_order ?? []
     const rank = (id: string) => (order.indexOf(id) + 1 || order.length + 1)
-    return Object.values(this.hass?.areas ?? {}).sort((a, b) => rank(a.area_id) - rank(b.area_id) || a.name.localeCompare(b.name))
+    const inHa = haAreaOrder(this.hass!)
+    return Object.values(this.hass?.areas ?? {}).sort((a, b) => rank(a.area_id) - rank(b.area_id) || inHa(a.area_id) - inHa(b.area_id))
   }
 
   private userLabel(key: string) {

@@ -109,14 +109,14 @@ describe('filters and nav position', () => {
 
   it('floors limits rooms, pages and the status bar to those floors', async () => {
     const { title, views } = await generateDashboard({ type: 'custom:auto-dashboard', floors: ['og'] }, createHass(true))
-    expect(views.filter(v => String(v.path).startsWith('area-')).map(v => v.path)).toEqual(['area-bad', 'area-kinderzimmer', 'area-schlafzimmer'])
+    expect(views.filter(v => String(v.path).startsWith('area-')).map(v => v.path)).toEqual(['area-schlafzimmer', 'area-bad', 'area-kinderzimmer'])
     expect(title).toBe('Zuhause')
     const home = cards(views[0]!)
-    expect(home.find(c => c.type === 'custom:ad-status-bar')!.areas).toEqual(['bad', 'kinderzimmer', 'schlafzimmer'])
+    expect(home.find(c => c.type === 'custom:ad-status-bar')!.areas).toEqual(['schlafzimmer', 'bad', 'kinderzimmer'])
     // The header greets without listing rooms
     expect(home.find(c => c.type === 'custom:ad-header')!.scope).toBeUndefined()
     const lights = views.find(v => v.path === 'lights')!
-    expect(cards(lights).filter(c => c.type === 'custom:ad-tile').map(c => c.entity)).toEqual(['light.bad', 'light.schlafzimmer'])
+    expect(cards(lights).filter(c => c.type === 'custom:ad-tile').map(c => c.entity)).toEqual(['light.schlafzimmer', 'light.bad'])
   })
 
   it('a single area puts its content on the home page', async () => {

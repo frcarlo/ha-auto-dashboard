@@ -253,12 +253,14 @@ export function floorsWithAreas(
     const i = order.indexOf(area.area_id)
     return i === -1 ? order.length : i
   }
+  // Without an order of the dashboard's own, the rooms as sorted in HA's settings (Settings → Areas, drag and drop)
+  const inHa = haAreaOrder(hass)
   const areas = Object.values(hass.areas)
     .filter(area => !config.areas?.length || config.areas.includes(area.area_id))
     .filter(area => !config.floors?.length || config.floors.includes(area.floor_id ?? ''))
     .filter(area => !config.hide_areas?.includes(area.area_id))
     .filter(area => areaEntities(hass, area.area_id, hideOf(config)).some(e => groupOf(e)))
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+    .sort((a, b) => rank(a) - rank(b) || inHa(a.area_id) - inHa(b.area_id))
 
   const floors = Object.values(hass.floors ?? {})
     .sort((a, b) => (b.level ?? -Infinity) - (a.level ?? -Infinity) || a.name.localeCompare(b.name))
@@ -269,6 +271,18 @@ export function floorsWithAreas(
   const floorless = areas.filter(area => !area.floor_id || !hass.floors?.[area.floor_id])
   if (floorless.length) groups.push({ areas: floorless })
   return groups
+}
+
+/**
+ * Where a room sits in HA's own order. HA hands out its areas in the order set under Settings → Areas, where
+ * they are sorted by drag and drop; the dashboard follows it unless it has an order of its own.
+ */
+export function haAreaOrder(hass: HomeAssistant): (areaId: string) => number {
+  const ids = Object.keys(hass.areas)
+  return id => {
+    const i = ids.indexOf(id)
+    return i === -1 ? ids.length : i
+  }
 }
 
 /** A room's temperature or humidity and where it comes from (tap opens that entity). */
@@ -382,6 +396,38 @@ export function deviceName(hass: HomeAssistant, entity: HassEntity) {
   return device?.name_by_user ?? device?.name ?? String(entity.attributes.friendly_name ?? entity.entity_id)
 }
 
+/** "0:03:20" or "1:02:03" as milliseconds */
+const hms = (text: unknown) => {
+  const parts = String(text ?? '').split(':').map(Number)
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return undefined
+  return ((parts[0]! * 60 + parts[1]!) * 60 + parts[2]!) * 1000
+}
+
+/** A voice satellite's or speaker's "next timer": a timestamp sensor that says so in its id or name */
+const NEXT_TIMER = /(^|[\s_.])(next_timer|nächster[\s_]timer)([\s_.]|$)|next timer/i
+
+/**
+ * What is left of a countdown, in milliseconds: a timer helper that runs or waits paused, or a voice
+ * satellite's next timer still ahead. Undefined for anything that is no running countdown.
+ */
+export function timerLeft(e: HassEntity, now = Date.now()): number | undefined {
+  const domain = domainOf(e.entity_id)
+  if (domain === 'timer') {
+    if (e.state === 'active') {
+      const end = Date.parse(String(e.attributes.finishes_at ?? ''))
+      return Number.isFinite(end) ? Math.max(0, end - now) : hms(e.attributes.remaining)
+    }
+    return e.state === 'paused' ? hms(e.attributes.remaining) : undefined
+  }
+  if (domain === 'sensor' && e.attributes.device_class === 'timestamp' && (NEXT_TIMER.test(e.entity_id) || NEXT_TIMER.test(String(e.attributes.friendly_name ?? '')))) {
+    const end = Date.parse(e.state)
+    return Number.isFinite(end) && end > now ? end - now : undefined
+  }
+  return undefined
+}
+
+export const isRunningTimer = (e: HassEntity, now = Date.now()) => timerLeft(e, now) !== undefined
+
 /**
  * A console on which someone plays, with the game: PS5-MQTT's activity sensor says "playing" and names the title.
  * Merely switched on is no game; that is the console's power switch.
@@ -405,6 +451,8 @@ export function homeStatus(entities: HassEntity[], batteries: HassEntity[] = [],
       key: 'presence' as const,
       entities: entities.filter(is('binary_sensor')).filter(e => PRESENCE_CLASSES.includes(deviceClassOf(e) ?? '') && e.state === 'on'),
     }] : []),
+    // A countdown first: it is what runs out
+    { key: 'timers', entities: entities.filter(e => isRunningTimer(e)).sort((a, b) => (timerLeft(a) ?? 0) - (timerLeft(b) ?? 0)) },
     { key: 'lights', entities: entities.filter(is('light')).filter(e => e.state === 'on') },
     { key: 'openings', entities: entities.filter(is('binary_sensor')).filter(e => OPENING_CLASSES.includes(deviceClassOf(e) ?? '') && e.state === 'on') },
     { key: 'unlocked', entities: entities.filter(is('lock')).filter(e => ['unlocked', 'open', 'opening', 'unlocking'].includes(e.state)) },

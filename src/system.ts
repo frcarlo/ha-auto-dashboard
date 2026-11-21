@@ -1,5 +1,6 @@
 // What the maintenance page shows admins about HA itself: repairs, integrations that fail, errors in the log,
 // how busy the server is and how the backups stand. Plain functions over what HA's websocket API returns.
+import type { DeviceRegistryEntry, HomeAssistant } from './types'
 
 export interface Issue {
   domain: string
@@ -92,6 +93,36 @@ export function failedIntegrations(entries: ConfigEntry[] = [], flows: FlowProgr
     .filter(f => f.context?.source === 'reauth')
     .map(f => ({ domain: f.handler, title: f.context?.title_placeholders?.name ?? f.handler, state: 'reauth' }))
   return [...reauth, ...failed]
+}
+
+/** How HA came to find a device on its own, as a config flow's source says */
+const DISCOVERY = ['zeroconf', 'ssdp', 'dhcp', 'bluetooth', 'homekit', 'mqtt', 'usb', 'hassio', 'discovery', 'integration_discovery']
+
+export interface Discovered {
+  flow_id: string
+  domain: string
+  name: string
+}
+
+/** Devices HA found by itself and that wait to be set up, as "Discovered" on HA's integrations page */
+export function discovered(flows: FlowProgress[] = []): Discovered[] {
+  return flows
+    .filter(f => DISCOVERY.includes(f.context?.source ?? ''))
+    .map(f => ({ flow_id: f.flow_id, domain: f.handler, name: f.context?.title_placeholders?.name ?? f.handler }))
+}
+
+/**
+ * Devices in the house that sit in no room: they show nowhere on the room pages. An integration's own entry
+ * (a service like the weather), a disabled device and one whose entities are all hidden or settings don't count.
+ */
+export function devicesWithoutArea(hass: HomeAssistant): DeviceRegistryEntry[] {
+  const shown = new Set<string>()
+  for (const e of Object.values(hass.entities)) {
+    if (e.device_id && !e.hidden && !e.entity_category && !e.area_id) shown.add(e.device_id)
+  }
+  return Object.values(hass.devices)
+    .filter(d => !d.area_id && d.entry_type !== 'service' && !d.disabled_by && shown.has(d.id))
+    .sort((a, b) => (a.name_by_user ?? a.name ?? '').localeCompare(b.name_by_user ?? b.name ?? ''))
 }
 
 /** Errors in HA's log, the latest first */

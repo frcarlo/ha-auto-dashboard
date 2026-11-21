@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { backupStatus, failedIntegrations, formatBytes, health, issueTitle, logErrors, logSource, openIssues } from '../src/system'
+import { devicesWithoutArea, discovered } from '../src/system'
+import type { HomeAssistant } from '../src/types'
 import { generateDashboard } from '../src/strategy'
 import { createHass } from '../dev/mock'
 
@@ -100,5 +102,41 @@ describe('maintenance page', () => {
     const { nav, sources } = await page(false)
     expect(nav).not.toContain('maintenance')
     expect(sources).toEqual(['battery', 'unavailable'])
+  })
+})
+
+describe('new devices and devices without a room', () => {
+  it('lists what HA discovered by itself, not sign-ins or flows a person started', () => {
+    expect(discovered([
+      { flow_id: 'a', handler: 'shelly', context: { source: 'zeroconf', title_placeholders: { name: 'Shelly Plug S' } } },
+      { flow_id: 'b', handler: 'hue', context: { source: 'reauth' } },
+      { flow_id: 'c', handler: 'mqtt', context: { source: 'user' } },
+      { flow_id: 'd', handler: 'esphome', context: { source: 'dhcp' } },
+    ])).toEqual([{ flow_id: 'a', domain: 'shelly', name: 'Shelly Plug S' }, { flow_id: 'd', domain: 'esphome', name: 'esphome' }])
+  })
+
+  it('lists devices in no room that show something, not services, disabled devices or ones with only hidden entities', () => {
+    const hass = {
+      devices: {
+        lamp: { id: 'lamp', name: 'Stehlampe' },
+        placed: { id: 'placed', name: 'Decke', area_id: 'kuche' },
+        sun: { id: 'sun', name: 'Sonne', entry_type: 'service' },
+        off: { id: 'off', name: 'Alt', disabled_by: 'user' },
+        quiet: { id: 'quiet', name: 'Versteckt' },
+        bridge: { id: 'bridge', name: 'Bridge' },
+        moved: { id: 'moved', name: 'Plug' },
+      },
+      entities: {
+        'light.stehlampe': { entity_id: 'light.stehlampe', device_id: 'lamp' },
+        'light.decke': { entity_id: 'light.decke', device_id: 'placed' },
+        'sensor.sonne': { entity_id: 'sensor.sonne', device_id: 'sun' },
+        'light.alt': { entity_id: 'light.alt', device_id: 'off' },
+        'light.versteckt': { entity_id: 'light.versteckt', device_id: 'quiet', hidden: true },
+        'sensor.bridge_rssi': { entity_id: 'sensor.bridge_rssi', device_id: 'bridge', entity_category: 'diagnostic' },
+        // The device has no room, but its one entity has: it shows in that room
+        'switch.plug': { entity_id: 'switch.plug', device_id: 'moved', area_id: 'kuche' },
+      },
+    } as unknown as HomeAssistant
+    expect(devicesWithoutArea(hass).map(d => d.id)).toEqual(['lamp'])
   })
 })

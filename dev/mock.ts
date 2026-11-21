@@ -15,10 +15,13 @@ const defs: Def[] = [
   ['cover.wohnzimmer_dachfenster', 'closed', { friendly_name: 'Wohnzimmer Dachfenster', device_class: 'window', current_position: 0 }, 'wohnzimmer'],
   ['cover.wohnzimmer_rollo', 'open', { friendly_name: 'Wohnzimmer Rollo', current_position: 70 }, 'wohnzimmer'],
   ['switch.wohnzimmer_steckdose', 'off', { friendly_name: 'Wohnzimmer Steckdose', device_class: 'outlet' }, 'wohnzimmer'],
-  ['scene.wohnzimmer_kino', new Date(Date.now() - 2 * 3600_000).toISOString(), { friendly_name: 'Wohnzimmer Kino' }, 'wohnzimmer'],
+  ['scene.wohnzimmer_kino', new Date(Date.now() - 2 * 3600_000).toISOString(), { friendly_name: 'Wohnzimmer Kino', id: 'kino' }, 'wohnzimmer'],
+  // A kitchen timer that runs, and one that waits
+  ['timer.nudeln', 'active', { friendly_name: 'Nudeln', duration: '0:10:00', remaining: '0:10:00', finishes_at: new Date(Date.now() + 200_000).toISOString(), editable: true }, 'kuche'],
+  ['timer.timer_10_minuten', 'idle', { friendly_name: 'Timer 10 Minuten', duration: '0:10:00', editable: true }, 'kuche'],
   // No room of its own: it sets the kitchen's lights only, so it belongs to the kitchen
-  ['scene.kuche_hell', new Date(Date.now() - 5 * 86400_000).toISOString(), { friendly_name: 'Küche hell', entity_id: ['light.kuche', 'light.kuche_theke'] }, null as unknown as string],
-  ['scene.esszimmer_abendessen', new Date(Date.now() - 26 * 3600_000).toISOString(), { friendly_name: 'Abendessen', icon: 'mdi:silverware-fork-knife' }, 'esszimmer'],
+  ['scene.kuche_hell', new Date(Date.now() - 5 * 86400_000).toISOString(), { friendly_name: 'Küche hell', id: 'hell', entity_id: ['light.kuche', 'light.kuche_theke'] }, null as unknown as string],
+  ['scene.esszimmer_abendessen', new Date(Date.now() - 26 * 3600_000).toISOString(), { friendly_name: 'Abendessen', icon: 'mdi:silverware-fork-knife', id: 'abendessen' }, 'esszimmer'],
 
   ['light.kuche', 'off', { friendly_name: 'Küche Licht', supported_color_modes: ['brightness'] }, 'kuche'],
   ['light.kuche_theke', 'off', { friendly_name: 'Küche Theke', supported_color_modes: ['onoff'] }, 'kuche'],
@@ -740,6 +743,13 @@ export function createHass(dark: boolean): HomeAssistant {
     },
     // Events around today, like HA's calendar API returns them
     callApi: async <T,>(_method: string, path: string) => {
+      // What each scene sets: warm light for the cinema, cool for the kitchen, candle light for dinner
+      const scene = /^config\/scene\/config\/(.+)$/.exec(path)?.[1]
+      if (scene) return ({
+        kino: { entities: { 'light.wohnzimmer_decke': { state: 'on', color_temp_kelvin: 2200, brightness: 60 }, 'light.wohnzimmer_stehlampe': { state: 'on', rgb_color: [255, 120, 40] } } },
+        hell: { entities: { 'light.kuche': { state: 'on', color_temp_kelvin: 5000 }, 'light.kuche_theke': { state: 'on', color_temp_kelvin: 5000 } } },
+        abendessen: { entities: { 'light.esszimmer': { state: 'on', rgb_color: [255, 170, 80] } } },
+      } as Record<string, unknown>)[scene] as T
       const [, id, query] = /^calendars\/([^?]+)\?(.*)$/.exec(path) ?? []
       const params = new URLSearchParams(query)
       const from = new Date(params.get('start') ?? 0)
