@@ -28,7 +28,8 @@ export type { GroupKey } from './types'
 
 /** Order in which groups appear on a room page. */
 export const GROUP_ORDER: GroupKey[] = [
-  'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'scene', 'button',
+  // The room's scenes first, as the row of buttons Home has
+  'scene', 'light', 'climate', 'shading', 'awning', 'opening', 'gate', 'lock', 'media', 'outlet', 'switch', 'select', 'motion', 'safety', 'sensor', 'button',
 ]
 
 /** Groups the security page collects. */
@@ -114,7 +115,20 @@ const indexCache = new WeakMap<object, Map<string, Index>>()
 export function entityAreaId(hass: HomeAssistant, entityId: string): string | undefined {
   const entry = hass.entities[entityId]
   if (!entry) return undefined
-  return entry.area_id ?? (entry.device_id ? hass.devices[entry.device_id]?.area_id ?? undefined : undefined)
+  return entry.area_id ?? (entry.device_id ? hass.devices[entry.device_id]?.area_id ?? undefined : undefined) ?? sceneAreaId(hass, entityId)
+}
+
+/**
+ * A scene without a room of its own belongs where everything it sets is: "Schlafzimmer Lichter AUS" switches
+ * the bedroom's lights only. A scene across rooms has no room and stays on Home.
+ */
+function sceneAreaId(hass: HomeAssistant, entityId: string): string | undefined {
+  if (domainOf(entityId) !== 'scene') return undefined
+  const members = hass.states[entityId]?.attributes.entity_id
+  if (!Array.isArray(members) || !members.length) return undefined
+  const areas = new Set(members.map(id => typeof id === 'string' && domainOf(id) !== 'scene' ? entityAreaId(hass, id) : undefined))
+  const [only] = areas
+  return areas.size === 1 ? only : undefined
 }
 
 /** Whether the entity, its device or its area carries one of the labels. */

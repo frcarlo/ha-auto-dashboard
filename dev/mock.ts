@@ -16,6 +16,8 @@ const defs: Def[] = [
   ['cover.wohnzimmer_rollo', 'open', { friendly_name: 'Wohnzimmer Rollo', current_position: 70 }, 'wohnzimmer'],
   ['switch.wohnzimmer_steckdose', 'off', { friendly_name: 'Wohnzimmer Steckdose', device_class: 'outlet' }, 'wohnzimmer'],
   ['scene.wohnzimmer_kino', new Date(Date.now() - 2 * 3600_000).toISOString(), { friendly_name: 'Wohnzimmer Kino' }, 'wohnzimmer'],
+  // No room of its own: it sets the kitchen's lights only, so it belongs to the kitchen
+  ['scene.kuche_hell', new Date(Date.now() - 5 * 86400_000).toISOString(), { friendly_name: 'Küche hell', entity_id: ['light.kuche', 'light.kuche_theke'] }, null as unknown as string],
   ['scene.esszimmer_abendessen', new Date(Date.now() - 26 * 3600_000).toISOString(), { friendly_name: 'Abendessen', icon: 'mdi:silverware-fork-knife' }, 'esszimmer'],
 
   ['light.kuche', 'off', { friendly_name: 'Küche Licht', supported_color_modes: ['brightness'] }, 'kuche'],

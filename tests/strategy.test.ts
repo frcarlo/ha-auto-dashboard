@@ -198,6 +198,16 @@ describe('room page, favorites and scenes', () => {
     expect(lights!.entities).toHaveLength(2)
   })
 
+  it('a room page opens with its scenes as a row of buttons, a scene without a room in the room of its lights', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
+    const kitchen = cards(views.find(v => v.path === 'area-kuche')!)
+    const row = kitchen.find(c => c.type === 'custom:ad-scenes')
+    expect(row).toMatchObject({ entities: ['scene.kuche_hell'] })
+    // Before the lights, and no tile of its own
+    expect(kitchen.indexOf(row!)).toBeLessThan(kitchen.findIndex(c => c.type === 'custom:ad-group-heading' && c.title === 'Licht'))
+    expect(kitchen.some(c => c.type === 'custom:ad-tile' && c.entity === 'scene.kuche_hell')).toBe(false)
+  })
+
   it('lights, covers and security list what happened today beside the tiles; climate does not', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     for (const path of ['lights', 'covers', 'security']) {
@@ -251,7 +261,7 @@ describe('room page, favorites and scenes', () => {
     const home = cards(views[0]!)
     const tiles = home.filter(c => c.type === 'custom:ad-tile').map(c => c.entity)
     expect(tiles).toEqual(['light.flur', 'script.gute_nacht'])
-    expect(home.find(c => c.type === 'custom:ad-scenes')!.entities).toEqual(['scene.esszimmer_abendessen', 'scene.wohnzimmer_kino'])
+    expect(home.find(c => c.type === 'custom:ad-scenes')!.entities).toEqual(['scene.esszimmer_abendessen', 'scene.kuche_hell', 'scene.wohnzimmer_kino'])
     const flur = cards(views.find(v => v.path === 'area-flur')!)
     expect(flur.filter(c => c.entity === 'light.flur')).toHaveLength(2)
   })

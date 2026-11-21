@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices, entityAreaId } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -282,6 +282,19 @@ describe('favorites and scenes', () => {
     expect(sceneEntities(hass, undefined).map(e => e.entity_id)).toEqual(['scene.a', 'scene.b'])
     expect(sceneEntities(hass, undefined, { domains: ['scene'] })).toEqual([])
     expect(sceneEntities(hass, ['script.s', 'light.flur']).map(e => e.entity_id)).toEqual(['script.s'])
+  })
+
+  it('puts a scene without a room where everything it sets is, and one across rooms nowhere', () => {
+    const hass = fakeHass()
+    hass.states['light.flur_2'] = st('light.flur_2', 'off')
+    hass.entities['light.flur_2'] = { entity_id: 'light.flur_2', area_id: 'flur' }
+    hass.states['scene.flur'] = st('scene.flur', '2026-01-01T00:00:00Z', { entity_id: ['light.flur', 'light.flur_2'] })
+    hass.states['scene.haus'] = st('scene.haus', '2026-01-01T00:00:00Z', { entity_id: ['light.flur', 'light.kueche'] })
+    hass.entities['scene.flur'] = { entity_id: 'scene.flur' }
+    hass.entities['scene.haus'] = { entity_id: 'scene.haus' }
+    expect(entityAreaId(hass, 'scene.flur')).toBe('flur')
+    expect(entityAreaId(hass, 'scene.haus')).toBeUndefined()
+    expect(areaEntities(hass, 'flur').map(e => e.entity_id)).toContain('scene.flur')
   })
 })
 
