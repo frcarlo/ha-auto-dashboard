@@ -3,7 +3,7 @@ import { normalizeConfig } from './config'
 import { currentDashboard, dashboardTitle, faceFor, loadPersonal, personalAllowed, withPersonal } from './personal'
 import { t, type Key } from './i18n'
 import {
-  SECURITY_GROUPS, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities, isRoomFavorite,
+  SECURITY_GROUPS, GROUP_ORDER, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities, isRoomFavorite,
   floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, socketReadings, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
@@ -332,6 +332,13 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     const room = config.rooms?.[area.area_id] ?? {}
     // Own cards are plain Lovelace configs, passed through untouched
     const own = (slot: CardSlot) => room.cards?.[slot] ?? []
+    // The TV leads the room's media, before the speakers; a room with a TV and nothing else to play gets the group for it
+    const tvCards: Card[] = tvs.filter(tv => tv.area === area.area_id).map(tv => ({ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }))
+    const groups = arrangeRoom(groupEntities(areaEntities(hass, area.area_id, hide).filter(e => !claimed.has(e.entity_id))), room)
+    if (tvCards.length && !groups.some(([key]) => key === 'media') && !room.hide_groups?.includes('media')) {
+      const at = groups.findIndex(([key]) => GROUP_ORDER.indexOf(key) > GROUP_ORDER.indexOf('media'))
+      groups.splice(at < 0 ? groups.length : at, 0, ['media', []])
+    }
     return [
       ...ownSections(own('top')),
       ...favoritesSection(favorites.filter(e => entityAreaId(hass, e.entity_id) === area.area_id).map(e => tile(e, area.name)), true),
@@ -341,7 +348,6 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         cards: [{ type: 'custom:ad-group-heading', title: t(hass, 'timetable'), entities: [], ...look }, schoolCard(s, true)],
       })),
       ...cameraInfos.filter(c => c.area === area.area_id).map((c): Section => ({ type: 'grid', cards: [cameraCard(hass.states[c.entity]!, area.name, c.name)] })),
-      ...tvs.filter(tv => tv.area === area.area_id).map((tv): Section => ({ type: 'grid', cards: [{ type: 'custom:ad-tv', tv, apps: tvApps(config.tv_apps), ...look }] })),
       ...(appliances.some(a => a.area === area.area_id) ? [{
         type: 'grid' as const,
         cards: [
@@ -349,12 +355,12 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           ...appliances.filter(a => a.area === area.area_id).map(a => applianceCard(a)),
         ],
       }] : []),
-      ...arrangeRoom(groupEntities(areaEntities(hass, area.area_id, hide).filter(e => !claimed.has(e.entity_id))), room).map(([key, entities]): Section => ({
+      ...groups.map(([key, entities]): Section => ({
         type: 'grid',
         // Scenes and scripts as the row of buttons Home has, with when each last ran
         cards: key === 'scene'
           ? [groupHeading(t(hass, 'group.scene'), []), { type: 'custom:ad-scenes', entities: entities.map(e => e.entity_id), ...look }, ...own(key)]
-          : [groupHeading(t(hass, `group.${key}`), entities), ...entities.map(e => tile(e, area.name)), ...own(key)],
+          : [groupHeading(t(hass, `group.${key}`), entities), ...(key === 'media' ? tvCards : []), ...entities.map(e => tile(e, area.name)), ...own(key)],
       })),
       ...ownSections(own('bottom')),
     ]

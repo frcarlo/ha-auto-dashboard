@@ -582,6 +582,20 @@ describe('appliances and TVs', () => {
     expect(living.filter(c => c.type === 'custom:ad-tv').map(c => c.tv.entity)).toEqual(['media_player.tv_wohnzimmer'])
     expect(living.filter(c => c.type === 'custom:ad-tile').map(c => c.entity).filter(id => id.includes('tv_wohnzimmer'))).toEqual([])
   })
+
+  it('puts the TV first in the media of its room, and gives a room with only a TV a media group for it', async () => {
+    const sectionsOf = (view: Record<string, any>) => view.sections as { cards: Record<string, any>[] }[]
+    const hass = createHass(true)
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, hass)
+    const media = sectionsOf(views.find(v => v.path === 'area-wohnzimmer')!).find(s => s.cards[0]?.title === 'Medien')!
+    expect(media.cards[1]).toMatchObject({ type: 'custom:ad-tv' })
+    expect(media.cards.slice(2).every(c => c.type === 'custom:ad-tile')).toBe(true)
+    // Without the speakers, the TV still sits under its heading
+    const only = await generateDashboard({ type: 'custom:auto-dashboard', hide_entities: Object.keys(hass.states).filter(id => id.startsWith('media_player.') && !id.startsWith('media_player.tv_')) }, hass)
+    const alone = sectionsOf(only.views.find(v => v.path === 'area-wohnzimmer')!).find(s => s.cards.some(c => c.type === 'custom:ad-tv'))!
+    expect(alone.cards.map(c => c.type)).toEqual(['custom:ad-group-heading', 'custom:ad-tv'])
+    expect(alone.cards[0]).toMatchObject({ title: 'Medien' })
+  })
 })
 
 describe('calendar page', () => {
