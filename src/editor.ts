@@ -5,7 +5,7 @@ import { keyed } from 'lit/directives/keyed.js'
 import { cleanConfig, normalizeConfig } from './config'
 import { findSchools } from './school'
 import { CO2_LIMIT, co2Sensors } from './events'
-import { HIDE_LABEL, haAreaOrder, hideOf, isRoomFavorite, replaceFavorites } from './model'
+import { HIDE_LABEL, haAreaOrder, hideOf, isRoomFavorite, orderedFloors, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
 import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
 import { entityName } from './presentation'
@@ -22,7 +22,7 @@ import { house, houseStyles, type RoomMark } from './editor-house'
 import { t, type Key } from './i18n'
 import { accessOf, ruleFor } from './access'
 import { currentDashboard, dashboardTitle, loadPersonal, personalAllowed, savePersonal, type PersonalSettings } from './personal'
-import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FaceStyle, HomeAssistant, NavPosition, OwnCardsPage, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
+import type { Access, ApplianceConfig, PopupRule, AreaRegistryEntry, FaceConfig, FloorRegistryEntry, FaceStyle, HomeAssistant, NavPosition, OwnCardsPage, PagePath, StatusChip, StrategyConfig, ThemeMode, UserRule } from './types'
 import { scrollRow } from './scroll-row'
 
 interface HaUser {
@@ -165,6 +165,9 @@ export class AdStrategyEditor extends LitElement {
     .order { display: flex; flex-direction: column; gap: 2px; }
     .order div { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; }
     .order span { flex: 1; }
+    .order .order-floor { font-weight: 600; margin-top: 8px; }
+    .order .order-floor:first-child { margin-top: 0; }
+    .order .order-room { padding-left: 14px; }
     .icon-btn { all: unset; cursor: pointer; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; opacity: 0.7; }
     .icon-btn:hover { background: var(--secondary-background-color, rgba(127, 127, 127, 0.15)); opacity: 1; }
     .icon-btn[disabled] { opacity: 0.2; pointer-events: none; }
@@ -570,6 +573,8 @@ export class AdStrategyEditor extends LitElement {
           ${this.field(this.l('ed.warnings'), this.entityPicker(c.weather_warnings, ['binary_sensor', 'sensor'], weather_warnings => this.change({ weather_warnings })), this.l('ed.warnings_hint'))}
           ${this.field(this.l('ed.forecast_days'), html`<div class="seg" role="group">${[0, 3, 5, 7].map(n => html`
             <button aria-pressed=${(c.forecast_days ?? 3) === n} @click=${() => this.change({ forecast_days: n })}>${n}</button>`)}</div>`)}`)}
+        ${this.section('mdi:lightning-bolt-outline', this.l('energy'), this.field(this.l('ed.house_power'),
+          this.singleEntityPicker(c.house_power, 'sensor', house_power => this.change({ house_power }), ['power']), this.l('ed.house_power_hint')))}
         ${this.section('mdi:washing-machine', this.l('appliances'), this.renderAppliances())}`
   }
 
@@ -664,13 +669,24 @@ export class AdStrategyEditor extends LitElement {
 
   private renderHouse() {
     const c = this.config
+    // The rooms by floor, as the dashboard shows them: a room moves within its floor, a floor as a whole
     const ordered = this.orderedAreas
-    const move = (index: number, by: number) => {
-      const ids = ordered.map(a => a.area_id)
-      const [id] = ids.splice(index, 1)
-      ids.splice(index + by, 0, id!)
-      this.change({ area_order: ids })
+    const groups: { floor?: FloorRegistryEntry; areas: AreaRegistryEntry[] }[] = [
+      ...orderedFloors(this.hass!, c.floor_order).map(floor => ({ floor, areas: ordered.filter(a => a.floor_id === floor.floor_id) })),
+      { areas: ordered.filter(a => !a.floor_id || !this.hass!.floors?.[a.floor_id]) },
+    ].filter(g => g.areas.length)
+    const swap = <T>(list: T[], index: number, by: number) => {
+      const next = [...list]
+      const [item] = next.splice(index, 1)
+      next.splice(index + by, 0, item!)
+      return next
     }
+    const moveRoom = (g: number, index: number, by: number) => this.change({
+      area_order: groups.flatMap((group, i) => (i === g ? swap(group.areas, index, by) : group.areas).map(a => a.area_id)),
+    })
+    const floorIds = groups.flatMap(g => (g.floor ? [g.floor.floor_id] : []))
+    const moveFloor = (index: number, by: number) => this.change({ floor_order: swap(floorIds, index, by) })
+    const headings = groups.length > 1 || !!groups[0]?.floor
     const key = TOOL_KEYS[this.tool]
     const toggleIn = (list: string[] | undefined, id: string) => (list ?? []).includes(id) ? (list ?? []).filter(x => x !== id) : [...(list ?? []), id]
     const faded = (id: string) => !!(c.areas?.length && !c.areas.includes(id))
@@ -685,7 +701,7 @@ export class AdStrategyEditor extends LitElement {
           [['hide', 'ed.tool_hide'], ['outdoor', 'ed.tool_outdoor'], ['only', 'ed.tool_only']], this.tool, tool => (this.tool = tool))}
           <span class="hint tool-hint">${this.l(`ed.tool_${this.tool}_hint` as Key)}</span>
           ${house({
-            hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel, marks,
+            hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel, marks, floorOrder: c.floor_order,
             active: TOOL_MARKS[this.tool], faded,
             onRoom: id => this.change({ [key]: toggleIn(c[key], id) }),
             // Storeys narrow the dashboard to whole floors, whatever tool is active
@@ -698,14 +714,25 @@ export class AdStrategyEditor extends LitElement {
             DOMAINS.map(d => ({ id: d, label: this.l(`dom.${d}`) })), c.hide_domains, hide_domains => this.change({ hide_domains })))}
           ${this.labelOptions.length ? this.field(this.l('ed.hide_labels'), this.chips(
             this.labelOptions, c.hide_labels, hide_labels => this.change({ hide_labels })), this.l('ed.hide_labels_hint')) : nothing}`)}
-        ${this.section('mdi:sort', this.l('ed.order'), this.field('', html`<div class="order">
-          ${ordered.map((area, i) => html`<div>
-            <span>${area.name}</span>
-            <button class="icon-btn" aria-label="↑" ?disabled=${i === 0} @click=${() => move(i, -1)}>↑</button>
-            <button class="icon-btn" aria-label="↓" ?disabled=${i === ordered.length - 1} @click=${() => move(i, 1)}>↓</button>
-          </div>`)}
-          ${c.area_order?.length ? html`<button class="link" @click=${() => this.change({ area_order: undefined })}>${this.l('ed.reset')}</button>` : nothing}
-        </div>`))}`
+        ${this.section('mdi:sort', this.l(headings ? 'ed.order_floors' : 'ed.order'), this.field('', html`<div class="order">
+          ${groups.map((group, g) => {
+            const f = group.floor ? floorIds.indexOf(group.floor.floor_id) : -1
+            return html`
+            ${headings ? html`<div class="order-floor">
+              <span>${group.floor?.name ?? this.l('other_rooms')}</span>
+              ${group.floor ? html`
+                <button class="icon-btn" aria-label="${group.floor.name} ↑" ?disabled=${f === 0} @click=${() => moveFloor(f, -1)}>↑</button>
+                <button class="icon-btn" aria-label="${group.floor.name} ↓" ?disabled=${f === floorIds.length - 1} @click=${() => moveFloor(f, 1)}>↓</button>` : nothing}
+            </div>` : nothing}
+            ${group.areas.map((area, i) => html`<div class=${headings ? 'order-room' : ''}>
+              <span>${area.name}</span>
+              <button class="icon-btn" aria-label="${area.name} ↑" ?disabled=${i === 0} @click=${() => moveRoom(g, i, -1)}>↑</button>
+              <button class="icon-btn" aria-label="${area.name} ↓" ?disabled=${i === group.areas.length - 1} @click=${() => moveRoom(g, i, 1)}>↓</button>
+            </div>`)}`
+          })}
+          ${c.area_order?.length || c.floor_order?.length
+            ? html`<button class="link" @click=${() => this.change({ area_order: undefined, floor_order: undefined })}>${this.l('ed.reset')}</button>` : nothing}
+        </div>`, headings ? this.l('ed.order_hint') : undefined))}`
   }
 
   /** The status chips by the name they carry; the lessons chip only with pupils in the house */
@@ -752,7 +779,7 @@ export class AdStrategyEditor extends LitElement {
       ${this.toggle(this.l('ed.settings_allowed'), rule.settings !== false, on => this.changeRule(key, { settings: on ? undefined : false }))}
       <span class="hint">${this.l('ed.settings_allowed_hint')}</span>
       ${this.field(this.l('ed.rule_rooms'), house({
-        hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel,
+        hass: this.hass!, outsideLabel: this.l('other_rooms'), markLabel: this.markLabel, floorOrder: this.config.floor_order,
         marks: id => rule.areas?.includes(id) ? ['only'] : [],
         onRoom: id => this.changeRule(key, { areas: rule.areas?.includes(id) ? rule.areas.filter(x => x !== id) : [...(rule.areas ?? []), id] }),
         onFloor: id => this.changeRule(key, { floors: rule.floors?.includes(id) ? rule.floors.filter(x => x !== id) : [...(rule.floors ?? []), id] }),

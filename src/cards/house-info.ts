@@ -4,7 +4,7 @@
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { averageClimate, entityIndex, hideOf, housePower, roomPower, sourceIds, type PowerSources } from '../model'
+import { averageClimate, entityIndex, hideOf, housePower, meterSensors, roomPower, sourceIds, type PowerSources } from '../model'
 import { formatVolume, loadUsage, meterFlow, meterUnit, usageFresh, usageOf, type Meter } from '../meters'
 import { tokens } from '../styles/tokens'
 import { METER_ICONS } from './meters'
@@ -121,7 +121,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
 
   protected render() {
     const c = this.config!
-    const rooms = roomPower(this.hass!, this.areas(c.areas), this.hide)
+    const rooms = roomPower(this.hass!, this.areas(c.areas), this.hide, meterSensors(this.hass!, c.power_sources))
     // HA's energy settings know the whole house; the rooms' sum misses what has no own sensor
     const house = housePower(this.hass!, c.power_sources)
     const watts = house?.total ?? rooms.reduce((sum, room) => sum + room.total, 0)

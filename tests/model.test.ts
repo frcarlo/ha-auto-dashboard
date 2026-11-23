@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { HassEntity, HomeAssistant } from '../src/types'
-import { areaEntities, arrangeRoom, averageClimate, housePower, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices, entityAreaId, timerLeft } from '../src/model'
+import { areaEntities, arrangeRoom, averageClimate, housePower, meterSensors, orderedFloors, powerSources, batteryEntities, bulkControl, coverKind, powerW, roomPower, favoriteEntities, isRoomFavorite, replaceFavorites, floorsWithAreas, groupEntities, homeStatus, isOutlet, isScreenLight, groupOf, quickGroups, roomSummary, sceneEntities, unavailableDevices, entityAreaId, timerLeft } from '../src/model'
 import { entityIcon, shortName, stateColor } from '../src/presentation'
 import { PALETTE_VARS, haGlassVars, haThemeVars, paletteVars, parseHex } from '../src/styles/palette'
 
@@ -103,6 +103,16 @@ describe('floorsWithAreas', () => {
     const groups = floorsWithAreas(fakeHass(), { area_order: ['wohnzimmer'], hide_areas: ['flur'] })
     expect(groups[0]!.areas.map(a => a.area_id)).toEqual(['wohnzimmer', 'kueche'])
     expect(groups).toHaveLength(1)
+  })
+
+  it('puts floors in floor_order first, the others by level behind them', () => {
+    const hass = fakeHass()
+    hass.floors!.kg = { floor_id: 'kg', name: 'Keller', level: -1 }
+    expect(orderedFloors(hass).map(f => f.floor_id)).toEqual(['og', 'eg', 'kg'])
+    expect(orderedFloors(hass, ['kg']).map(f => f.floor_id)).toEqual(['kg', 'og', 'eg'])
+    hass.states['light.bad'] = st('light.bad', 'on')
+    hass.entities['light.bad'] = { entity_id: 'light.bad', area_id: 'bad' }
+    expect(floorsWithAreas(hass, { floor_order: ['eg', 'og'] }).map(g => g.floor?.floor_id ?? null)).toEqual(['eg', 'og', null])
   })
 })
 
@@ -436,6 +446,32 @@ describe('energy settings', () => {
     expect(powerSources(h, { energy_sources: [
       { type: 'grid', stat_rate: 'sensor.grid' }, { type: 'grid', stat_rate: 'sensor.gone1' }, { type: 'grid', stat_rate: 'sensor.gone2' },
     ] })).toBeUndefined()
+  })
+
+  it("takes the dashboard's own house meter before the energy settings", () => {
+    const prefs = { energy_sources: [{ type: 'grid', stat_rate: 'sensor.grid' }] }
+    expect(powerSources(hass(), prefs, 'sensor.house')).toEqual({ home: ['sensor.house'] })
+    expect(powerSources(hass(), prefs, 'sensor.gone')).toEqual({ grid: ['sensor.grid'] })
+  })
+
+  it('reads grid power from the list older HA versions keep it in', () => {
+    expect(powerSources(hass(), { energy_sources: [{ type: 'grid', power: [{ stat_rate: 'sensor.grid' }] }, { type: 'solar', stat_rate: 'sensor.pv' }] }))
+      .toEqual({ grid: ['sensor.grid'], solar: ['sensor.pv'] })
+  })
+
+  it('leaves the meter and the other power sensors of its device out of the rooms', () => {
+    const h = hass()
+    const watt = (id: string, w: string) => (h.states[id] = st(id, w, { device_class: 'power', unit_of_measurement: 'W' }))
+    watt('sensor.p1_power', '1500')
+    watt('sensor.p1_phase_l1', '600')
+    watt('sensor.tv', '80')
+    h.entities['sensor.p1_power'] = { entity_id: 'sensor.p1_power', device_id: 'p1', area_id: 'kueche' }
+    h.entities['sensor.p1_phase_l1'] = { entity_id: 'sensor.p1_phase_l1', device_id: 'p1', area_id: 'kueche' }
+    h.entities['sensor.tv'] = { entity_id: 'sensor.tv', area_id: 'wohnzimmer' }
+    const skip = meterSensors(h, { home: ['sensor.p1_power'] })
+    expect([...skip].sort()).toEqual(['sensor.p1_phase_l1', 'sensor.p1_power'])
+    const rooms = roomPower(h, [h.areas.kueche!, h.areas.wohnzimmer!], {}, skip)
+    expect(rooms.map(r => [r.area.area_id, r.total])).toEqual([['wohnzimmer', 80]])
   })
 
   it('the house is the home sensor, else grid + solar + battery', () => {

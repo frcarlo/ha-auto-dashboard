@@ -547,7 +547,7 @@ const extras: HassEntity[] = [
   { entity_id: 'script.gute_nacht', state: 'off', attributes: { friendly_name: 'Gute Nacht', icon: 'mdi:weather-night', last_triggered: new Date(Date.now() - 15 * 3600_000).toISOString() } },
   { entity_id: 'sensor.kuche_fenster_batterie', state: '34', attributes: { friendly_name: 'Küche Fenster Batterie', device_class: 'battery', unit_of_measurement: '%' } },
   { entity_id: 'update.zigbee_router', state: 'on', attributes: { friendly_name: 'Zigbee Router Firmware', installed_version: '1.2.0', latest_version: '1.3.1' } },
-  { entity_id: 'sensor.netz_leistung', state: '1.42', attributes: { friendly_name: 'Netz Leistung', device_class: 'power', unit_of_measurement: 'kW' } },
+  { entity_id: 'sensor.netz_leistung', state: '4.12', attributes: { friendly_name: 'Netz Leistung', device_class: 'power', unit_of_measurement: 'kW' } },
   { entity_id: 'sensor.pv_leistung', state: '860', attributes: { friendly_name: 'PV Leistung', device_class: 'power', unit_of_measurement: 'W' } },
   { entity_id: 'person.frank', state: 'home', attributes: { friendly_name: 'Frank Carlo', device_trackers: ['device_tracker.pixel_8', 'device_tracker.iphone_15', 'device_tracker.pixel_watch_4'] } },
   { entity_id: 'person.leni', state: 'not_home', attributes: { friendly_name: 'Leni', device_trackers: ['device_tracker.galaxy_a35'] } },

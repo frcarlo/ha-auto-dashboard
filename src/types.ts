@@ -238,6 +238,8 @@ export interface StrategyConfig extends Look {
   users?: Record<string, UserRule>
   hide_areas?: string[]
   area_order?: string[]
+  /** Floor ids in the order the dashboard shows them; the others follow by level */
+  floor_order?: string[]
   hide_domains?: string[]
   /** Label ids: entities, devices and areas with one of them are left out */
   hide_labels?: string[]
@@ -258,6 +260,8 @@ export interface StrategyConfig extends Look {
   background_image?: string
   /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */
   outdoor_areas?: string[]
+  /** The power sensor for the whole house's consumption (e.g. a P1 meter); unset = HA's energy settings */
+  house_power?: string
   /** Weather on Home; unset = the first weather entity, hide_domains: [weather] hides it */
   weather_entity?: string
   /** Warning entities shown with the weather: NINA binary sensors, a DWD warnings sensor, or any on/off */

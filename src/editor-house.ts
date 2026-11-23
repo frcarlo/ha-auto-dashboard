@@ -1,8 +1,9 @@
 // The house as a cross-section for picking rooms in the editor: a roof, the floors as storeys
-// (highest on top), each room a field inside its storey, rooms without a floor outside on the ground.
+// (in the dashboard's order, else highest on top), each room a field inside its storey, rooms without a floor outside on the ground.
 // A room draws its role (hidden, outdoor, shown, picked) right where it is, so one picture replaces
 // the separate room lists that were easy to mix up.
 import { css, html, nothing, type TemplateResult } from 'lit'
+import { orderedFloors } from './model'
 import type { AreaRegistryEntry, FloorRegistryEntry, HomeAssistant } from './types'
 
 export type RoomMark = 'hidden' | 'outdoor' | 'only' | 'picked'
@@ -24,6 +25,8 @@ export interface HouseOptions {
   onFloor?: (floorId: string) => void
   floorPressed?: (floorId: string) => boolean
   outsideLabel: string
+  /** The dashboard's floor order; the storeys follow it top to bottom */
+  floorOrder?: string[]
   /**
    * The tool in use: only its mark is drawn in full, the others as small icons. Otherwise a room picked
    * with one tool looks just as picked under every other tool.
@@ -33,17 +36,16 @@ export interface HouseOptions {
   faded?: (areaId: string) => boolean
 }
 
-function storeys(hass: HomeAssistant) {
+function storeys(hass: HomeAssistant, floorOrder?: string[]) {
   const areas = Object.values(hass.areas).sort((a, b) => a.name.localeCompare(b.name))
-  const floors: FloorRegistryEntry[] = Object.values(hass.floors ?? {})
-    .sort((a, b) => (b.level ?? -Infinity) - (a.level ?? -Infinity) || a.name.localeCompare(b.name))
+  const floors = orderedFloors(hass, floorOrder)
   const inside = floors.map(floor => ({ floor, areas: areas.filter(a => a.floor_id === floor.floor_id) })).filter(s => s.areas.length)
   const outside = areas.filter(a => !a.floor_id || !hass.floors?.[a.floor_id])
   return { inside, outside }
 }
 
 export function house(o: HouseOptions): TemplateResult {
-  const { inside, outside } = storeys(o.hass)
+  const { inside, outside } = storeys(o.hass, o.floorOrder)
   const room = (area: AreaRegistryEntry) => {
     const marks = o.marks(area.area_id)
     const full = o.active ? marks.filter(m => m === o.active) : marks

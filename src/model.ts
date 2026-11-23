@@ -247,7 +247,7 @@ export interface FloorGroup {
 /** Areas with at least one visible entity, grouped by floor (highest level first, as in a house). */
 export function floorsWithAreas(
   hass: HomeAssistant,
-  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'hide_domains' | 'hide_labels' | 'hide_entities' | 'areas' | 'floors'> = {},
+  config: Pick<StrategyConfig, 'hide_areas' | 'area_order' | 'floor_order' | 'hide_domains' | 'hide_labels' | 'hide_entities' | 'areas' | 'floors'> = {},
 ): FloorGroup[] {
   const order = config.area_order ?? []
   const rank = (area: AreaRegistryEntry) => {
@@ -263,8 +263,7 @@ export function floorsWithAreas(
     .filter(area => areaEntities(hass, area.area_id, hideOf(config)).some(e => groupOf(e)))
     .sort((a, b) => rank(a) - rank(b) || inHa(a.area_id) - inHa(b.area_id))
 
-  const floors = Object.values(hass.floors ?? {})
-    .sort((a, b) => (b.level ?? -Infinity) - (a.level ?? -Infinity) || a.name.localeCompare(b.name))
+  const floors = orderedFloors(hass, config.floor_order)
 
   const groups: FloorGroup[] = floors
     .map(floor => ({ floor, areas: areas.filter(area => area.floor_id === floor.floor_id) }))
@@ -272,6 +271,16 @@ export function floorsWithAreas(
   const floorless = areas.filter(area => !area.floor_id || !hass.floors?.[area.floor_id])
   if (floorless.length) groups.push({ areas: floorless })
   return groups
+}
+
+/** The floors in the dashboard's own order (floor_order), the others behind them highest level first, as in a house */
+export function orderedFloors(hass: HomeAssistant, order: string[] = []): FloorRegistryEntry[] {
+  const rank = (floor: FloorRegistryEntry) => {
+    const i = order.indexOf(floor.floor_id)
+    return i === -1 ? order.length : i
+  }
+  return Object.values(hass.floors ?? {})
+    .sort((a, b) => rank(a) - rank(b) || (b.level ?? -Infinity) - (a.level ?? -Infinity) || a.name.localeCompare(b.name))
 }
 
 /**
@@ -632,11 +641,15 @@ export interface RoomPower {
   sensors: { entity: HassEntity; watts: number }[]
 }
 
-/** Power per room, biggest room first. Rooms without a reading are left out. */
-export function roomPower(hass: HomeAssistant, areas: AreaRegistryEntry[], hide: Hide = {}): RoomPower[] {
+/**
+ * Power per room, biggest room first. Rooms without a reading are left out, and so are the house's meters
+ * (`skip`, from meterSensors): a P1 meter in the utility room is the house, not something the room uses.
+ */
+export function roomPower(hass: HomeAssistant, areas: AreaRegistryEntry[], hide: Hide = {}, skip: ReadonlySet<string> = new Set()): RoomPower[] {
   return areas
     .map(area => {
       const sensors = areaEntities(hass, area.area_id, hide)
+        .filter(entity => !skip.has(entity.entity_id))
         .map(entity => ({ entity, watts: powerW(entity) }))
         .filter((s): s is { entity: HassEntity; watts: number } => s.watts !== undefined)
         .sort((a, b) => b.watts - a.watts)
@@ -712,19 +725,25 @@ export interface PowerSources {
 }
 
 export interface EnergyPrefs {
-  energy_sources?: { type: string; stat_rate?: string }[]
+  /** Grid power sits in stat_rate in current HA, in a list under power in older versions */
+  energy_sources?: { type: string; stat_rate?: string; power?: { stat_rate?: string }[] }[]
 }
 
+type EnergySource = NonNullable<EnergyPrefs['energy_sources']>[number]
+const rates = (s: EnergySource) => (s.stat_rate ? [s.stat_rate] : (s.power ?? []).map(p => p.stat_rate).filter((id): id is string => !!id))
+
 /**
- * The power sensors HA's energy settings name, keeping only those that exist. Only an unambiguous setup counts:
+ * The power sensors that tell the house's consumption. The dashboard's own house meter (house_power) comes first;
+ * else those HA's energy settings name, keeping only those that exist. Only an unambiguous setup counts there:
  * a home sensor, or exactly one grid source with a power sensor (plus solar and battery). Several grid sources
  * with power sensors are usually single plugs entered as "grid", and their sum is not the house.
  */
-export function powerSources(hass: HomeAssistant, prefs: EnergyPrefs | undefined): PowerSources | undefined {
-  const sources = (prefs?.energy_sources ?? []).filter(s => s.stat_rate && ['home', 'grid', 'solar', 'battery'].includes(s.type))
+export function powerSources(hass: HomeAssistant, prefs: EnergyPrefs | undefined, housePowerId?: string): PowerSources | undefined {
+  if (housePowerId && hass.states[housePowerId]) return { home: [housePowerId] }
+  const sources = (prefs?.energy_sources ?? []).filter(s => rates(s).length && ['home', 'grid', 'solar', 'battery'].includes(s.type))
   // Counted before checking the sensors exist: four plugs entered as grid stay ambiguous even if three are gone
   const configured = (type: string) => sources.filter(s => s.type === type)
-  const existing = (type: string) => configured(type).map(s => s.stat_rate!).filter(id => hass.states[id])
+  const existing = (type: string) => configured(type).flatMap(rates).filter(id => hass.states[id])
   if (existing('home').length) return { home: existing('home') }
   if (configured('grid').length !== 1 || !existing('grid').length) return undefined
   const out: PowerSources = { grid: existing('grid') }
@@ -751,3 +770,17 @@ export function housePower(hass: HomeAssistant, sources?: PowerSources) {
 }
 
 export const sourceIds = (sources?: PowerSources) => Object.values(sources ?? {}).flat()
+
+/**
+ * The power sensors that measure the house rather than something in it: the sources themselves and every other
+ * power sensor on their devices (a P1 meter's phases and return, an inverter's strings). Rooms leave them out.
+ */
+export function meterSensors(hass: HomeAssistant, sources?: PowerSources): Set<string> {
+  const out = new Set<string>()
+  for (const id of sourceIds(sources)) {
+    out.add(id)
+    const device = hass.entities[id]?.device_id
+    if (device) deviceEntities(hass, device).filter(isPower).forEach(e => out.add(e.entity_id))
+  }
+  return out
+}

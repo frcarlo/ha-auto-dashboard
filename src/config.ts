@@ -46,7 +46,7 @@ export function cleanConfig(config: StrategyConfig): StrategyConfig {
 }
 
 const LIST_KEYS = [
-  'areas', 'floors', 'hide_pages', 'hide_areas', 'area_order', 'hide_domains', 'hide_labels', 'hide_entities',
+  'areas', 'floors', 'hide_pages', 'hide_areas', 'area_order', 'floor_order', 'hide_domains', 'hide_labels', 'hide_entities',
   'favorites', 'scenes', 'todo_lists', 'outdoor_areas', 'weather_warnings', 'calendars', 'tv_apps', 'hide_chips',
 ] as const
 const RULE_LIST_KEYS = ['areas', 'floors', 'hide_pages', 'hide_chips'] as const

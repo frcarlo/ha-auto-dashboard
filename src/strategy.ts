@@ -4,7 +4,7 @@ import { currentDashboard, dashboardTitle, faceFor, loadPersonal, personalAllowe
 import { t, type Key } from './i18n'
 import {
   SECURITY_GROUPS, GROUP_ORDER, allEntities, areaEntities, arrangeRoom, averageClimate, hideOf, bulkControl, coverKind, entityAreaId, favoriteEntities, isRoomFavorite,
-  floorsWithAreas, groupEntities, groupOf, isPower, powerSources, sceneEntities, socketReadings, type EnergyPrefs,
+  floorsWithAreas, groupEntities, groupOf, isPower, meterSensors, powerSources, sceneEntities, socketReadings, type EnergyPrefs,
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
@@ -174,11 +174,14 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   }
   // The energy settings know the house meter; without them (or without access) the rooms' sum stands in
   const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
-  const sources = powerSources(hass, prefs)
+  const sources = powerSources(hass, prefs, config.house_power)
   const sourceOpts = sources ? { power_sources: sources } : {}
+  // The meters themselves (and their phases) are the house, not a consumer in the room they sit in
+  const meterIds = meterSensors(hass, sources)
+  const consumer = (e: HassEntity) => isPower(e) && !meterIds.has(e.entity_id)
   // Gas and water: the meters HA's energy settings name, used today on Home, more on the energy page
   const meters = config.hide_domains?.includes('sensor') ? [] : meterSources(hass, prefs)
-  const hasPower = all.some(isPower) || !!sources
+  const hasPower = all.some(consumer) || !!sources
   const hasEnergy = pageAllowed('energy') && (hasPower || meters.length > 0)
   const hasMaintenance = pageAllowed('maintenance')
   // The weather card takes over outside (and the weather next to the clock); inside stays a tile next to power
@@ -512,13 +515,13 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(hasPower ? [fullWidth([{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }])] : []),
     // Gas and water side by side: today, this month, the cost, the flow and the last day per hour
     ...(meters.length ? [fullWidth([heading(t(hass, 'meter.heading'), 'mdi:gauge'), { type: 'custom:ad-meters', meters, ...look }])] : []),
-    ...pageGroups(area => areaEntities(hass, area.area_id, hide).some(isPower)).map((group): Section => {
+    ...pageGroups(area => areaEntities(hass, area.area_id, hide).some(consumer)).map((group): Section => {
       const cards = group.areas.flatMap(area => {
-        const sensors = areaEntities(hass, area.area_id, hide).filter(isPower)
+        const sensors = areaEntities(hass, area.area_id, hide).filter(consumer)
         // Card and graph each take the full row: HA packs sections densely and would otherwise
         // slide the next room's card next to this room's graph. The history graph needs no long-term statistics.
         return [
-          { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], wide: true, ...powerOpts },
+          { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], wide: true, ...sourceOpts, ...powerOpts },
           // The legend grows with the sensors; the plot keeps about four rows of its own
           { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: Math.min(10, 4 + Math.ceil(sensors.length / 2)) } },
         ]

@@ -73,7 +73,7 @@ Each one can be hidden with `hide_chips` (`warning`, `waste`, `birthday`, `parce
 
 **Weather:** Home has a weather card with temperature, condition, humidity, wind, pressure and visibility, and below it the next days with temperature bars. With `weather_sensors`, sensors at the house replace the forecast service's values: temperature, humidity, pressure, wind, wind direction, rain and illuminance. Next to a measured temperature the forecast service's value appears for comparison, so a sensor in the sun or inside stands out. A tap on a measured value opens its history. With `weather_warnings` severe weather warnings appear: NINA creates several `binary_sensor.warning_…` per region, and the card shows each active one with headline and end, otherwise "No warnings". The DWD warning sensor works too. The weather card replaces the "Outside" tile; "Inside" and "Power" sit next to it. If there is no weather entity or `weather` is in `hide_domains`, "Outside" appears as a tile again.
 
-**Inside, outside, power:** "Inside" is the average of all rooms, "Outside" the average of the areas in `outdoor_areas`. Outdoor areas don't count inside. "Power" comes from HA's energy settings when they are unambiguous: a house consumption sensor, otherwise exactly one grid source with a power sensor (plus solar and battery). Several grid sources with power sensors are usually single plugs and are ignored. The energy page then shows the three separately. Without these settings (or for users without access to them) "Power" is the sum of all power sensors (`device_class: power`) in the rooms; a main meter in a room then counts twice and can be hidden with a label.
+**Inside, outside, power:** "Inside" is the average of all rooms, "Outside" the average of the areas in `outdoor_areas`. Outdoor areas don't count inside. "Power" comes from the meter set as `house_power` (Settings → Home → Energy, e.g. a P1 meter). Without one it comes from HA's energy settings when they are unambiguous: a house consumption sensor, otherwise exactly one grid source with a power sensor (plus solar and battery). Several grid sources with power sensors are usually single plugs and are ignored. The energy page then shows the three separately. Without either (or for users without access to the energy settings) "Power" is the sum of all power sensors (`device_class: power`) in the rooms. The meter and the other power sensors of its device (phases, return) never count as a room's consumers. With a meter, the energy page also shows how much of the total the rooms' sensors measure and how much is left unmeasured.
 
 **People and alarm:** All visible `person` entities as avatars, greyed out when away, plus the first alarm panel as a chip (triggered red and blinking, armed blue, disarmed green). Hide them with `hide_domains: [person]` or `[alarm_control_panel]`, or the label `ad_hide`.
 
@@ -140,6 +140,7 @@ strategy:
   floors: [upstairs]       # only rooms on these floors
   hide_areas: [storage]
   area_order: [living_room, kitchen]   # otherwise as sorted in HA under Settings → Areas, per floor
+  floor_order: [ground_floor, upstairs] # otherwise highest level first
   hide_pages: [cameras]    # hide pages for everyone, admins included: lights | climate | covers | security | cameras | music | calendar | lists | energy | maintenance
   hide_domains: [fan, scene]
   hide_labels: [utility]   # label IDs, see below
@@ -147,6 +148,7 @@ strategy:
   scenes: [scene.movie, script.good_night]     # row on Home
   todo_lists: [todo.shopping_list]             # only these lists on the "Lists" page, otherwise all (new ones too)
   outdoor_areas: [garden]  # don't count for indoor climate; without a weather card their average is "Outside"
+  house_power: sensor.p1_power                   # the whole house's consumption; otherwise from HA's energy settings
   weather_entity: weather.forecast_home        # otherwise the first weather entity with a daily forecast
   weather_warnings: [binary_sensor.warning_muelheim_1]   # NINA sensors or the DWD warning sensor
   weather_sensors:         # own readings instead of the forecast service, all optional

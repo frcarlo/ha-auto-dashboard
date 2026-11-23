@@ -4,7 +4,7 @@ import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { formatWatts } from './house-info'
 import { t } from '../i18n'
-import { entityIndex, hideOf, housePower, roomPower, sourceIds, type PowerSources, type RoomPower } from '../model'
+import { entityIndex, hideOf, housePower, meterSensors, roomPower, sourceIds, type PowerSources, type RoomPower } from '../model'
 import { entityName, shortName } from '../presentation'
 import { tokens } from '../styles/tokens'
 import type { AreaRegistryEntry } from '../types'
@@ -37,6 +37,14 @@ export class AdPower extends BaseCard<PowerConfig> {
     .flows { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--ad-fs-s); }
     .flows span { display: inline-flex; align-items: center; gap: 4px; }
     .flows ha-icon { --mdc-icon-size: 16px; opacity: var(--ad-o2); }
+    .split { display: flex; flex-direction: column; gap: 4px; }
+    .split .bar { display: flex; height: 6px; }
+    .split .bar span + span { background: rgba(var(--ad-on-surface), 0.25); border-radius: 0 2px 2px 0; }
+    .split .bar span:first-child:not(:only-child) { border-radius: 2px 0 0 2px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: var(--ad-fs-s); }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--ad-warning)); }
+    .legend span + span i { background: rgba(var(--ad-on-surface), 0.25); }
     .flows small { font-size: var(--ad-fs-xs); opacity: var(--ad-o2); margin-left: 1px; }
     .rows { display: flex; flex-direction: column; gap: 8px; }
     .rowx { all: unset; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; cursor: pointer; font-size: var(--ad-fs-s); }
@@ -58,7 +66,7 @@ export class AdPower extends BaseCard<PowerConfig> {
 
   private get rooms(): RoomPower[] {
     const areas = this.config!.areas.map(id => this.hass!.areas[id]).filter((a): a is AreaRegistryEntry => !!a)
-    return roomPower(this.hass!, areas, hideOf(this.config!))
+    return roomPower(this.hass!, areas, hideOf(this.config!), meterSensors(this.hass!, this.config!.power_sources))
   }
 
   protected watched() {
@@ -100,12 +108,25 @@ export class AdPower extends BaseCard<PowerConfig> {
     const total = house?.total ?? rooms.reduce((sum, room) => sum + room.total, 0)
     const top = rooms[0]
     const flows = house ? (['grid', 'solar', 'battery'] as const).filter(k => house[k] !== undefined) : []
+    // With a meter for the house, how much of it the rooms' own sensors explain, and what is left unmeasured.
+    // Rooms well above the meter count something twice (a plug and the appliance on it): no split then, it would only confuse.
+    const measured = rooms.reduce((sum, room) => sum + room.total, 0)
+    const unmeasured = Math.max(0, total - measured)
+    const share = total > 0 ? Math.min(100, (measured / total) * 100) : 0
+    const split = !!house && rooms.length > 0 && total > 0 && measured <= total * 1.1
     return html`<div class="card">
       <div class="head">
         <span class="title"><ha-icon icon="mdi:home-lightning-bolt-outline"></ha-icon>${t(this.hass, 'whole_house')}</span>
         <span class="total">${this.watts(total)}</span>
       </div>
       ${flows.length ? html`<div class="flows">${flows.map(k => html`<span><ha-icon icon=${FLOW_ICONS[k]}></ha-icon>${t(this.hass, `flow.${k}`)} ${this.watts(house![k]!)}</span>`)}</div>` : nothing}
+      ${split ? html`<div class="split">
+        <span class="bar" role="img" aria-label="${t(this.hass, 'measured')} ${Math.round(share)} %"><span style="width:${share}%"></span>${unmeasured > 0 ? html`<span style="width:${100 - share}%"></span>` : nothing}</span>
+        <span class="legend">
+          <span><i></i>${t(this.hass, 'measured')} ${this.watts(measured)}</span>
+          <span><i></i>${t(this.hass, 'unmeasured')} ${this.watts(unmeasured)}</span>
+        </span>
+      </div>` : nothing}
       ${top ? html`<span class="top">${t(this.hass, 'top_room')}: ${top.area.name} · ${this.watts(top.total)}</span>
         ${this.rows(top, 3)}` : nothing}
     </div>`
