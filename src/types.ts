@@ -256,6 +256,8 @@ export interface StrategyConfig extends Look {
   todo_lists?: string[]
   /** With primary_color: false keeps HA's header, sidebar and dialogs in HA's theme */
   ha_colors?: boolean
+  /** false: no quick search (magnifier in the nav bar, "/" on a keyboard) */
+  search?: boolean
   /** Picture behind the cards: a URL like /local/garten.jpg or a media-source:// id from an upload; replaces the glass light */
   background_image?: string
   /** Areas outside the house (garden, terrace): their average is "outside", and they don't count indoors */

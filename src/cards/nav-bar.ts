@@ -10,6 +10,8 @@ import './face'
 import type { AdFace, FaceSettings } from './face'
 import { AdPopup } from './popup'
 import type { Popup } from '../popups'
+import { AdSpotlight } from './spotlight'
+import type { SearchSettings } from '../search'
 
 export interface NavItem {
   path: string
@@ -26,6 +28,8 @@ interface NavBarConfig extends BaseConfig {
   face?: FaceSettings
   /** Windows that open when something happens (the doorbell rings); carried by the bar for the same reason */
   popups?: Popup[]
+  /** The quick search behind the magnifier: the shown rooms and the dashboard's filters; unset hides it */
+  search?: SearchSettings
 }
 
 
@@ -45,6 +49,14 @@ const barStyles = css`
     -webkit-tap-highlight-color: transparent;
   }
   a ha-icon { --mdc-icon-size: 22px; }
+  /* The quick search: only a magnifier, so it takes less room than a page */
+  .search {
+    all: unset; box-sizing: border-box; flex: 0 0 48px; display: grid; place-items: center; border-radius: 20px; cursor: pointer;
+    color: rgba(var(--ad-on-surface), 0.55); -webkit-tap-highlight-color: transparent;
+  }
+  .search:hover { color: rgb(var(--ad-on-surface)); background: rgba(var(--ad-on-surface), 0.08); }
+  .search:focus-visible { outline: 2px solid rgb(var(--ad-primary)); }
+  .search ha-icon { --mdc-icon-size: 24px; }
   a[aria-current=page] { color: rgb(var(--ad-primary)); background: rgba(var(--ad-primary), 0.12); }
   /* On a phone the bar keeps five pages; the rest open above it from "More" */
   .sheet {
@@ -66,6 +78,7 @@ const barStyles = css`
     :host([pos=right]) { left: auto; right: 12px; }
     :host([pos=left]) nav, :host([pos=right]) nav { flex-direction: column; gap: 2px; }
     :host([pos=left]) a, :host([pos=right]) a { flex: none; width: 64px; padding: 8px 0; }
+    :host([pos=left]) .search, :host([pos=right]) .search { flex: none; width: 64px; height: 48px; }
   }
 `
 
@@ -124,6 +137,27 @@ function placePopup(config: NavBarConfig | undefined, hass: unknown) {
 
 /** The dashboard's popup element, for the dev harness */
 export const popupElement = () => popup
+
+/** The quick search, one for the dashboard; inside HA's tree like the popup, so the details dialog it opens reaches HA */
+let spotlight: AdSpotlight | undefined
+
+function placeSpotlight(config: NavBarConfig | undefined, hass: unknown) {
+  if (!config?.search) {
+    spotlight?.remove()
+    spotlight = undefined
+    return
+  }
+  if (!spotlight) {
+    if (!customElements.get('ad-spotlight')) customElements.define('ad-spotlight', AdSpotlight)
+    spotlight = document.createElement('ad-spotlight') as AdSpotlight
+    const ha = document.querySelector('home-assistant')?.shadowRoot
+    ;(ha ?? document.body).appendChild(spotlight)
+  }
+  const pages = config.items.map(({ path, icon, label }) => ({ path, icon, label }))
+  const next = { type: 'spotlight', search: config.search, pages, theme: config.theme, glass: config.glass, primary_color: config.primary_color, access: config.access }
+  if (JSON.stringify(spotlight.config) !== JSON.stringify(next)) spotlight.setConfig(next)
+  spotlight.hass = hass as AdSpotlight['hass']
+}
 
 let sidebarObserver: ResizeObserver | undefined
 
@@ -259,6 +293,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
         pad(undefined, undefined)
         placeFace(undefined, document.body, undefined)
         placePopup(undefined, undefined)
+        placeSpotlight(undefined, undefined)
       }
     }, 0)
   }
@@ -267,6 +302,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
   protected shouldUpdate(changed: Map<string | number | symbol, unknown>) {
     if (face && this.config?.face && changed.has('hass')) face.hass = this.hass
     if (popup && this.config?.popups && changed.has('hass')) popup.hass = this.hass
+    if (spotlight && this.config?.search && changed.has('hass')) spotlight.hass = this.hass
     return super.shouldUpdate(changed as never)
   }
 
@@ -299,6 +335,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     this.padView()
     placeFace(this.config.face, this, this.hass)
     placePopup(this.config, this.hass)
+    placeSpotlight(this.config, this.hass)
     // A bare dashboard URL shows the first view
     const active = currentView() || this.config.items[0]?.path
     const dashboard = location.pathname.split('/')[1]
@@ -323,6 +360,10 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
           @click=${(e: Event) => { e.preventDefault(); moreOpen = !moreOpen; this.paint() }}>
           <ha-icon icon="mdi:dots-horizontal"></ha-icon>${t(this.hass, 'more')}
         </a>` : ''}
+        ${this.config.search ? html`<button class="search" aria-label=${t(this.hass, 'search.open')} title="${t(this.hass, 'search.open')} (/)"
+          @click=${() => { moreOpen = false; this.paint(); spotlight?.show() }}>
+          <ha-icon icon="mdi:magnify"></ha-icon>
+        </button>` : ''}
       </nav>`, bar.shadowRoot)
   }
 

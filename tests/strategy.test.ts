@@ -515,6 +515,16 @@ describe('room settings, own cards and energy settings', () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard', primary_color: '#14b8a6', ha_colors: false }, createHass(true))
     expect(cards(views[0]!).find(c => c.type === 'custom:ad-nav-bar')).toMatchObject({ ha_colors: false })
   })
+
+  it('gives the nav bar the shown rooms for the quick search, and search: false takes it away', async () => {
+    const { views } = await generateDashboard({ type: 'custom:auto-dashboard', areas: ['wohnzimmer', 'kuche'], hide_domains: ['camera'] }, createHass(true))
+    const search = cards(views[0]!).find(c => c.type === 'custom:ad-nav-bar')!.search
+    expect(search.rooms.map((r: any) => r.id).sort()).toEqual(['kuche', 'wohnzimmer'])
+    expect(search.areas.sort()).toEqual(['kuche', 'wohnzimmer'])
+    expect(search.hide).toMatchObject({ domains: ['camera'] })
+    const off = await generateDashboard({ type: 'custom:auto-dashboard', search: false }, createHass(true))
+    expect(cards(off.views[0]!).find(c => c.type === 'custom:ad-nav-bar')!.search).toBeUndefined()
+  })
 })
 
 describe('hand-written YAML', () => {

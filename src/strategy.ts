@@ -19,6 +19,7 @@ import { tvApps } from './tv-apps'
 import { glassBackground, imageBackground, isHexColor, pageBackground } from './styles/palette'
 import { printers } from './printers'
 import type { NavItem } from './cards/nav-bar'
+import type { SearchSettings } from './search'
 import type { FaceSettings } from './cards/face'
 import type { AreaRegistryEntry, CardSlot, HassEntity, HomeAssistant, OwnCardsPage, PagePath, StrategyConfig } from './types'
 
@@ -297,9 +298,17 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   } : undefined
   // Popups (the doorbell's camera and the door's buttons) open on every page, so the nav bar carries them like the face
   const popups = resolvePopups(hass, config.popups)
+  // The quick search finds the shown rooms and what the dashboard shows of the house; the bar opens it on every page
+  const search: SearchSettings | undefined = config.search === false ? undefined : {
+    rooms: floors.flatMap(g => g.areas.map(a => ({
+      id: a.area_id, name: a.name, ...(a.icon ? { icon: a.icon } : {}), ...(floors.length > 1 && g.floor ? { floor: g.floor.name } : {}),
+    }))),
+    ...(areaIds ? { areas: areaIds } : {}),
+    ...(Object.values(hide).some(v => v?.length) ? { hide } : {}),
+  }
   const nav = fullWidth([{
     type: 'custom:ad-nav-bar', items: navItems.filter(i => !ownHidden.has(i.path)), position, ...(config.ha_colors === false ? { ha_colors: false } : {}),
-    ...(face ? { face } : {}), ...(popups.length ? { popups } : {}), ...look,
+    ...(face ? { face } : {}), ...(popups.length ? { popups } : {}), ...(search ? { search } : {}), ...look,
   }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
