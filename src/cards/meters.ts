@@ -1,9 +1,10 @@
-// Gas and water on the energy page: today, this month, what gas cost today, the current flow, and the last day
-// as one bar per hour.
+// Gas and water on the energy page: today, this month, what gas cost today, the current flow, and bars for the last
+// day by the hour, or the last 7 or 30 days by the day.
 import { css, html, nothing } from 'lit'
 import { BaseCard, type BaseConfig } from './base'
 import { t } from '../i18n'
-import { formatVolume, loadUsage, meterFlow, meterPrice, meterUnit, usageFresh, usageOf, type Meter } from '../meters'
+import { RANGE_DAYS, daysFresh, daysOf, formatVolume, loadDays, loadUsage, meterFlow, meterPrice, meterUnit, usageFresh, usageOf, type Meter } from '../meters'
+import { onRange, rangeStyles, rangeSwitch, savedRange, setRange, type Range } from '../range'
 import { tokens } from '../styles/tokens'
 
 interface MetersConfig extends BaseConfig {
@@ -13,8 +14,13 @@ interface MetersConfig extends BaseConfig {
 export const METER_ICONS = { gas: 'mdi:fire', water: 'mdi:water' } as const
 
 export class AdMeters extends BaseCard<MetersConfig> {
-  static styles = [tokens, css`
+  static properties = { ...BaseCard.properties, range: { state: true } }
+  range: Range = savedRange('meters')
+  private stopRange?: () => void
+
+  static styles = [tokens, rangeStyles, css`
     :host { display: block; container-type: inline-size; }
+    .top { display: flex; justify-content: flex-end; margin: -4px 0 8px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
     .meter { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; height: auto; }
     .head { display: flex; align-items: center; gap: 10px; }
@@ -35,7 +41,9 @@ export class AdMeters extends BaseCard<MetersConfig> {
     .bars span { flex: 1; min-height: 2px; border-radius: 2px 2px 0 0; background: rgba(var(--ad-on-surface), 0.12); }
     .gas .bars span.used { background: rgba(var(--ad-warning), 0.75); }
     .water .bars span.used { background: rgba(var(--ad-info), 0.75); }
-    .axis { display: flex; justify-content: space-between; font-size: var(--ad-fs-xs); opacity: var(--ad-o3); font-variant-numeric: tabular-nums; }
+    .axis { display: flex; justify-content: space-between; gap: 2px; font-size: var(--ad-fs-xs); opacity: var(--ad-o3); font-variant-numeric: tabular-nums; }
+    .axis span { white-space: nowrap; }
+    .axis:has(span:nth-child(3)) span { flex: 1; text-align: center; }
     .empty { font-size: var(--ad-fs-s); opacity: var(--ad-o2); }
   `]
 
@@ -55,9 +63,33 @@ export class AdMeters extends BaseCard<MetersConfig> {
     return this.config!.meters.flatMap(m => [...m.meters, ...(m.rates ?? []), ...(m.price_entity ? [m.price_entity] : [])])
   }
 
+  connectedCallback() {
+    super.connectedCallback()
+    this.stopRange = onRange('meters', range => (this.range = range))
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    this.stopRange?.()
+  }
+
   protected updated() {
-    if (usageFresh(this.ids)) return
-    void loadUsage(this.hass!, this.ids).then(() => this.requestUpdate())
+    if (!usageFresh(this.ids)) void loadUsage(this.hass!, this.ids).then(() => this.requestUpdate())
+    const range = this.range
+    if (range !== 'day' && !daysFresh(this.ids, range)) void loadDays(this.hass!, this.ids, range).then(() => this.requestUpdate())
+  }
+
+  /** The bars of the chosen range: hours of the last day, or days; undefined while loading */
+  private bars(meter: Meter): [number, number][] | undefined {
+    return this.range === 'day' ? usageOf(meter.meters)?.hours : daysOf(meter.meters, this.range)
+  }
+
+  /** Under the bars and in their tooltips: the hour, the weekday, or the date */
+  private when(ms: number, full = false) {
+    const d = new Date(ms)
+    if (this.range === 'day') return d.toLocaleTimeString(this.loc, { hour: 'numeric' })
+    if (this.range === 'week' && !full) return d.toLocaleDateString(this.loc, { weekday: 'short' })
+    return d.toLocaleDateString(this.loc, full ? { weekday: 'short', day: 'numeric', month: 'numeric' } : { day: 'numeric', month: 'numeric' })
   }
 
   private get loc() {
@@ -74,8 +106,10 @@ export class AdMeters extends BaseCard<MetersConfig> {
     const usage = usageOf(meter.meters)
     const flow = meterFlow(hass, meter)
     const price = meterPrice(hass, meter)
-    const max = Math.max(...(usage?.hours.map(([, v]) => v) ?? [0]), 0)
-    const hour = (ms: number) => new Date(ms).toLocaleTimeString(this.loc, { hour: 'numeric' })
+    const bars = this.bars(meter)
+    const max = Math.max(...(bars?.map(([, v]) => v) ?? [0]), 0)
+    const vol = (v: number) => { const f = formatVolume(v, meterUnit(hass, meter), meter.kind, this.loc); return `${f.value} ${f.unit}` }
+    const range = this.range
     const money = (n: number) => new Intl.NumberFormat(this.loc, { style: 'currency', currency: hass.config?.currency ?? 'EUR' }).format(n)
     return html`<section class="card meter ${meter.kind}">
       <div class="head">
@@ -93,18 +127,22 @@ export class AdMeters extends BaseCard<MetersConfig> {
           </button>
           <div class="fig"><span class="k">${t(hass, 'meter.month')}</span><span class="v">${this.volume(meter, usage.month)}</span></div>
           ${price !== undefined ? html`<div class="fig"><span class="k">${t(hass, 'meter.cost_today')}</span><span class="v">${money(usage.today * price)}</span></div>` : nothing}
+          ${range !== 'day' && bars ? html`<div class="fig"><span class="k">${t(hass, 'meter.last_days', { n: RANGE_DAYS[range] })}</span>
+            <span class="v">${this.volume(meter, bars.reduce((sum, [, v]) => sum + v, 0))}</span></div>` : nothing}
         </div>
-        ${usage.hours.length ? html`
-          <div class="bars" role="img" aria-label=${t(hass, 'meter.last_day')}>${usage.hours.map(([at, v]) => html`
-            <span class=${v > 0 ? 'used' : ''} style="height:${max > 0 ? Math.max(3, (v / max) * 100) : 3}%"
-              title="${hour(at)}: ${formatVolume(v, meterUnit(hass, meter), meter.kind, this.loc).value} ${formatVolume(v, meterUnit(hass, meter), meter.kind, this.loc).unit}"></span>`)}
+        ${bars?.length ? html`
+          <div class="bars" role="img" aria-label=${range === 'day' ? t(hass, 'meter.last_day') : t(hass, 'meter.per_day', { n: RANGE_DAYS[range] })}>${bars.map(([at, v]) => html`
+            <span class=${v > 0 ? 'used' : ''} style="height:${max > 0 ? Math.max(3, (v / max) * 100) : 3}%" title="${this.when(at, true)}: ${vol(v)}"></span>`)}
           </div>
-          <div class="axis"><span>${hour(usage.hours[0]![0])}</span><span>${hour(usage.hours[usage.hours.length - 1]![0])}</span></div>` : nothing}
+          <div class="axis">${range === 'week'
+            ? bars.map(([at]) => html`<span>${this.when(at)}</span>`)
+            : html`<span>${this.when(bars[0]![0])}</span><span>${this.when(bars[bars.length - 1]![0])}</span>`}</div>` : nothing}
       ` : html`<span class="empty">${t(hass, 'meter.loading')}</span>`}
     </section>`
   }
 
   protected render() {
-    return html`<div class="grid">${this.config!.meters.map(m => this.renderMeter(m))}</div>`
+    return html`<div class="top">${rangeSwitch(this.hass, this.range, range => setRange('meters', range))}</div>
+      <div class="grid">${this.config!.meters.map(m => this.renderMeter(m))}</div>`
   }
 }

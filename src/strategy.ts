@@ -523,7 +523,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
         return [
           { type: 'custom:ad-power', variant: 'room', areas: [area.area_id], wide: true, ...sourceOpts, ...powerOpts },
           // The legend grows with the sensors; the plot keeps about four rows of its own
-          { type: 'history-graph', entities: sensors.map(e => e.entity_id), hours_to_show: 24, grid_options: { columns: 'full', rows: Math.min(10, 4 + Math.ceil(sensors.length / 2)) } },
+          { type: 'custom:ad-history', entities: sensors.map(e => e.entity_id), ...look, grid_options: { columns: 'full', rows: Math.min(10, 4 + Math.ceil(sensors.length / 2)) } },
         ]
       })
       return { type: 'grid', column_span: 2, cards: titled(group.title, cards) }

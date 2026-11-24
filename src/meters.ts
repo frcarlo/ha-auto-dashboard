@@ -103,6 +103,51 @@ export function loadUsage(hass: HomeAssistant, ids: string[], now = Date.now()):
   return job
 }
 
+// ── Per day, for the week and month views ─────────────────
+
+/** What the bars cover: the last day by the hour, or the last 7 or 30 days by the day */
+export type Range = 'day' | 'week' | 'month'
+export const RANGE_DAYS = { week: 7, month: 30 } as const
+
+const days = new Map<string, { at: number; days: [start: number, change: number][] }>()
+const daysLoading = new Map<string, Promise<void>>()
+const dayKey = (range: Exclude<Range, 'day'>, id: string) => `${range}:${id}`
+
+/** Midnight a number of days back, by the calendar (DST makes a day 23 or 25 hours) */
+const daysBack = (now: number, n: number) => { const d = new Date(startOfDay(now)); d.setDate(d.getDate() - n); return d.getTime() }
+
+/** Use per day over the range, today last, summed over the meters; undefined until loaded */
+export function daysOf(ids: string[], range: Exclude<Range, 'day'>): [number, number][] | undefined {
+  const parts = ids.map(id => days.get(dayKey(range, id))?.days)
+  if (!parts.length || parts.some(p => !p)) return undefined
+  const sum = new Map<number, number>()
+  for (const p of parts) for (const [t, v] of p!) sum.set(t, (sum.get(t) ?? 0) + v)
+  return [...sum.entries()].sort((a, b) => a[0] - b[0])
+}
+
+export const daysFresh = (ids: string[], range: Exclude<Range, 'day'>, now = Date.now()) =>
+  ids.every(id => { const c = days.get(dayKey(range, id)); return !!c && now - c.at < STALE_MS })
+
+/** Daily changes of the last 7 or 30 days, in one call for all meters asked together. Days without a change count 0. */
+export function loadDays(hass: HomeAssistant, ids: string[], range: Exclude<Range, 'day'>, now = Date.now()): Promise<void> {
+  const key = `${range}:${ids.join(',')}`
+  if (!hass.callWS || !ids.length || daysFresh(ids, range, now)) return Promise.resolve()
+  const running = daysLoading.get(key)
+  if (running) return running
+  const n = RANGE_DAYS[range]
+  const starts = Array.from({ length: n }, (_, i) => daysBack(now, n - 1 - i))
+  const job = hass.callWS<Record<string, Stat[]>>({
+    type: 'recorder/statistics_during_period', start_time: new Date(starts[0]!).toISOString(), statistic_ids: ids, period: 'day', types: ['change'],
+  }).catch(() => ({} as Record<string, Stat[]>)).then(result => {
+    for (const id of ids) {
+      const byDay = new Map((result?.[id] ?? []).map(s => [startOfDay(startOf(s)), Number(s.change) || 0]))
+      days.set(dayKey(range, id), { at: now, days: starts.map(t => [t, byDay.get(t) ?? 0]) })
+    }
+  }).finally(() => daysLoading.delete(key))
+  daysLoading.set(key, job)
+  return job
+}
+
 // ── One counter's use today ───────────────────────────────
 
 const today = new Map<string, { at: number; day: number; value?: number }>()
@@ -139,6 +184,8 @@ export function loadToday(hass: HomeAssistant, id: string, now = Date.now()): Pr
 export function clearUsage() {
   cache.clear()
   loading.clear()
+  days.clear()
+  daysLoading.clear()
   today.clear()
   todayLoading.clear()
 }

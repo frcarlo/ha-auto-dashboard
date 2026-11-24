@@ -358,14 +358,14 @@ describe('energy, maintenance, cameras and lists', () => {
     expect(cards(views.find(v => v.path === 'energy')!).find(c => c.type === 'custom:ad-meters')!.meters).toEqual(meters)
   })
 
-  it('energy shows each room with a 24-hour history of all its power sensors', async () => {
+  it('energy shows each room with a history of all its power sensors', async () => {
     const { views } = await generateDashboard({ type: 'custom:auto-dashboard' }, createHass(true))
     const energy = cards(views.find(v => v.path === 'energy')!)
-    const graphs = energy.filter(c => c.type === 'history-graph').flatMap(c => c.entities)
+    const graphs = energy.filter(c => c.type === 'custom:ad-history').flatMap(c => c.entities)
     expect(graphs).toContain('sensor.kuche_backofen')
     expect(graphs).toContain('sensor.wohnzimmer_tv_leistung')
     // More sensors, longer legend, taller graph
-    const rows = energy.filter(c => c.type === 'history-graph').map(c => [c.entities.length, c.grid_options.rows])
+    const rows = energy.filter(c => c.type === 'custom:ad-history').map(c => [c.entities.length, c.grid_options.rows])
     expect(rows).toContainEqual([2, 5])
     expect(rows).toContainEqual([1, 5])
     expect(energy.filter(c => c.type === 'custom:ad-power' && c.variant === 'room').map(c => c.areas[0]))

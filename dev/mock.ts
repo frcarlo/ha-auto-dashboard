@@ -1082,6 +1082,17 @@ function statistics(msg: Record<string, unknown>, states: Record<string, { state
     for (const id of msg.statistic_ids as string[]) {
       const water = id.includes('wasser')
       if (msg.period === 'month') { out[id] = [{ start, end: Date.now(), change: water ? 3.84 : 41.2 }]; continue }
+      if (msg.period === 'day') {
+        // A day per entry from the start on: more gas on cold days, water steady with a wash day now and then
+        const count = Math.max(1, Math.ceil((Date.now() - start) / 86400_000))
+        out[id] = Array.from({ length: count }, (_, i) => {
+          const at = new Date(start)
+          at.setDate(at.getDate() + i)
+          const change = water ? 0.18 + (i % 4 === 1 ? 0.12 : 0) + (i % 3) * 0.02 : 3.2 + 1.6 * Math.sin(i / 2.3) + (i % 5) * 0.3
+          return { start: at.getTime(), end: at.getTime() + 86400_000, change }
+        })
+        continue
+      }
       const hours = Math.max(1, Math.ceil((Date.now() - start) / 3600_000))
       out[id] = Array.from({ length: hours }, (_, i) => {
         const at = new Date(start + i * 3600_000)

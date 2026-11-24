@@ -203,6 +203,16 @@ function ring() {
   setTimeout(() => setState('binary_sensor.haustur_besucher', 'off'), 4000)
 }
 ;(window as any).ring = ring
+// HA's own cards made from inside ours (the power history): a placeholder that says what it would show
+;(window as any).loadCardHelpers = async () => ({
+  createCardElement: (config: any) => {
+    const el: any = document.createElement('div')
+    el.className = 'placeholder'
+    el.setConfig = () => {}
+    el.textContent = `${config.type}: ${config.hours_to_show ?? ''} h · ${(config.entities ?? []).join(', ')}`
+    return el
+  },
+})
 if (params.has('ring')) setTimeout(ring, Number(params.get('ring') || 0) * 1000)
 
 function toast(text: string) {
