@@ -19,6 +19,8 @@ interface HouseInfoConfig extends BaseConfig {
   hide_labels?: string[]
   hide_entities?: string[]
   power_sources?: PowerSources
+  /** Power sensors the rooms leave out: the house meters, and an appliance's own reading when its plug measures it */
+  skip_power?: string[]
   /** Gas and water from HA's energy settings */
   meters?: Meter[]
   /** View paths the tiles open */
@@ -121,7 +123,7 @@ export class AdHouseInfo extends BaseCard<HouseInfoConfig> {
 
   protected render() {
     const c = this.config!
-    const rooms = roomPower(this.hass!, this.areas(c.areas), this.hide, meterSensors(this.hass!, c.power_sources))
+    const rooms = roomPower(this.hass!, this.areas(c.areas), this.hide, new Set([...meterSensors(this.hass!, c.power_sources), ...(c.skip_power ?? [])]))
     // HA's energy settings know the whole house; the rooms' sum misses what has no own sensor
     const house = housePower(this.hass!, c.power_sources)
     const watts = house?.total ?? rooms.reduce((sum, room) => sum + room.total, 0)

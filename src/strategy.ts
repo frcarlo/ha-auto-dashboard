@@ -8,7 +8,7 @@ import {
 } from './model'
 import { domainOf, entityName, shortName } from './presentation'
 import { weatherEntity, weatherSensors } from './weather'
-import { applianceEntities, findAppliances, findTvs } from './appliances'
+import { applianceEntities, doublePower, findAppliances, findTvs } from './appliances'
 import { findCameras } from './cameras'
 import { findSchools, schoolIds, type School } from './school'
 import { co2Sensors, findEventSources } from './events'
@@ -176,9 +176,11 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const prefs = await hass.callWS?.<EnergyPrefs>({ type: 'energy/get_prefs' }).catch(() => undefined)
   const sources = powerSources(hass, prefs, config.house_power)
   const sourceOpts = sources ? { power_sources: sources } : {}
-  // The meters themselves (and their phases) are the house, not a consumer in the room they sit in
-  const meterIds = meterSensors(hass, sources)
-  const consumer = (e: HassEntity) => isPower(e) && !meterIds.has(e.entity_id)
+  // The meters themselves (and their phases) are the house, not a consumer in the room they sit in; an appliance
+  // measured by its plug and by itself counts once, through the plug
+  const skipPower = [...new Set([...meterSensors(hass, sources), ...doublePower(hass, appliances)])]
+  const consumer = (e: HassEntity) => isPower(e) && !skipPower.includes(e.entity_id)
+  const skipOpts = skipPower.length ? { skip_power: skipPower } : {}
   // Gas and water: the meters HA's energy settings name, used today on Home, more on the energy page
   const meters = config.hide_domains?.includes('sensor') ? [] : meterSources(hass, prefs)
   const hasPower = all.some(consumer) || !!sources
@@ -402,7 +404,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
           }] : []),
           ...(showClimate || hasEnergy ? [{
             type: 'custom:ad-house-info', areas: indoor.map(a => a.area_id), ...(outsideTile.length ? { outdoor: outsideTile } : {}), ...hideOpts, ...look,
-            ...sourceOpts, ...(meters.length ? { meters } : {}), links: { climate: has('climate'), energy: hasEnergy && !ownHidden.has('energy') ? 'energy' : undefined },
+            ...sourceOpts, ...skipOpts, ...(meters.length ? { meters } : {}), links: { climate: has('climate'), energy: hasEnergy && !ownHidden.has('energy') ? 'energy' : undefined },
           }] : []),
         ], { widths: [2, 1] }),
         // Now playing hides itself while nothing plays
@@ -509,7 +511,7 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
   const titled = (title: string | undefined, cards: Card[]) => (cards.length && title ? [heading(title), ...cards] : cards)
 
   // Energy: the house, then per floor each room's sensors next to a graph of the last day
-  const powerOpts = { ...hideOpts, ...look }
+  const powerOpts = { ...hideOpts, ...skipOpts, ...look }
   const energyView = subview('energy', t(hass, 'energy'), 'mdi:lightning-bolt-outline', [
     // The house sum spans the whole page, however many columns the floors below get
     ...(hasPower ? [fullWidth([{ type: 'custom:ad-power', variant: 'house', areas: indoor.map(a => a.area_id), ...sourceOpts, ...powerOpts }])] : []),

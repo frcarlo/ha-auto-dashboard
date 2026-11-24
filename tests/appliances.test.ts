@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applianceEntities, appliancePhase, applianceProgress, applianceTimes, findAppliances, findTvs, kindOf, programLabel } from '../src/appliances'
+import { applianceEntities, appliancePhase, doublePower, applianceProgress, applianceTimes, findAppliances, findTvs, kindOf, programLabel } from '../src/appliances'
 import { createHass } from '../dev/mock'
 
 describe('appliances', () => {
@@ -38,6 +38,19 @@ describe('appliances', () => {
     expect(list.map(a => [a.name, a.kind, a.area])).toEqual([['Geschirrspüler', 'dishwasher', 'kuche'], ['Maschine', 'washer', 'waschkeller'], ['Trockner', 'dryer', 'waschkeller']])
     expect(findAppliances(hass, [], { domains: ['appliance'] })).toEqual([])
     expect(findAppliances(hass, [], {}, ['kuche']).map(a => a.name)).toEqual(['Geschirrspüler'])
+  })
+
+  it("counts an appliance's own power reading as double when a plug in its room measures it too", () => {
+    const hass = createHass(true)
+    // Only the coffee machine's plug in the kitchen: no plug of a dishwasher, nothing double
+    expect(doublePower(hass, findAppliances(hass))).toEqual([])
+    hass.states['sensor.steckdose_wm_leistung'] = { entity_id: 'sensor.steckdose_wm_leistung', state: '412', attributes: { friendly_name: 'Leistung', device_class: 'power', unit_of_measurement: 'W' } }
+    hass.entities['sensor.steckdose_wm_leistung'] = { entity_id: 'sensor.steckdose_wm_leistung', device_id: 'plug_wm' }
+    hass.devices.plug_wm = { id: 'plug_wm', name: 'Steckdose Waschmaschine', area_id: 'waschkeller' }
+    expect(doublePower(hass, findAppliances(hass))).toEqual(['sensor.waschmaschine_leistung'])
+    // The same plug in another room measures something else
+    hass.devices.plug_wm.area_id = 'kuche'
+    expect(doublePower(hass, findAppliances(hass))).toEqual([])
   })
 
   it('reads the phase from a state, a power reading or a switch', () => {

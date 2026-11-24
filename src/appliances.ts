@@ -167,6 +167,34 @@ export function findAppliances(
   return [...manual, ...found].sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/**
+ * Power sensors that count an appliance a second time: its own reading (from its device, as Home Connect or
+ * SmartThings report it) while a plug in the same room measures it too, the plug told by its name ("Steckdose
+ * Waschmaschine" for a washer). The plug stays; it measures at the socket, standby included.
+ */
+export function doublePower(hass: HomeAssistant, appliances: Appliance[]): string[] {
+  const isPower = (id: string) => domainOf(id) === 'sensor' && hass.states[id]?.attributes.device_class === 'power'
+  const deviceOf = (id: string | undefined) => (id ? hass.entities[id]?.device_id : undefined)
+  const words = (id: string) => {
+    const device = hass.devices[deviceOf(id) ?? '']
+    return `${text(hass.states[id]!)} ${device?.name_by_user ?? ''} ${device?.name ?? ''}`.toLowerCase()
+  }
+  const out = new Set<string>()
+  for (const a of appliances) {
+    if (a.kind === 'appliance') continue
+    const device = deviceOf(a.status)
+    const own = [...new Set([...(a.power ? [a.power] : []), ...(device ? deviceEntityIds(hass, device) : [])])]
+      .filter(id => isPower(id) && hass.states[id])
+    if (!own.length) continue
+    const ownDevices = new Set(own.map(deviceOf).filter(Boolean))
+    const area = a.area ?? entityAreaId(hass, a.status)
+    const plug = Object.keys(hass.states).some(id => isPower(id) && !own.includes(id) && !ownDevices.has(deviceOf(id))
+      && entityAreaId(hass, id) === area && kindOf(words(id)) === a.kind)
+    if (plug) own.forEach(id => out.add(id))
+  }
+  return [...out]
+}
+
 /** The entities a card shows, so the room page does not list them a second time. */
 export function applianceEntities(hass: HomeAssistant, appliance: Appliance): string[] {
   const roles = [appliance.status, appliance.progress, appliance.end, appliance.remaining, appliance.program, appliance.phase, appliance.door,

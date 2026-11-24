@@ -20,6 +20,8 @@ interface PowerConfig extends BaseConfig {
   wide?: boolean
   /** Sensors from HA's energy settings; the house total comes from them when set */
   power_sources?: PowerSources
+  /** Power sensors the rooms leave out: the house meters, and an appliance's own reading when its plug measures it */
+  skip_power?: string[]
 }
 
 const FLOW_ICONS = { grid: 'mdi:transmission-tower', solar: 'mdi:solar-power-variant', battery: 'mdi:home-battery-outline' }
@@ -64,9 +66,13 @@ export class AdPower extends BaseCard<PowerConfig> {
     return 3
   }
 
+  private get skip() {
+    return new Set([...meterSensors(this.hass!, this.config!.power_sources), ...(this.config!.skip_power ?? [])])
+  }
+
   private get rooms(): RoomPower[] {
     const areas = this.config!.areas.map(id => this.hass!.areas[id]).filter((a): a is AreaRegistryEntry => !!a)
-    return roomPower(this.hass!, areas, hideOf(this.config!), meterSensors(this.hass!, this.config!.power_sources))
+    return roomPower(this.hass!, areas, hideOf(this.config!), this.skip)
   }
 
   protected watched() {
