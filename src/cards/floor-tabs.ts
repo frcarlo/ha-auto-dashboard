@@ -47,9 +47,15 @@ export class AdFloorTabs extends BaseCard<FloorTabsConfig> {
      * it the backdrop of the room cards, and their own glass would then blur only the panel.
      */
     .panel { position: relative; isolation: isolate; border-radius: var(--ad-radius); padding: 8px 8px 8px; }
+    /*
+     * Without glass the panel is solid like the cards around it, a shade off their surface so the room cards stand
+     * out on it. A see-through tint would let a background picture show through here alone.
+     */
     .panel::before {
       content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
-      background: rgba(var(--ad-on-surface), 0.04); box-shadow: inset 0 0 0 1px rgba(var(--ad-on-surface), 0.08);
+      background: var(--ad-surface-variant);
+      background: color-mix(in srgb, var(--ad-surface) 94%, rgb(var(--ad-on-surface)));
+      box-shadow: var(--ad-shadow), inset 0 0 0 1px rgba(var(--ad-on-surface), 0.08);
     }
     :host([glass]) .panel::before {
       background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur);
