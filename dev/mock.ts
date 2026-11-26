@@ -65,6 +65,8 @@ const defs: Def[] = [
 
   ['light.garage', 'off', { friendly_name: 'Garage', supported_color_modes: ['onoff'] }, 'garage'],
   ['light.haustur', 'off', { friendly_name: 'Haustürlicht', supported_color_modes: ['onoff'] }, 'eingangstur'],
+  // Double Take writes who it recognized at the door into this helper, through an automation
+  ['input_text.gesicht_haustur', 'Leni', { friendly_name: 'Gesicht Haustür', icon: 'mdi:face-recognition' }, 'eingangstur'],
   ['binary_sensor.garage_tor', 'on', { friendly_name: 'Garagentor', device_class: 'garage_door' }, 'garage'],
   ['cover.garage_tor', 'open', { friendly_name: 'Garagentorantrieb', device_class: 'garage' }, 'garage'],
   ['binary_sensor.garage_rauch', 'off', { friendly_name: 'Garage Rauchmelder', device_class: 'smoke' }, 'garage'],
@@ -582,6 +584,13 @@ function cameraHistory(since: number, ids: string[]) {
   ]
   const now = Date.now()
   const out: Record<string, { s: string; lu: number }[]> = {}
+  // Leni came home with the person detection 420 minutes ago, Tom rang 331 minutes ago
+  if (ids.includes('input_text.gesicht_haustur')) {
+    out['input_text.gesicht_haustur'] = [{ s: 'Leni', lu: since / 1000 }, ...[[420, 'Leni'], [331, 'Tom']].flatMap(([ago, name]) => {
+      const at = (now - (ago as number) * 60_000) / 1000
+      return at * 1000 < since ? [] : [{ s: '', lu: at + 2 }, { s: name as string, lu: at + 4 }]
+    })]
+  }
   // Everything else switched a few times today, so the pages' activity lists have something to show
   const pairs: Record<string, [string, string]> = { light: ['on', 'off'], switch: ['on', 'off'], cover: ['open', 'closed'], lock: ['unlocked', 'locked'], binary_sensor: ['on', 'off'] }
   for (const [i, id] of ids.entries()) {

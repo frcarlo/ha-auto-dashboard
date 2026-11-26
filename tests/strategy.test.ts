@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateDashboard, ownSections } from '../src/strategy'
-import { findCameras, detectionsFrom, detectionKind } from '../src/cameras'
+import { findCameras, detectionsFrom, detectionKind, isFaceEntity } from '../src/cameras'
 import { createHass } from '../dev/mock'
 import { cleanConfig } from '../src/config'
 
@@ -741,6 +741,7 @@ describe('cameras', () => {
     expect(Object.fromEntries(door.detections!.map(d => [d.entity, d.kind]))).toEqual({
       'binary_sensor.haustur_person': 'person', 'binary_sensor.haustur_paket': 'package',
       'binary_sensor.haustur_besucher': 'visitor', 'binary_sensor.haustur_bewegung': 'motion',
+      'input_text.gesicht_haustur': 'face',
     })
     expect(cams.find(c => c.name === 'Esszimmer')!.detections).toBeUndefined()
   })
@@ -770,6 +771,29 @@ describe('cameras', () => {
     }
     const found = detectionsFrom(history, [door], since)
     expect(found.map(d => [d.kind, (d.at / 1000 - since / 1000) / 60])).toEqual([['person', 800], ['motion', 700], ['package', 600.5]])
+  })
+
+  it('takes the face helper of the camera\'s room, a text called Gesicht or Face, but no surface temperature', () => {
+    const e = (entity_id: string, friendly_name: string) => ({ entity_id, state: '', attributes: { friendly_name } }) as any
+    expect(isFaceEntity(e('input_text.gesicht_buro_keller', 'Gesicht Büro Keller'))).toBe(true)
+    expect(isFaceEntity(e('sensor.double_take_face', 'Face'))).toBe(true)
+    expect(isFaceEntity(e('sensor.surface_temperature', 'Surface Temperature'))).toBe(false)
+    expect(isFaceEntity(e('binary_sensor.gesicht', 'Gesicht'))).toBe(false)
+  })
+
+  it('names who the face recognition saw, in place of the person detection beside it, each time a name is written', () => {
+    const since = Date.UTC(2026, 10, 8)
+    const at = (min: number) => since / 1000 + min * 60
+    const history = {
+      'binary_sensor.haustur_person': [{ s: 'off', lu: at(0) }, { s: 'on', lu: at(500) }, { s: 'off', lu: at(501) }, { s: 'on', lu: at(900) }, { s: 'off', lu: at(901) }],
+      // Emptied before each recognition, so Tom at 500 and at 600 are two visits; at 900 no one was known
+      'input_text.gesicht_haustur': [{ s: 'Leni', lu: at(0) }, { s: '', lu: at(500.05) }, { s: 'Tom', lu: at(500.1) },
+        { s: '', lu: at(600) }, { s: 'Tom', lu: at(600.1) }, { s: 'unavailable', lu: at(700) }],
+    }
+    const found = detectionsFrom(history, [door], since)
+    expect(found.map(d => [d.kind, d.name, Math.round((d.at / 1000 - since / 1000) / 60)])).toEqual([
+      ['person', undefined, 900], ['face', 'Tom', 600], ['face', 'Tom', 500],
+    ])
   })
 })
 

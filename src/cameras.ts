@@ -1,18 +1,19 @@
 // Cameras, one per device. A doorbell brings several camera entities (sub stream, main stream, snapshots);
 // the page wants one picture of it, and the detections the device reports beside: person, vehicle, animal,
-// package, a ring at the door, plain motion.
+// package, a ring at the door, plain motion. A face recognition (Double Take, ...) that writes the name of whoever
+// it saw into a helper in the camera's room adds who it was.
 import { allEntities, areaEntities, deviceEntities, entityAreaId, type Hide } from './model'
 import { domainOf, entityName } from './presentation'
 import type { HassEntity, HomeAssistant } from './types'
 
-export type DetectionKind = 'visitor' | 'package' | 'person' | 'vehicle' | 'animal' | 'motion'
+export type DetectionKind = 'visitor' | 'face' | 'package' | 'person' | 'vehicle' | 'animal' | 'motion'
 
 export interface CameraInfo {
   /** The camera entity the picture comes from */
   entity: string
   name: string
   area?: string
-  /** Detection sensors of the same device, with what each one sees */
+  /** Detection sensors of the same device, with what each one sees; a face helper of its room as kind 'face' */
   detections?: { entity: string; kind: DetectionKind }[]
   /** Lights at the camera: its own floodlight first, then the lights of its room */
   lights?: string[]
@@ -56,11 +57,25 @@ export function detectionKind(e: HassEntity, deviceNames: string[] = []): Detect
   return undefined
 }
 
-/** Detections first by how much they tell: a ring beats a package beats a person beats plain motion */
-export const DETECTION_RANK: Record<DetectionKind, number> = { visitor: 6, package: 5, person: 4, vehicle: 3, animal: 2, motion: 1 }
+/** Detections first by how much they tell: a ring beats a known face beats a package beats a person beats plain motion */
+export const DETECTION_RANK: Record<DetectionKind, number> = { visitor: 7, face: 6, package: 5, person: 4, vehicle: 3, animal: 2, motion: 1 }
 
 export const DETECTION_ICON: Record<DetectionKind, string> = {
-  visitor: 'mdi:doorbell', package: 'mdi:package-variant-closed', person: 'mdi:account', vehicle: 'mdi:car', animal: 'mdi:paw', motion: 'mdi:motion-sensor',
+  visitor: 'mdi:doorbell', face: 'mdi:face-recognition', package: 'mdi:package-variant-closed', person: 'mdi:account', vehicle: 'mdi:car', animal: 'mdi:paw', motion: 'mdi:motion-sensor',
+}
+
+/**
+ * Where a face recognition writes the name of whoever it saw: a text helper or sensor called "Gesicht …" or
+ * "Face …", e.g. an input_text an automation fills from Double Take. It has no device, so its room ties it to a camera.
+ */
+export const isFaceEntity = (e: HassEntity) => ['input_text', 'text', 'sensor'].includes(domainOf(e.entity_id)) && /\b(gesicht|face)/.test(text(e))
+
+/** The face helper of a camera: in its room, and named after it when the room has more than one camera */
+function faceEntity(hass: HomeAssistant, area: string | undefined, deviceNames: string[], camerasInArea: number) {
+  if (!area) return undefined
+  const found = Object.values(hass.states).filter(e => isFaceEntity(e) && entityAreaId(hass, e.entity_id) === area)
+  const named = found.find(e => deviceNames.some(n => text(e).includes(n.toLowerCase()) || text(e).includes(slug(n))))
+  return named ?? (camerasInArea === 1 ? found[0] : undefined)
 }
 
 /** One camera per device, from the cameras the dashboard shows, with its detections and the lights beside it. */
@@ -71,6 +86,11 @@ export function findCameras(hass: HomeAssistant, cameras: HassEntity[], hide: Hi
     groups.set(key, [...(groups.get(key) ?? []), camera])
   }
   const visible = new Set(allEntities(hass, hide).map(e => e.entity_id))
+  const perArea = new Map<string, number>()
+  for (const list of groups.values()) {
+    const area = entityAreaId(hass, list[0]!.entity_id)
+    if (area) perArea.set(area, (perArea.get(area) ?? 0) + 1)
+  }
   return [...groups.entries()].map(([key, list]) => {
     const best = [...list].sort((a, b) => pictureScore(b) - pictureScore(a))[0]!
     const device = hass.devices[key]
@@ -83,6 +103,8 @@ export function findCameras(hass: HomeAssistant, cameras: HassEntity[], hide: Hi
     const detections = own
       .map(e => ({ entity: e.entity_id, kind: detectionKind(e, deviceNames) }))
       .filter((d): d is { entity: string; kind: DetectionKind } => !!d.kind && !hass.entities[d.entity]?.entity_category)
+    const face = faceEntity(hass, area, deviceNames, area ? perArea.get(area) ?? 0 : 0)
+    if (face) detections.push({ entity: face.entity_id, kind: 'face' })
     const lights = [
       ...own.filter(e => domainOf(e.entity_id) === 'light' && visible.has(e.entity_id)),
       ...(area ? areaEntities(hass, area, hide).filter(e => domainOf(e.entity_id) === 'light' && !own.includes(e)) : []),
@@ -101,7 +123,12 @@ export interface Detection {
   camera: string
   kind: DetectionKind
   at: number
+  /** Who it was, for a face */
+  name?: string
 }
+
+/** A face helper's state that names someone; empty while the next recognition runs */
+const isName = (s: string) => !!s.trim() && !['unknown', 'unavailable'].includes(s)
 
 /** History rows as HA's websocket sends them: s is the state, lu when it was last updated (seconds) */
 type Row = { s: string; lu?: number; lc?: number }
@@ -120,10 +147,12 @@ export function detectionsFrom(history: Record<string, Row[]>, cameras: CameraIn
       for (const [i, row] of rows.entries()) {
         const at = (row.lu ?? row.lc ?? 0) * 1000
         const event = d.entity.startsWith('event.')
-        // The first row is the state the day began with, not something that happened today
-        const fired = i > 0 && (event ? !['unknown', 'unavailable'].includes(row.s) : row.s === 'on' && before !== 'on')
+        // The first row is the state the day began with, not something that happened today. A face counts each
+        // time a name is written; the helper is emptied in between, so the same person twice counts twice.
+        const fired = i > 0 && (d.kind === 'face' ? isName(row.s) && row.s !== before
+          : event ? !['unknown', 'unavailable'].includes(row.s) : row.s === 'on' && before !== 'on')
         before = row.s
-        if (fired && at >= since) raw.push({ camera: camera.entity, kind: d.kind, at })
+        if (fired && at >= since) raw.push({ camera: camera.entity, kind: d.kind, at, ...(d.kind === 'face' ? { name: row.s.trim() } : {}) })
       }
     }
   }
@@ -131,11 +160,15 @@ export function detectionsFrom(history: Record<string, Row[]>, cameras: CameraIn
   const kept: Detection[] = []
   for (const d of raw) {
     const near = (o: Detection, ms: number) => o.camera === d.camera && Math.abs(o.at - d.at) <= ms
-    if (kept.some(o => near(o, 120_000) && o.kind === d.kind)) continue
+    if (kept.some(o => near(o, 120_000) && o.kind === d.kind && o.name === d.name)) continue
     if (d.kind === 'motion' && raw.some(o => near(o, 60_000) && o.kind !== 'motion')) continue
-    // A detection that tells more replaces the motion just before it
-    const motion = kept.findIndex(o => near(o, 60_000) && o.kind === 'motion')
-    if (motion >= 0 && d.kind !== 'motion') kept.splice(motion, 1)
+    // Who it was tells more than that it was someone: the face stands for the person detection beside it
+    if (d.kind === 'person' && raw.some(o => near(o, 60_000) && o.kind === 'face')) continue
+    // A detection that tells more replaces the motion just before it, a face also the person
+    for (let i = kept.length - 1; i >= 0; i--) {
+      const o = kept[i]!
+      if (near(o, 60_000) && d.kind !== 'motion' && (o.kind === 'motion' || (d.kind === 'face' && o.kind === 'person'))) kept.splice(i, 1)
+    }
     kept.push(d)
   }
   return kept.sort((a, b) => b.at - a.at)

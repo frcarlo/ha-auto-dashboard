@@ -291,8 +291,14 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
     .tabs button[aria-current='true'] { opacity: 1; font-weight: 500; border-bottom-color: currentColor; }
   `]
 
+  /** The sentence: "Person detected", or for a face "Francesco recognized" */
   private kindText(d: Detection) {
-    return t(this.hass, `cam.${d.kind}` as Key)
+    return d.name ? t(this.hass, 'cam.face', { name: d.name }) : t(this.hass, `cam.${d.kind}` as Key)
+  }
+
+  /** The short label under a tile: "Package", or for a face the name */
+  private kindLabel(d: Detection) {
+    return d.name ?? t(this.hass, `cam.kind.${d.kind}` as Key)
   }
 
   private feed() {
@@ -319,7 +325,7 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
     const picture = this.pictures[camera.entity]
     const last = this.detections.find(d => d.camera === camera.entity)
     const fresh = !!last && this.now - last.at < 5 * 60_000
-    const seen = last ? `${this.time(last.at)} · ${t(hass, `cam.kind.${last.kind}` as Key)}` : camera.detections?.length ? t(hass, 'cam.quiet') : ''
+    const seen = last ? `${this.time(last.at)} · ${this.kindLabel(last)}` : camera.detections?.length ? t(hass, 'cam.quiet') : ''
     return html`<button class="card tile ${size}" @click=${() => this.open(camera.entity)} aria-label=${camera.name}>
       <div class="shot">
         ${picture?.url ? html`<img src=${picture.url} alt="" loading="lazy">` : html`<div class="none"><ha-icon icon="mdi:cctv"></ha-icon></div>`}
@@ -377,7 +383,7 @@ export class AdCameras extends BaseCard<CamerasCardConfig> {
             <span class="label-text">${t(hass, 'cam.last')}</span>
             ${last ? html`
               <div class="clock">${this.time(last.at)}</div>
-              <div class="where">${this.ago(last.at)} · ${t(hass, `cam.kind.${last.kind}` as Key)}</div>
+              <div class="where">${this.ago(last.at)} · ${this.kindLabel(last)}</div>
               <div class="sentence">${this.kindText(last)}</div>
               ${earlier.length ? html`<ul class="rows">${earlier.slice(0, 4).map(d => html`<li><div class="row"><span class="at">${this.time(d.at)}</span><span class="what">${this.kindText(d)}</span></div></li>`)}</ul>` : nothing}
             ` : html`<div class="empty">${t(hass, 'cam.none_today')}</div>`}
