@@ -19,6 +19,11 @@ interface MusicCardConfig extends BaseConfig {
   nav_position?: NavPosition
   /** Sonos or Cast speakers whose media browser lists the Spotify accounts */
   spotify_browsers?: string[]
+  /**
+   * Only the big player for this speaker, without the side and the library: the window that opens in place of
+   * HA's dialog when a speaker is tapped (see more-info.ts)
+   */
+  solo?: string
 }
 
 type BrowseNode = Parameters<typeof browseToItem>[0] & { children?: Parameters<typeof browseToItem>[0][] }
@@ -167,6 +172,8 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   private lyricsFor = ''
   /** Where the big player was opened from, for the way back */
   private nowFrom: View = 'home'
+  /** In the window for one speaker: another one picked there, not remembered beyond it */
+  private soloPick?: string
   private lastLine = -2
   /** Height of the page on screen, 0 where it scrolls as a whole */
   fit = 0
@@ -202,6 +209,15 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     .bar { grid-area: bar; position: sticky; bottom: var(--bottom); z-index: 2; overflow: visible;
       background: var(--ad-glass-bg); backdrop-filter: var(--ad-glass-blur); -webkit-backdrop-filter: var(--ad-glass-blur);
       box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(var(--ad-on-surface), 0.08), inset 0 1px 0 var(--ad-glass-hi); }
+
+    /* The window for one speaker: no side, no surfaces of its own (the window is the card), the bar below */
+    .music.solo { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'main' 'bar'; gap: 8px; }
+    .solo .main { min-height: 0; padding: 4px 4px 8px; position: relative; isolation: isolate; }
+    .solo .now { --lyr-h: min(46vh, 440px); }
+    /* On a phone the bar stays in view below the lyrics */
+    @container (max-width: 760px) { .solo .now { --lyr-h: min(32vh, 300px); } }
+    .solo .bar { position: static; background: rgba(var(--ad-on-surface), 0.05); backdrop-filter: none; -webkit-backdrop-filter: none;
+      box-shadow: inset 0 0 0 1px rgba(var(--ad-on-surface), 0.06); }
 
     /* Side: the views, then the playlists */
     nav { display: flex; flex-direction: column; gap: 2px; }
@@ -518,6 +534,15 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     }
   `]
 
+  setConfig(config: MusicCardConfig) {
+    // The window for one speaker opens on the big player, and the way back from the queue leads there
+    if (config.solo && config.solo !== this.config?.solo) {
+      this.view = this.nowFrom = this.queueFrom = 'now'
+      this.soloPick = undefined
+    }
+    super.setConfig(config)
+  }
+
   getCardSize() {
     return 10
   }
@@ -602,15 +627,16 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   protected updated() {
     if (!this.hass || !this.config) return
     this.setAttribute('nav', this.config.nav_position ?? 'bottom')
-    this.measure()
+    const solo = !!this.config.solo
+    if (!solo) this.measure()
     const shown = `${this.view}|${this.detail?.item.uri ?? ''}`
     if (shown !== this.shown) {
       this.shown = shown
       const main = this.renderRoot.querySelector<HTMLElement>('.music.fit .main')
       if (main) main.scrollTop = 0
     }
-    if (!this.libLoading && (!library || Date.now() - library.at > LIBRARY_EVERY) && !this.libFailed) void this.loadLibrary()
-    if (!this.spotifyLoading && !this.shelves && this.config.spotify_browsers?.length) void this.loadSpotify()
+    if (!solo && !this.libLoading && (!library || Date.now() - library.at > LIBRARY_EVERY) && !this.libFailed) void this.loadLibrary()
+    if (!solo && !this.spotifyLoading && !this.shelves && this.config.spotify_browsers?.length) void this.loadSpotify()
     // The queue changes with the track; read it again while it is shown and something new plays
     const p = this.player
     const key = `${p?.entity_id}|${p?.attributes.media_content_id}|${p?.state}`
@@ -699,6 +725,8 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   /** The chosen player: picked here (and remembered on this device), else one that plays, else the first Music Assistant one */
   private get playerId(): string | undefined {
     const ids = this.players.map(p => p.entity)
+    const solo = this.config?.solo
+    if (solo) return this.soloPick && ids.includes(this.soloPick) && this.reachable(this.soloPick) ? this.soloPick : solo
     if (this.selected && ids.includes(this.selected) && this.reachable(this.selected)) return this.selected
     const playing = this.players.find(p => this.hass?.states[p.entity]?.state === 'playing' && p.ma)
       ?? this.players.find(p => this.hass?.states[p.entity]?.state === 'playing')
@@ -719,6 +747,12 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
   }
 
   private select(id: string) {
+    if (this.config?.solo) {
+      this.soloPick = id
+      this.panel = undefined
+      this.view = 'now'
+      return
+    }
     this.selected = id
     try { localStorage.setItem(PLAYER_KEY, id) } catch { /* private window */ }
     this.panel = undefined
@@ -1357,7 +1391,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     const members = groupMembers(this.player)
     const song = this.currentSong
     return html`
-      <button class="back" @click=${() => this.closeNow()}><ha-icon icon="mdi:arrow-left"></ha-icon>${backLabel}</button>
+      ${this.config?.solo ? nothing : html`<button class="back" @click=${() => this.closeNow()}><ha-icon icon="mdi:arrow-left"></ha-icon>${backLabel}</button>`}
       ${!track ? html`<div class="placeholder"><ha-icon icon="mdi:music-note-off"></ha-icon>${t(this.hass, 'mu.idle')}</div>` : html`
         <div class="now">
           <div class="now-track">
@@ -1370,7 +1404,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
               <div class="now-chips">
                 <button class="chip" @click=${() => { this.view = 'players' }}>
                   <ha-icon icon=${this.info?.spotify ? 'mdi:spotify' : members.length ? 'mdi:speaker-multiple' : 'mdi:speaker'}></ha-icon>
-                  ${this.info?.name}${members.length ? ` + ${members.length}` : ''}
+                  ${this.info?.name ?? this.nameOf(this.playerId ?? '')}${members.length ? ` + ${members.length}` : ''}
                 </button>
                 ${song ? html`<button class="chip" ?disabled=${!this.target || !this.canControl(this.target)} @click=${() => this.songRadio(song)}>
                   <ha-icon icon="mdi:radio"></ha-icon>${t(this.hass, 'mu.song_radio')}</button>` : nothing}
@@ -1567,7 +1601,7 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
           ${sub ? html`<span class="s">${sub}</span>` : nothing}
           <button class="who" @click=${() => { this.view = 'players' }} title=${t(this.hass, 'mu.players')}>
             <ha-icon icon=${this.info?.spotify ? 'mdi:spotify' : members.length ? 'mdi:speaker-multiple' : 'mdi:speaker'}></ha-icon>
-            <span>${this.info?.name}${members.length ? ` + ${members.length}` : ''}</span>
+            <span>${this.info?.name ?? this.nameOf(p.entity_id)}${members.length ? ` + ${members.length}` : ''}</span>
           </button>
         </div>
       </div>
@@ -1622,7 +1656,24 @@ export class AdMusic extends BaseCard<MusicCardConfig> {
     </div></div>`
   }
 
+  /** The window for one speaker: the big player, the queue or the speakers, and the bar */
+  private renderSolo() {
+    const glow = playerPicture(this.player)
+    const back = html`<button class="back" @click=${() => { this.view = 'now'; this.detail = undefined }}><ha-icon icon="mdi:arrow-left"></ha-icon>${t(this.hass, 'mu.now')}</button>`
+    return html`<div class="music solo">
+      <main class="main ${this.view === 'now' ? 'big' : ''}">
+        ${glow && ['playing', 'paused'].includes(this.player?.state ?? '') ? html`<div class="glow-wrap"><div class="glow" style="background-image:url('${secureImage(glow)}')"></div></div>` : nothing}
+        ${this.view === 'queue' ? this.renderQueue()
+          : this.view === 'players' ? html`${back}${this.renderPlayers()}`
+          : this.view === 'detail' && this.detail ? this.renderDetail()
+          : this.renderNow()}
+      </main>
+      ${this.renderBar()}
+    </div>`
+  }
+
   protected render() {
+    if (this.config?.solo) return this.renderSolo()
     if (!this.players.length) return nothing
     const views: [View, string, Key][] = [['home', 'mdi:home-variant-outline', 'mu.home'], ['search', 'mdi:magnify', 'mu.search'], ['radio', 'mdi:radio', 'mu.radio'], ['queue', 'mdi:playlist-play', 'mu.queue'], ['players', 'mdi:speaker-multiple', 'mu.players']]
     const current = this.view === 'detail' ? this.from : this.view

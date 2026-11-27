@@ -1,4 +1,5 @@
 // Minimal Home Assistant types, only what this dashboard reads.
+import type { MoreInfoRules } from './more-info'
 
 export interface HassEntity {
   entity_id: string
@@ -294,4 +295,9 @@ export interface StrategyConfig extends Look {
   kiosk_mode?: Record<string, unknown>
   /** Windows that open on every dashboard when something happens, e.g. the camera and door buttons when it rings */
   popups?: PopupRule[]
+  /**
+   * What a tap opens in place of HA's dialog, by device type or entity: a card (e.g. { type: custom:mini-media-player }),
+   * `player` for the dashboard's own player, or false for HA's dialog. Music speakers open the player by default.
+   */
+  more_info?: MoreInfoRules
 }

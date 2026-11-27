@@ -8,6 +8,7 @@ import { CO2_LIMIT, co2Sensors } from './events'
 import { HIDE_LABEL, haAreaOrder, hideOf, isRoomFavorite, orderedFloors, replaceFavorites } from './model'
 import { findAppliances } from './appliances'
 import { CLOSE_AFTER, actionsFor, cameraFor, findDoorbells } from './popups'
+import { installedCards, type MoreInfoRule } from './more-info'
 import { entityName } from './presentation'
 import { DEFAULT_TV_APPS, TV_APPS } from './tv-apps'
 import { isHexColor } from './styles/palette'
@@ -78,6 +79,7 @@ export class AdStrategyEditor extends LitElement {
     bgPage: { state: true },
     cardsError: { state: true },
     own: { state: true },
+    miDraft: { state: true },
   }
 
   hass?: HomeAssistant
@@ -94,6 +96,8 @@ export class AdStrategyEditor extends LitElement {
   cardsSlot: 'top' | 'bottom' = 'top'
   /** Page whose background picture the Pages tab shows */
   bgPage: PagePath = 'music'
+  /** A rule under "tap opens" being added: its device type or entity is still to be picked */
+  miDraft?: 'domain' | 'entity'
   cardsError = false
   /** The admin's own settings for this dashboard: where they differ, they apply to the admin instead of what is set here */
   own?: PersonalSettings
@@ -455,6 +459,67 @@ export class AdStrategyEditor extends LitElement {
     this.l('ed.popups_hint'))
   }
 
+  /**
+   * What a tap opens in place of HA's dialog, per device type or entity: a card that is installed (from HACS),
+   * the dashboard's own player for speakers, or HA's dialog. Options of a card beyond its type stay in the YAML.
+   */
+  private renderMoreInfo() {
+    const rules = this.config.more_info ?? {}
+    const entries = Object.entries(rules)
+    const set = (next: [string, MoreInfoRule][]) => this.change({ more_info: next.length ? Object.fromEntries(next) : undefined })
+    const domains = [...new Set(Object.keys(this.hass!.states).map(id => id.split('.')[0]!))].sort()
+    const cards = installedCards()
+    const speaker = (key: string) => key.split('.')[0] === 'media_player'
+    // A new rule starts with what fits: the player for speakers, else the first installed card
+    const first = (key: string): MoreInfoRule => speaker(key) ? 'player' : cards[0] ? { type: cards[0].type } : false
+    const add = (key: string | undefined) => {
+      this.miDraft = undefined
+      if (key && !(key in rules)) set([...entries, [key, first(key)]])
+    }
+    const value = (rule: MoreInfoRule) => rule === false ? 'ha' : rule === 'player' ? 'player' : rule.type
+    const pick = (v: string, old: MoreInfoRule): MoreInfoRule => v === 'ha' ? false : v === 'player' ? 'player'
+      : typeof old === 'object' && old.type === v ? old : { type: v }
+    const update = (i: number, key: string, rule: MoreInfoRule) => set(entries.map((e, j) => j === i ? [key, rule] : e))
+    const domainSelect = (key: string, onChange: (d: string) => void) => html`<select .value=${key}
+      @change=${(e: Event) => onChange((e.target as HTMLSelectElement).value)}>
+      <option value="" ?selected=${!key} disabled>–</option>
+      ${domains.map(d => html`<option value=${d} ?selected=${d === key} ?disabled=${d !== key && d in rules}>${d}</option>`)}
+    </select>`
+    const row = ([key, rule]: [string, MoreInfoRule], i: number) => {
+      const single = key.includes('.')
+      const current = value(rule)
+      const known = current === 'ha' || current === 'player' || cards.some(c => c.type === current)
+      const extra = typeof rule === 'object' && Object.keys(rule).some(k => k !== 'type')
+      return html`<div class="appliance">
+        <span>${this.l(single ? 'ed.mi_entity' : 'ed.mi_domain')}</span>
+        ${single
+          ? this.singleEntityPicker(key, domains, id => id && id !== key && !(id in rules) && update(i, id, rule))
+          : domainSelect(key, d => update(i, d, rule))}
+        <span>${this.l('ed.mi_opens')}</span>
+        <select .value=${current} @change=${(e: Event) => update(i, key, pick((e.target as HTMLSelectElement).value, rule))}>
+          <option value="ha" ?selected=${current === 'ha'}>${this.l('ed.mi_ha')}</option>
+          ${speaker(key) ? html`<option value="player" ?selected=${current === 'player'}>${this.l('ed.mi_player')}</option>` : nothing}
+          ${cards.map(c => html`<option value=${c.type} ?selected=${c.type === current}>${c.name}</option>`)}
+          ${known ? nothing : html`<option value=${current} selected>${current} (${this.l('ed.mi_missing')})</option>`}
+        </select>
+        ${extra ? html`<span></span><span class="hint">${this.l('ed.mi_options')}</span>` : nothing}
+        <button class="link" @click=${() => set(entries.filter((_, j) => j !== i))}>${this.l('ed.remove')}</button>
+      </div>`
+    }
+    const draft = this.miDraft ? html`<div class="appliance">
+      <span>${this.l(this.miDraft === 'entity' ? 'ed.mi_entity' : 'ed.mi_domain')}</span>
+      ${this.miDraft === 'entity' ? this.singleEntityPicker(undefined, domains, add) : domainSelect('', add)}
+      <button class="link" @click=${() => { this.miDraft = undefined }}>${this.l('ed.remove')}</button>
+    </div>` : nothing
+    return this.field('', html`
+      ${entries.map(row)}
+      ${draft}
+      ${this.miDraft ? nothing : html`
+        <button class="link" @click=${() => { this.miDraft = 'domain' }}>${this.l('ed.mi_add_domain')}</button>
+        <button class="link" @click=${() => { this.miDraft = 'entity' }}>${this.l('ed.mi_add_entity')}</button>`}`,
+    this.l('ed.mi_hint'))
+  }
+
   /** Without a label when the block's heading already says it */
   private field(label: string, content: TemplateResult, hint?: string) {
     return html`<div class="field">${label ? html`<span class="label">${label}</span>` : nothing}${content}${hint ? html`<span class="hint">${hint}</span>` : nothing}</div>`
@@ -593,6 +658,7 @@ export class AdStrategyEditor extends LitElement {
         ${this.section('mdi:television', this.l('ed.sec_tv'), this.field(this.l('ed.tv_apps'), this.chips(Object.entries(TV_APPS).map(([id, app]) => ({ id, label: app.name })),
           c.tv_apps ?? DEFAULT_TV_APPS, tv_apps => this.change({ tv_apps: tv_apps.length ? tv_apps : undefined })), this.l('ed.tv_apps_hint')))}
         ${this.section('mdi:doorbell-video', this.l('ed.popups'), this.renderPopups())}
+        ${this.section('mdi:card-bulleted-outline', this.l('ed.more_info'), this.renderMoreInfo())}
         ${this.section('mdi:code-braces', this.l('ed.page_cards'), this.renderPageCards())}`
   }
 

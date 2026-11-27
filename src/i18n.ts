@@ -728,6 +728,18 @@ const de = {
   'ed.popup_doorbell': 'Klingel: {name}',
   'ed.popup_auto': 'Automatisch: {ids}',
   'ed.popup_auto_none': 'Nichts gefunden, bitte wählen',
+  'mi.native': 'Dialog von Home Assistant',
+  'ed.more_info': 'Fenster beim Antippen',
+  'ed.mi_hint': 'Was ein Tipp auf ein Gerät öffnet, statt des Dialogs von Home Assistant: eine installierte Karte (z. B. aus HACS) oder für Lautsprecher den Player des Dashboards. Lautsprecher mit Musik öffnen den Player auch ohne Eintrag hier. Ist eine Karte nicht mehr installiert, öffnet wieder der Dialog von HA. Weitere Optionen einer Karte kommen in die YAML unter more_info.',
+  'ed.mi_domain': 'Gerätetyp',
+  'ed.mi_entity': 'Entität',
+  'ed.mi_opens': 'Öffnet',
+  'ed.mi_ha': 'Dialog von Home Assistant',
+  'ed.mi_player': 'Player des Dashboards',
+  'ed.mi_missing': 'nicht installiert',
+  'ed.mi_options': 'Mit eigenen Optionen aus der YAML',
+  'ed.mi_add_domain': 'Für einen Gerätetyp festlegen',
+  'ed.mi_add_entity': 'Für eine Entität festlegen',
 }
 
 export type Key = keyof typeof de
@@ -1460,6 +1472,18 @@ const en: Record<Key, string> = {
   'ed.popup_doorbell': 'Doorbell: {name}',
   'ed.popup_auto': 'Automatic: {ids}',
   'ed.popup_auto_none': 'Nothing found, please pick',
+  'mi.native': 'Home Assistant\'s dialog',
+  'ed.more_info': 'Window on tap',
+  'ed.mi_hint': 'What a tap on a device opens instead of Home Assistant\'s dialog: an installed card (e.g. from HACS) or, for speakers, the dashboard\'s player. Speakers that play music open the player even without an entry here. If a card is no longer installed, HA\'s dialog opens again. Further options of a card go into the YAML under more_info.',
+  'ed.mi_domain': 'Device type',
+  'ed.mi_entity': 'Entity',
+  'ed.mi_opens': 'Opens',
+  'ed.mi_ha': 'Home Assistant\'s dialog',
+  'ed.mi_player': 'Dashboard player',
+  'ed.mi_missing': 'not installed',
+  'ed.mi_options': 'With own options from the YAML',
+  'ed.mi_add_domain': 'Set for a device type',
+  'ed.mi_add_entity': 'Set for an entity',
 }
 
 export function t(hass: Pick<HomeAssistant, 'language'> | undefined, key: Key, vars: Record<string, string | number> = {}) {

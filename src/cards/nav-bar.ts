@@ -11,6 +11,8 @@ import type { AdFace, FaceSettings } from './face'
 import { AdPopup } from './popup'
 import type { Popup } from '../popups'
 import { AdSpotlight } from './spotlight'
+import { AdMoreInfo } from './more-info'
+import type { MoreInfoSettings } from '../more-info'
 import type { SearchSettings } from '../search'
 
 export interface NavItem {
@@ -30,6 +32,8 @@ interface NavBarConfig extends BaseConfig {
   popups?: Popup[]
   /** The quick search behind the magnifier: the shown rooms and the dashboard's filters; unset hides it */
   search?: SearchSettings
+  /** Own cards or the player in place of HA's dialog; carried by the bar so every page has them */
+  more_info?: MoreInfoSettings
 }
 
 
@@ -137,6 +141,30 @@ function placePopup(config: NavBarConfig | undefined, hass: unknown) {
 
 /** The dashboard's popup element, for the dev harness */
 export const popupElement = () => popup
+
+/** The window in place of HA's dialog, one for the whole dashboard */
+let moreInfo: AdMoreInfo | undefined
+
+function placeMoreInfo(config: NavBarConfig | undefined, hass: unknown) {
+  if (!config?.more_info) {
+    moreInfo?.remove()
+    moreInfo = undefined
+    return
+  }
+  if (!moreInfo) {
+    if (!customElements.get('ad-more-info')) customElements.define('ad-more-info', AdMoreInfo)
+    moreInfo = document.createElement('ad-more-info') as AdMoreInfo
+    // In HA's tree like the popup: HA's own cards in it get their connection from there
+    const ha = document.querySelector('home-assistant')?.shadowRoot
+    ;(ha ?? document.body).appendChild(moreInfo)
+  }
+  const next = { type: 'more-info', ...config.more_info, theme: config.theme, glass: config.glass, primary_color: config.primary_color, access: config.access }
+  if (JSON.stringify(moreInfo.config) !== JSON.stringify(next)) moreInfo.setConfig(next)
+  moreInfo.hass = hass as AdMoreInfo['hass']
+}
+
+/** The dashboard's window in place of HA's dialog, for the dev harness */
+export const moreInfoElement = () => moreInfo
 
 /** The quick search, one for the dashboard; inside HA's tree like the popup, so the details dialog it opens reaches HA */
 let spotlight: AdSpotlight | undefined
@@ -293,6 +321,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
         pad(undefined, undefined)
         placeFace(undefined, document.body, undefined)
         placePopup(undefined, undefined)
+        placeMoreInfo(undefined, undefined)
         placeSpotlight(undefined, undefined)
       }
     }, 0)
@@ -302,6 +331,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
   protected shouldUpdate(changed: Map<string | number | symbol, unknown>) {
     if (face && this.config?.face && changed.has('hass')) face.hass = this.hass
     if (popup && this.config?.popups && changed.has('hass')) popup.hass = this.hass
+    if (moreInfo && this.config?.more_info && changed.has('hass')) moreInfo.hass = this.hass
     if (spotlight && this.config?.search && changed.has('hass')) spotlight.hass = this.hass
     return super.shouldUpdate(changed as never)
   }
@@ -335,6 +365,7 @@ export class AdNavBar extends BaseCard<NavBarConfig> {
     this.padView()
     placeFace(this.config.face, this, this.hass)
     placePopup(this.config, this.hass)
+    placeMoreInfo(this.config, this.hass)
     placeSpotlight(this.config, this.hass)
     // A bare dashboard URL shows the first view
     const active = currentView() || this.config.items[0]?.path

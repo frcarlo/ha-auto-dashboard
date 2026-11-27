@@ -13,6 +13,7 @@ import { findCameras } from './cameras'
 import { findSchools, schoolIds, type School } from './school'
 import { co2Sensors, findEventSources } from './events'
 import { resolvePopups } from './popups'
+import type { MoreInfoSettings } from './more-info'
 import { meterSources } from './meters'
 import { findMusicPlayers, findSpotifyBrowsers } from './music'
 import { tvApps } from './tv-apps'
@@ -306,9 +307,13 @@ export async function generateDashboard(rawConfig: StrategyConfig, hass: HomeAss
     ...(areaIds ? { areas: areaIds } : {}),
     ...(Object.values(hide).some(v => v?.length) ? { hide } : {}),
   }
+  // Speakers open the dashboard's own player, and own rules put cards in place of HA's dialog; the bar carries them too
+  const moreInfoRules = config.more_info && typeof config.more_info === 'object' && Object.keys(config.more_info).length ? config.more_info : undefined
+  const moreInfo: MoreInfoSettings | undefined = musicPlayers.length || moreInfoRules
+    ? { players: musicPlayers, ...(moreInfoRules ? { rules: moreInfoRules } : {}) } : undefined
   const nav = fullWidth([{
     type: 'custom:ad-nav-bar', items: navItems.filter(i => !ownHidden.has(i.path)), position, ...(config.ha_colors === false ? { ha_colors: false } : {}),
-    ...(face ? { face } : {}), ...(popups.length ? { popups } : {}), ...(search ? { search } : {}), ...look,
+    ...(face ? { face } : {}), ...(popups.length ? { popups } : {}), ...(search ? { search } : {}), ...(moreInfo ? { more_info: moreInfo } : {}), ...look,
   }])
   // The nav card also reserves room for the floating bar, so it goes where the bar sits
   const withNav = (sections: Section[]) => position === 'top' ? [nav, ...sections] : [...sections, nav]
